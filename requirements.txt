@@ -1,0 +1,5 @@
+beets>=2.13
+pyacoustid
+discogs-client
+PyYAML
+requests

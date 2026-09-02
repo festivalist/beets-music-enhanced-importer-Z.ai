@@ -1,0 +1,33 @@
+# --- personal / machine-specific: never commit -------------------------
+config.yaml
+discogs_token.json
+state/
+reports/
+bin/
+tools/
+.venv/
+
+# --- python -------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# --- beets leftovers ----------------------------------------------------
+*.db
+*.db-*.bak
+*.log
+
+# --- os / editor --------------------------------------------------------
+desktop.ini
+Thumbs.db
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# --- workspace / assistant tooling --------------------------------------
+.zcode/
+AGENTS.md
