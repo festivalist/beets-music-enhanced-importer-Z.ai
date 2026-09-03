@@ -179,6 +179,16 @@ class Decider:
             t for t in re.split(r"[^a-z0-9]+", (text or "").lower()) if t
         }
 
+    _UUID_RE = re.compile(
+        r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I
+    )
+
+    @classmethod
+    def _normalize_id(cls, value: str) -> str:
+        """Accept a bare MBID or a full release/recording URL."""
+        m = cls._UUID_RE.search(value or "")
+        return m.group(0).lower() if m else (value or "").strip()
+
     def _year_ok(self, info) -> bool:
         """True unless the candidate looks like a *different recording*
         that inherited the album title: big year gap plus live/broadcast/
@@ -295,17 +305,28 @@ class Decider:
         guessed = self._guessed_with_folder(task)
 
         if self.forced_album_id:
+            forced_id = self._normalize_id(self.forced_album_id)
             match = next(
-                (c for c in candidates if c.info.album_id == self.forced_album_id),
+                (c for c in candidates if c.info.album_id == forced_id),
                 None,
             )
+            if match is None:
+                # The ID didn't come back from the text search: look it
+                # up directly by ID (covers obscure/renamed releases).
+                _artist, _album, prop = tag_album(
+                    task.items, search_ids=[forced_id]
+                )
+                if prop.candidates:
+                    task.candidates = list(prop.candidates) + list(candidates)
+                    candidates = task.candidates
+                    match = prop.candidates[0]
             if match is not None:
                 return "apply", self._apply_record(
-                    match, "review-apply", f"forced album id {self.forced_album_id}", guessed
+                    match, "review-apply", f"forced album id {forced_id}", guessed
                 )
             return "skip", {
                 "status": "review",
-                "reason": f"forced id {self.forced_album_id} not among candidates",
+                "reason": f"forced id {forced_id} not among candidates",
                 "candidates": [candidate_preview(c) for c in candidates[: self.review_candidates]],
                 "guessed": guessed,
             }

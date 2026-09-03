@@ -67,6 +67,12 @@ def main(argv: list[str] | None = None) -> int:
     p_app = sub.add_parser("apply", help="process decisions from review.csv")
     p_app.add_argument("--csv", default=None)
 
+    p_rev = sub.add_parser(
+        "review",
+        help="interactive decisions for review units (accept/override/asis/skip/abort)",
+    )
+    p_rev.add_argument("--unit", default=None, help="folder prefix or exact unit path")
+
     p_rep = sub.add_parser("report", help="write reports; --verify checks the library DB")
     p_rep.add_argument("--verify", action="store_true")
 
@@ -127,6 +133,11 @@ def main(argv: list[str] | None = None) -> int:
         from . import review
 
         return review.apply_decisions(args.csv)
+
+    if args.cmd == "review":
+        from . import interactive
+
+        return interactive.cmd_review(args.unit)
 
     if args.cmd == "report":
         from . import state as state_mod
