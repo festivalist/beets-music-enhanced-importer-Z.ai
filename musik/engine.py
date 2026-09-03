@@ -183,7 +183,11 @@ def _protocol_lines(unit: dict, results: list[dict]) -> tuple[list[str], str]:
     if unit.get("status") == "asis" and not lines:
         for f in unit.get("files", []):
             lines.append(f"  [as-is   ] {os.path.basename(f)} (own tags)")
-        direct = len(unit.get("files", []))
+        summary = (
+            f"{len(unit.get('files', []))} file(s) imported with their own tags "
+            "(no suitable MusicBrainz match)"
+        )
+        return lines, summary
     total = direct + enhanced
     summary = (
         f"{total} file(s): {direct} direct {source} match(es), "
@@ -213,6 +217,60 @@ def _merge_result(unit: dict, outcome: dict) -> None:
         unit["candidates"] = r.get("candidates")
         unit["guessed"] = r.get("guessed")
         unit["reason"] = r.get("reason", "")
+
+
+def _rehome_after_asis(lib) -> None:
+    """Tier-3 asis items have no MusicBrainz original_year; the album
+    path template uses it. Fill empty original_year fields from year and
+    move affected items to their now-correct destinations."""
+    from beets.util import MoveOperation
+
+    from . import trash as trash_mod
+
+    fixed = 0
+    for album in lib.albums():
+        if not album.original_year and album.year:
+            album.original_year = album.year
+            album.store()
+            fixed += 1
+    for item in lib.items():
+        if not item.original_year and item.year:
+            item.original_year = item.year
+            item.store()
+            fixed += 1
+    if not fixed:
+        return
+
+    touched: list[str] = []
+    moved = 0
+    for album in lib.albums():
+        items = list(album.items())
+        stale = [
+            it for it in items
+            if os.path.normcase(it.path) != os.path.normcase(it.destination())
+        ]
+        if not stale:
+            continue
+        old_dirs = {os.path.dirname(os.fsdecode(it.path)) for it in items}
+        for it in items:
+            it.move(MoveOperation.MOVE)
+            moved += 1
+        album.store()
+        art = album.artpath
+        if art and os.path.isfile(os.fsdecode(art)):
+            art_str = os.fsdecode(art)
+            new_dir = os.path.dirname(os.fsdecode(items[0].path))
+            if os.path.dirname(art_str) != new_dir:
+                target = os.path.join(new_dir, os.path.basename(art_str))
+                try:
+                    os.replace(art_str, target)
+                    album.artpath = os.fsencode(target)
+                    album.store()
+                except OSError:
+                    pass
+        touched.extend(old_dirs)
+    trash_mod.prune_empty_dirs(touched, os.fsdecode(lib.directory))
+    print(f"asis re-home: filled original_year on {fixed} entr(ies), moved {moved} item(s)")
 
 
 def _select(state: dict, statuses: list[str] | None, limit: int | None,
@@ -358,6 +416,8 @@ def cmd_import(dry_run: bool = False, statuses: list[str] | None = None,
     if dry_run:
         report_mod.write_dryrun_report(st)
     else:
+        if any(u.get("status") == "asis" for u in state_mod.units(st).values()):
+            _rehome_after_asis(lib)
         review_mod.write_review_csv(st)
         review_mod.write_unidentified_csv(st)
         report_mod.write_import_report(st)

@@ -160,6 +160,11 @@ class Decider:
     FOLDER_NAME_TOLERANCE = 0.2
     YEAR_TOLERANCE = 3
     CANDIDATE_SCAN = 6  # how deep to look for a fully-passing candidate
+    # Tier-3 own-metadata fallback: only when the sources clearly don't
+    # know the release (no candidates at all, or best candidate is
+    # unrelated beyond this distance). The 0.25..0.35 middle band stays
+    # in review — MB might know the release and the match just missed.
+    TIER3_REJECT_FLOOR = 0.35
 
     # On a big year gap, candidate titles introducing these tokens
     # (absent from the folder name) are *different recordings*, not
@@ -296,6 +301,55 @@ class Decider:
         ok, _why = self._names_ok(task, cand)
         return ok
 
+    # -- tier 3: own-metadata fallback ---------------------------------------
+
+    def _tier3_check(self) -> dict | None:
+        """An 'asis' decision record when the files' own metadata is the
+        best available source: lookup genuinely found nothing usable, the
+        tags are complete and consistent, and (for album units) the
+        folder-name parse agrees with the tags. Never fires after a
+        network failure — "MB answered: nothing" must be real."""
+        from .asis import tags_complete
+
+        mb_errors = NetworkErrorRecorder.errors_from(
+            self.netrec.snapshot(), "musicbrainz"
+        )
+        if mb_errors:
+            return None  # MB unreachable: cannot conclude "not in MB"
+        ok, _why = tags_complete(self.unit)
+        if not ok:
+            return None
+
+        g = self.unit.get("guessed") or {}
+        if not self.unit.get("singleton"):
+            from .scan import tag_of
+            from beets.autotag import string_dist
+
+            first = next(
+                (f for f in self.unit.get("files", []) if os.path.isfile(f)),
+                None,
+            )
+            if first is None:
+                return None
+            tag_artist = tag_of(first, "albumartist") or tag_of(first, "artist")
+            tag_album = tag_of(first, "album")
+            da = string_dist((g.get("artist") or "").lower(), (tag_artist or "").lower())
+            db = string_dist((g.get("album") or "").lower(), (tag_album or "").lower())
+            if da > self.FOLDER_NAME_TOLERANCE or db > self.FOLDER_NAME_TOLERANCE:
+                return None
+            reason = (
+                "own metadata: sources don't know this release; folder and tags "
+                f"agree ({tag_artist} - {tag_album})"
+            )
+        else:
+            reason = "own metadata: no suitable MusicBrainz/Discogs match; tags complete"
+        return {
+            "status": "asis",
+            "reason": reason,
+            "candidates": [],
+            "guessed": g,
+        }
+
     # -- album decisions ----------------------------------------------------
 
     def decide_album(self, task) -> tuple[str, dict]:
@@ -352,6 +406,10 @@ class Decider:
 
         if not candidates:
             status, reason = self._classify_empty()
+            if status == "unmatched":
+                tier3 = self._tier3_check()
+                if tier3 is not None:
+                    return "apply-asis", tier3
             return "skip", {"status": status, "reason": reason, "candidates": [], "guessed": guessed}
 
         # Prefer the highest-ranked candidate that passes *every* check
@@ -364,6 +422,14 @@ class Decider:
         best = candidates[0]
         dist = float(best.distance)
         penalties = dict(best.distance)
+
+        # Tier 3: every candidate is unrelated garbage — the sources
+        # don't know this release. Trust complete, folder-verified tags.
+        if dist > self.TIER3_REJECT_FLOOR:
+            tier3 = self._tier3_check()
+            if tier3 is not None:
+                return "apply-asis", tier3
+
         reasons = [f"distance {dist:.3f}"]
         blocking = [
             key
@@ -415,6 +481,10 @@ class Decider:
 
         if not candidates:
             status, reason = self._classify_empty()
+            if status == "unmatched":
+                tier3 = self._tier3_check()
+                if tier3 is not None:
+                    return "apply-asis", tier3
             return "skip", {"status": status, "reason": reason, "candidates": [], "guessed": guessed}
 
         for cand in candidates[: self.CANDIDATE_SCAN]:
@@ -431,6 +501,10 @@ class Decider:
 
         best = candidates[0]
         dist = float(best.distance)
+        if dist > self.TIER3_REJECT_FLOOR:
+            tier3 = self._tier3_check()
+            if tier3 is not None:
+                return "apply-asis", tier3
         reasons = [f"distance {dist:.3f}"]
         ok, why = self._item_names_ok(task, best)
         if not ok:
@@ -517,6 +591,9 @@ class MusikSession(ImportSession):
         action, record = self.decider.decide_album(task)
         record["paths"] = [os.fsdecode(p) for p in task.paths]
         self.results.append(record)
+        if action == "apply-asis":
+            # Tier-3 own-metadata decision: import with current tags.
+            return Action.ASIS
         if action == "apply":
             match = self._match_for(task, record)
             # Tracks the release has that the rip doesn't map to (scene
@@ -537,6 +614,8 @@ class MusikSession(ImportSession):
         action, record = self.decider.decide_item(task)
         record["paths"] = [os.fsdecode(p) for p in task.paths]
         self.results.append(record)
+        if action == "apply-asis":
+            return Action.ASIS
         if action == "apply":
             match = self._match_for(task, record)
             record["file_map"] = [{
@@ -613,8 +692,8 @@ def aggregate_unit_status(unit: dict, results: list[dict]) -> tuple[str, str]:
             agg = "error"
         elif "review" in statuses:
             agg = "review"
-        elif all(s in ("auto", "review-apply") for s in statuses):
-            agg = "auto"
+        elif all(s in ("auto", "review-apply", "asis") for s in statuses):
+            agg = "asis" if "asis" in statuses else "auto"
         else:
             agg = "unmatched"
         return agg, "; ".join(dict.fromkeys(reasons))[:500]

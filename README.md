@@ -126,40 +126,48 @@ with `Singles\` and `Compilations\` branches — all configurable in `config.yam
 
 ## How decisions are made
 
-A unit (album, multi-disc set, playlist-referenced track, one-file live
-recording …) is **auto-accepted** only if *all* of these hold:
+Identification runs as a **priority chain** — the first tier that accepts a
+unit wins:
 
-1. **album title matches strictly** (small spelling/case deviations are the
-   same title),
-2. **artist matches** via string distance *or* token overlap across credited
-   variants — so `5MIINUST` vs `5MIINUST, nublu` is the same artist; names are
-   checked against file tags *and* the folder name for untagged rips,
-3. **track count is close** — missing/extra tracks up to ~1–3 are minor: the
-   album imports and leftover local files are archived to `_trash\unmapped-track\`
-   with a manifest entry; bigger deviations (a genuinely different tracklist)
-   stay in review,
-4. **total distance ≤ `auto_accept_distance`** (default 0.25) — durations up to
-   10 s off, vinyl side numbering, media, label, reissue years etc. count as
-   structural noise and never block an otherwise correct match,
-5. the folder-name year (when present, e.g. `0701. Slint - Spiderland (1991)`)
-   only vetoes a candidate that looks like a **different recording** —
-   live/broadcast/demo-style tokens appearing in the candidate title, or a
-   candidate that drops part of the album title.
+1. **MusicBrainz strict** — album title, artist, track titles and durations
+   all agree directly;
+2. **MusicBrainz enhanced** — the same release behind minor noise: small
+   spelling deviations, artist-credit formatting (`5MIINUST` vs
+   `5MIINUST, nublu`), reissue years, subtitle variants, 1–3 track-count
+   differences (leftover files are archived to `_trash\unmapped-track\`),
+   duration drift up to 10 s, vinyl side numbering;
+3. **own metadata** — when the sources *genuinely don't know the release*
+   (no candidates at all, or every candidate is unrelated beyond distance
+   0.35), the files' own tags become the source: they must be complete and
+   consistent, and for albums the folder-name parse must agree with the
+   tags (two independent presentations corroborating each other). Typical
+   beneficiaries: 0-day/scene WEB releases MusicBrainz hasn't indexed yet,
+   and DJ mixes/live sets that never will be. Units imported this way are
+   marked `asis` and can be re-tagged once MusicBrainz catches up;
+4. **review queue** — everything else: contradictory tags/folder names,
+   middle-band candidates (distance 0.25–0.35, where MusicBrainz might
+   still know the release), untagged files.
 
-Everything else lands in `reports\review.csv` (top candidates with sources,
-years, distances and MBIDs + the reason). Fill the `decision` column —
-`accept`, `accept2`, `override` (+ `override_artist`/`override_album`/
-`override_mbid`), `unmatched`, `ignore` — and run `musik.bat apply`.
+A lookup that *failed* (rate limit, network) never reaches tiers 3/4 as a
+"no match" — failed units are deferred and retried automatically within
+the run. The folder-name year (e.g. `0701. Slint - Spiderland (1991)`)
+vetoes candidates that look like a *different recording* (live/broadcast/
+demo-style tokens) or drop part of the album title.
+
+Review units can be resolved three ways: the interactive `review` command,
+the `review.csv` batch flow, or the explicit `asis` command — plus the
+automatic tier 3 above for the self-evident cases.
 
 ### 0-day material and the asis command
 
 Brand-new scene/WEB releases are often **not in MusicBrainz or Discogs yet**,
-even though their own tags are good. For those, `musik.bat asis --unit <folder>`
-is the escape hatch: it files review units **using their existing tags** after
-verifying every file carries consistent artist/album/title tags. It is an
-explicit, user-invoked action — never part of the automatic pipeline.
-Duplicates still resolve by quality; art and genres are still fetched. A later
-`retry --include-unmatched` can still pick up units you left in review instead.
+even though their own tags are good. Those are handled automatically by
+priority tier 3 (see *How decisions are made*): when the sources have no
+usable candidate and the tags are complete, consistent and agree with the
+folder name, the unit is imported on its own tags and marked `asis`. For
+units the automatic rule rejects (contradictory tags, middle-band
+candidates), `musik.bat asis --unit <folder>` remains the explicit escape
+hatch, and `review` / `review.csv` + `apply` the deliberate routes.
 
 ## Rate limiting & reliability
 

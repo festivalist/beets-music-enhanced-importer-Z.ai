@@ -66,8 +66,13 @@ a clean, consistent base for a later Plexamp setup.
 
 - Primary source: MusicBrainz via beets, metadata plus **chroma acoustic fingerprinting**.
 - Fallback: Discogs (token from `discogs_token.json`).
-- **Auto-accept** a candidate without interaction when the *music* is the same, checked component-wise: album title matches strictly, artist matches (string distance or token overlap across credited variants — multi-artist credit formatting like `5MIINUST` vs `5MIINUST, nublu` is not a mismatch), track-count deviations up to ~1–3 tracks are minor (the album imports; unmapped local files are archived to `_trash\unmapped-track\` with a manifest so every file stays accounted for), and total distance under the cap (0.25). **Minor things auto-accept**: reissue/remaster years, subtitle variants, credit-formatting differences, small spelling deviations, small track-count deviations. A folder-name year only vetoes a candidate that looks like a *different recording* (live/broadcast/demo-style tokens) or drops part of the album title.
-- **Not blind**: releases the sources don't know yet (0-day material) and wrong-artist/wrong-album candidates → review queue, never silently accepted as-is. `quiet_fallback: asis` must not be the blanket fallback.
+- **Priority chain**, first tier that accepts wins:
+  1. *MB strict* — names and durations agree directly;
+  2. *MB enhanced* — the same release behind minor noise: small spelling deviations, credit-formatting differences (`5MIINUST` vs `5MIINUST, nublu`), reissue/remaster years, subtitle variants, 1–3 track-count deviations (unmapped local files archived to `_trash\unmapped-track\` with a manifest), duration drift up to 10 s, vinyl side numbering;
+  3. *own metadata* — only when the sources genuinely don't know the release (no candidates, or best candidate unrelated beyond distance 0.35; never after a network failure), the tags are complete and consistent, and the folder-name parse agrees with the tags. Units import on their own tags, status `asis`, re-taggable when MusicBrainz catches up;
+  4. *review* — contradictory tags/folder, middle-band candidates (0.25–0.35), untagged files.
+- A folder-name year only vetoes a candidate that looks like a *different recording* (live/broadcast/demo-style tokens) or drops part of the album title.
+- **Not blind**: rate-limited or failed lookups never count as "no match"; wrong-artist/wrong-album candidates in the ambiguous band go to review.
 
 ### 4.4 Rate limiting & reliability rules
 
