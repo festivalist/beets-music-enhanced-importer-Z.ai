@@ -163,6 +163,36 @@ def run_unit_real(lib, unit: dict, decider: Decider) -> dict:
     return outcome
 
 
+def _protocol_lines(unit: dict, results: list[dict]) -> tuple[list[str], str]:
+    """Per-file protocol lines + a one-line summary for an imported unit."""
+    source = (unit.get("chosen") or {}).get("source") or "MusicBrainz"
+    lines: list[str] = []
+    direct = enhanced = unmapped = 0
+    for r in results:
+        for e in r.get("file_map") or []:
+            if e.get("kind") == "unmapped":
+                unmapped += 1
+                lines.append(f"  [unmapped]  {e.get('file')} -> _trash\\unmapped-track")
+                continue
+            title = e.get("title") or "?"
+            lines.append(f"  [{e.get('kind', '?'):<8}] {e.get('file')} -> '{title}'")
+            if e.get("kind") == "direct":
+                direct += 1
+            else:
+                enhanced += 1
+    if unit.get("status") == "asis" and not lines:
+        for f in unit.get("files", []):
+            lines.append(f"  [as-is   ] {os.path.basename(f)} (own tags)")
+        direct = len(unit.get("files", []))
+    total = direct + enhanced
+    summary = (
+        f"{total} file(s): {direct} direct {source} match(es), "
+        f"{enhanced} enhanced-acceptance"
+        + (f", {unmapped} unmapped -> _trash" if unmapped else "")
+    )
+    return lines, summary
+
+
 def _merge_result(unit: dict, outcome: dict) -> None:
     unit["status"] = outcome["status"]
     unit["reason"] = outcome.get("reason", "")
@@ -290,6 +320,13 @@ def cmd_import(dry_run: bool = False, statuses: list[str] | None = None,
                 f"[{i}/{len(selected)}] {unit['status']:<10} {label}"
                 + (f"  ({unit['reason'][:90]})" if unit.get("reason") and unit["status"] not in ("auto",) else "")
             )
+            if unit["status"] in ("auto", "asis", "review-apply"):
+                lines, summary = _protocol_lines(unit, outcome.get("results", []))
+                if lines:
+                    for line in lines:
+                        print(line)
+                    print(f"  -- {summary}")
+                    unit["protocol"] = {"summary": summary, "lines": lines}
 
     # Retry rounds for units whose lookups failed (rate limit / network).
     if not dry_run and rounds > 0:

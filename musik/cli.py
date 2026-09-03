@@ -79,6 +79,14 @@ def main(argv: list[str] | None = None) -> int:
     p_ded = sub.add_parser("dedupe", help="resolve duplicates in the library by quality")
     p_ded.add_argument("--dry-run", action="store_true")
 
+    p_clean = sub.add_parser(
+        "cleanup",
+        help="archive leftovers (.nfo/.sfv/...) of imported albums, remove emptied source folders",
+    )
+    p_clean.add_argument("--root", required=True, help="source folder to tidy")
+    p_clean.add_argument("--dry-run", action="store_true", help="show what would happen")
+    p_clean.add_argument("--trash-base", default=None, help=argparse.SUPPRESS)
+
     p_asis = sub.add_parser(
         "asis",
         help="file review/unmatched units with complete tags using their own tags (explicit opt-in)",
@@ -160,5 +168,12 @@ def main(argv: list[str] | None = None) -> int:
         from . import asis
 
         return asis.cmd_asis(only=args.unit, dry_run=args.dry_run)
+
+    if args.cmd == "cleanup":
+        from . import cleanup
+
+        return cleanup.cmd_cleanup(
+            root=args.root, dry_run=args.dry_run, trash_base=args.trash_base
+        )
 
     parser.error(f"unknown command {args.cmd}")

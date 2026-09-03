@@ -92,9 +92,10 @@ a clean, consistent base for a later Plexamp setup.
 
 - Detect duplicates; keep the better-quality copy; move the loser to `_trash\<reason>\` (e.g. `better-bitrate`) with a `manifest.csv` entry, per the `musik:` config section.
 
-### 4.8 Reporting
+### 4.8 Reporting & source-folder lifecycle
 
-- Import report with counts and per-item logs: identified/auto-accepted / review-queued / unmatched / non-audio.
+- Import report with counts and per-item logs: identified/auto-accepted / review-queued / unmatched / non-audio. Every imported unit carries a **track-by-track protocol** (`direct` MusicBrainz match vs `enhanced`-acceptance vs `unmapped` archived) and an album summary line.
+- **`musik cleanup`**: after import, packaging junk (.nfo/.sfv/.m3u/…) of albums whose audio has moved is archived to `_trash\source-cleanup\`; emptied folders are removed; a dropped source root is deleted only once nothing at all remains inside it. Folders whose units still wait in review keep their audio and are never touched.
 - Final verification pass: tree matches the config.yaml templates, cover art and genres present, every item from `unsorted` accounted for.
 
 ## 5. Acceptance criteria

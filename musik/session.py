@@ -476,6 +476,43 @@ class MusikSession(ImportSession):
     def should_resume(self, path) -> bool:
         return False
 
+    # -- per-file protocol --------------------------------------------------
+
+    @staticmethod
+    def _file_basename(item) -> str:
+        return os.path.basename(os.fsdecode(item.path))
+
+    @classmethod
+    def _pair_kind(cls, track_dist) -> str:
+        """'direct' when title, artist and duration agree exactly;
+        'enhanced' when the acceptance logic absorbed some noise."""
+        d = dict(track_dist) if track_dist is not None else {}
+        noisy = (
+            d.get("track_title", 0) > 0
+            or d.get("track_artist", 0) > 0
+            or d.get("track_length", 0) > 0
+            or d.get("track_index", 0) > 0
+        )
+        return "enhanced" if noisy else "direct"
+
+    @classmethod
+    def _album_file_map(cls, match) -> list[dict]:
+        out = []
+        tracks_dist = getattr(match.distance, "tracks", {}) or {}
+        for item, ti in match.mapping.items():
+            out.append({
+                "file": cls._file_basename(item),
+                "title": getattr(ti, "title", "") or "",
+                "kind": cls._pair_kind(tracks_dist.get(item)),
+            })
+        for item in getattr(match, "extra_items", []) or []:
+            out.append({
+                "file": cls._file_basename(item),
+                "title": "",
+                "kind": "unmapped",
+            })
+        return out
+
     def choose_match(self, task):
         action, record = self.decider.decide_album(task)
         record["paths"] = [os.fsdecode(p) for p in task.paths]
@@ -492,6 +529,7 @@ class MusikSession(ImportSession):
             if extras:
                 record["extra_files"] = extras
                 self.extra_files.extend(extras)
+            record["file_map"] = self._album_file_map(match)
             return match
         return Action.SKIP
 
@@ -500,7 +538,13 @@ class MusikSession(ImportSession):
         record["paths"] = [os.fsdecode(p) for p in task.paths]
         self.results.append(record)
         if action == "apply":
-            return self._match_for(task, record)
+            match = self._match_for(task, record)
+            record["file_map"] = [{
+                "file": self._file_basename(task.item),
+                "title": getattr(match.info, "title", "") or "",
+                "kind": self._pair_kind(match.distance),
+            }]
+            return match
         return Action.SKIP
 
     def _match_for(self, task, record):

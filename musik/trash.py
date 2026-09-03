@@ -20,12 +20,13 @@ def manifest_file() -> str:
     return os.path.join(paths.trash_dir(), "manifest.csv")
 
 
-def trash_files(files: list[str], reason: str, detail: str = "") -> list[str]:
-    """Move files into _trash/<reason>/<stamp>-<n>/ and append the manifest."""
+def trash_files(files: list[str], reason: str, detail: str = "",
+                base_dir: str | None = None) -> list[str]:
+    """Move files into <trash>/<reason>/<stamp>-<n>/ and append the manifest."""
     if not files:
         return []
     stamp = time.strftime("%Y%m%d-%H%M%S")
-    dest_root = os.path.join(paths.trash_dir(), reason, stamp)
+    dest_root = os.path.join(base_dir or paths.trash_dir(), reason, stamp)
     os.makedirs(dest_root, exist_ok=True)
 
     moved = []

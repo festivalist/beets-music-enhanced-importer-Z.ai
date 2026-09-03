@@ -138,12 +138,16 @@ def write_import_report(state: dict) -> str:
             for u in sel:
                 reason = (u.get("reason") or "").replace("\n", " ")[:200]
                 lines.append(f"- `{u['path']}` — {reason}")
+                proto = (u.get("protocol") or {}).get("summary")
+                if proto:
+                    lines.append(f"  - protocol: {proto}")
         else:
             for u in sel:
                 lines.append(f"- `{u['path']}`")
         lines.append("")
 
     section("Imported automatically", ["auto"])
+    section("Imported as-is (own tags)", ["asis"])
     section("Waiting in review.csv", ["review"])
     section("Unmatched (left in place)", ["unmatched"])
     section("Deferred: lookup failed (retry with `musik retry`)", ["network"])

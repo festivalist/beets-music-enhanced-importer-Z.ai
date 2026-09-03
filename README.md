@@ -65,11 +65,20 @@ All commands run from the tool folder via the `musik.bat` shim. Where
 prefix, so a whole drive path or a single album folder both work.
 
 **Drag & drop:** the quickest way is to drag a folder of new music onto
-**`import-here.bat`** (in the tool folder). It runs the full cycle —
-scan → import → interactive review → report — and pauses at the end. For
+**`import-here.bat`** (in the tool folder). It runs the full cycle and pauses
+at the end — scan → import → interactive review → cleanup → report. For
 hard-doubt albums it stops and asks per unit with the usual beets-style
 options: accept a candidate, search again, apply a MusicBrainz ID,
-import as-is anyway, skip, ignore forever, or abort the rest.
+import as-is anyway, skip, ignore forever, or abort the rest. Every imported
+album prints a **track-by-track protocol** (`[direct]` = exact MusicBrainz
+match, `[enhanced]` = matched via the forgiving rules, `[unmapped]` =
+leftover file archived to the trash) plus an album summary line like
+`14 file(s): 12 direct MusicBrainz match(es), 2 enhanced-acceptance`. After
+the run, the **cleanup step** archives the leftover packaging (.nfo/.sfv/.m3u)
+of imported albums to `_trash\source-cleanup\` and deletes folders left
+empty — including the dropped root folder once nothing at all remains in it
+(folders whose albums still wait in review keep their audio and are never
+touched).
 
 Command line equivalent:
 
@@ -89,6 +98,10 @@ musik.bat review --unit "D:\Incoming\2026-09-02"
                                           ::    [A] accept best  [2]/[3] candidate 2/3
                                           ::    [O] override search  [I] apply MBID
                                           ::    [W] import as-is  [S] skip  [X] ignore  [Q] abort
+musik.bat cleanup --root "D:\Incoming\2026-09-02"
+                                          :: archive leftovers of imported albums to
+                                          ::    _trash\source-cleanup, remove emptied folders
+                                          ::    (--dry-run to preview)
 musik.bat asis --unit "D:\Incoming\2026-09-02"
                                           :: explicit: file review units whose own tags are
                                           ::    complete using those tags (no MB match needed)
@@ -102,7 +115,9 @@ Typical per-batch workflow for a folder of new music:
 musik.bat scan --root "D:\Incoming\2026-09-02"
 musik.bat import --dry-run --unit "D:\Incoming\2026-09-02"
 musik.bat import --unit "D:\Incoming\2026-09-02"
-musik.bat asis --unit "D:\Incoming\2026-09-02"      :: optional, see below
+musik.bat review --unit "D:\Incoming\2026-09-02"    :: optional, interactive
+musik.bat asis --unit "D:\Incoming\2026-09-02"      :: optional
+musik.bat cleanup --root "D:\Incoming\2026-09-02"   :: archive junk, remove emptied folders
 musik.bat report --verify
 ```
 

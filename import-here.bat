@@ -1,14 +1,21 @@
 @echo off
 rem Drag && drop one or more music folders onto this file.
-rem Runs: scan -> import -> interactive review -> library report.
+rem Runs: scan -> import -> interactive review -> cleanup -> library report.
 setlocal
+rem Anchor the tool directory BEFORE any shift: %~dp0 can be re-resolved
+rem against the console's working directory after shift (drag&drop sets a
+rem different CWD), which breaks later venv calls.
+set "TOOLDIR=%~dp0"
+if "%TOOLDIR:~-1%"=="\" set "TOOLDIR=%TOOLDIR:~0,-1%"
+set "PY=%TOOLDIR%\.venv\Scripts\python.exe"
+
 if "%~1"=="" (
     echo Drag ^& drop a music folder onto this file ^(or pass it as a parameter^).
     pause
     exit /b 1
 )
-if not exist "%~dp0.venv\Scripts\python.exe" (
-    echo .venv not found - run install.bat first.
+if not exist "%PY%" (
+    echo .venv not found in %TOOLDIR% - run install.bat first.
     pause
     exit /b 1
 )
@@ -17,28 +24,35 @@ if "%~1"=="" goto done
 echo.
 echo ============================================================
 echo  [%~1]
-echo  step 1/3 - scan
+echo  step 1/4 - scan
 echo ============================================================
-"%~dp0.venv\Scripts\python.exe" "%~dp0musik.py" scan --root "%~1"
+"%PY%" "%TOOLDIR%\musik.py" scan --root "%~1"
 echo.
 echo ============================================================
 echo  [%~1]
-echo  step 2/3 - import (this talks to MusicBrainz, be patient)
+echo  step 2/4 - import (this talks to MusicBrainz, be patient)
 echo ============================================================
-"%~dp0.venv\Scripts\python.exe" "%~dp0musik.py" import --unit "%~1"
+"%PY%" "%TOOLDIR%\musik.py" import --unit "%~1"
 echo.
 echo ============================================================
 echo  [%~1]
-echo  step 3/3 - interactive review of doubtful units
+echo  step 3/4 - interactive review of doubtful units
 echo  A = accept candidate, O = new search, I = by MBID,
 echo  W = import as-is, S = skip, X = ignore, Q = abort rest
 echo ============================================================
-"%~dp0.venv\Scripts\python.exe" "%~dp0musik.py" review --unit "%~1"
+"%PY%" "%TOOLDIR%\musik.py" review --unit "%~1"
+echo.
+echo ============================================================
+echo  [%~1]
+echo  step 4/4 - cleanup: archive leftovers (.nfo/.sfv/.m3u/...) of
+echo  imported albums to _trash, delete folders left empty
+echo ============================================================
+"%PY%" "%TOOLDIR%\musik.py" cleanup --root "%~1"
 shift
 goto loop
 :done
 echo.
-"%~dp0.venv\Scripts\python.exe" "%~dp0musik.py" report --verify
+"%PY%" "%TOOLDIR%\musik.py" report --verify
 echo.
-echo All done. Reports: %~dp0reports  Library: see config.yaml "directory"
+echo All done. Reports: %TOOLDIR%\reports   Library: see config.yaml "directory"
 pause
