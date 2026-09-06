@@ -147,6 +147,10 @@ def cmd_asis(only: str | None = None, dry_run: bool = False) -> int:
                 )
                 trash_mod.prune_empty_dirs(session.duplicate_losers, unit["import_path"])
 
+            from . import engine as _engine
+
+            unit["decision_kind"] = _engine._release_kind(unit)
+            unit["decision_type"] = "own-tags"
             state_mod.set_status(unit, "asis", "imported as-is (user-invoked, tags complete)")
             state_mod.save(st)
             done += 1

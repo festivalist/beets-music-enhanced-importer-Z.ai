@@ -207,6 +207,26 @@ def cmd_summary() -> int:
         print("no session started — run `musik session-begin` first "
               "(import-here.bat does this automatically)")
         return 1
+
+    # Self-heal: units imported before decision fields existed (older
+    # asis/interactive imports) get them derived from status + size.
+    healed = 0
+    for u in state_mod.units(st).values():
+        if u.get("decision_type"):
+            continue
+        if u.get("status") == "asis":
+            n = u.get("n_files", 0)
+            u["decision_kind"] = u.get("decision_kind") or (
+                "mix" if "onefile-live" in (u.get("hints") or [])
+                else "single" if n <= 1 else "ep" if n <= 6 else "album"
+            )
+            u["decision_type"] = "own-tags"
+            u["updated"] = u.get("updated") or time.time()
+            healed += 1
+    if healed:
+        state_mod.save(st)
+        print(f"(backfilled decision info on {healed} older unit(s))")
+
     rows, stats = aggregate_session(state_mod.units(st), since)
 
     header = ["kind"] + TYPE_ORDER + ["total"]

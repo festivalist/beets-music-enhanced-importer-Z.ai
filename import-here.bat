@@ -64,7 +64,7 @@ goto loop
 :done
 echo.
 echo ============================================================
-echo  session summary - what this drag && drop action did
+echo  session summary - what this drop action did
 echo ============================================================
 "%PY%" "%TOOLDIR%\musik.py" summary
 echo.
