@@ -1,6 +1,7 @@
-"""Human-readable reports: scan, dry-run and import results."""
+"""Human-readable reports: scan, dry-run, import results and session totals."""
 
 import os
+import time
 from collections import Counter
 
 from . import state as state_mod
@@ -158,6 +159,103 @@ def write_import_report(state: dict) -> str:
     with open(path, "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines) + "\n")
     return path
+
+
+KIND_ORDER = ["album", "ep", "single", "compilation", "mix"]
+TYPE_ORDER = ["direct", "enhanced", "own-tags", "undecided",
+              "deferred", "duplicate", "failed"]
+
+
+def aggregate_session(units: dict, since: float) -> tuple[dict, dict]:
+    """Aggregate the units touched since `since` into a session summary.
+
+    Returns (rows, stats): rows maps release kind -> {decision type: n},
+    stats holds file totals and the undecided unit list.
+    """
+    rows: dict[str, dict[str, int]] = {}
+    stats = {"files_imported": 0, "files_unmapped": 0, "undecided": []}
+    for u in units.values():
+        if (u.get("updated") or 0) < since:
+            continue
+        if u.get("status") in ("pending", "ignored"):
+            continue
+        kind = u.get("decision_kind") or "album"
+        dt = u.get("decision_type") or "undecided"
+        rows.setdefault(kind, {}).setdefault(dt, 0)
+        rows[kind][dt] += 1
+        if u.get("status") in ("auto", "asis"):
+            stats["files_imported"] += u.get("n_files", 0)
+            stats["files_unmapped"] += len(u.get("unmapped_files") or [])
+        if dt == "undecided":
+            stats["undecided"].append(os.path.basename(u["import_path"]))
+    return rows, stats
+
+
+def cmd_session_begin() -> int:
+    st = state_mod.load()
+    start = time.time()
+    st.setdefault("meta", {})["session_start"] = start
+    state_mod.save(st)
+    print("session started", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start)))
+    return 0
+
+
+def cmd_summary() -> int:
+    st = state_mod.load()
+    since = (st.get("meta") or {}).get("session_start")
+    if not since:
+        print("no session started — run `musik session-begin` first "
+              "(import-here.bat does this automatically)")
+        return 1
+    rows, stats = aggregate_session(state_mod.units(st), since)
+
+    header = ["kind"] + TYPE_ORDER + ["total"]
+    widths = [max(6, len(h)) for h in header]
+    body = []
+    kinds = [k for k in KIND_ORDER if k in rows] + \
+            sorted(k for k in rows if k not in KIND_ORDER)
+    for kind in kinds:
+        counts = rows[kind]
+        line = [kind] + [str(counts.get(t, 0)) for t in TYPE_ORDER]
+        line.append(str(sum(counts.values())))
+        body.append(line)
+
+    def fmt(sep: str) -> list[str]:
+        out = []
+        for line in [header] + body:
+            out.append(sep.join(c.ljust(w) for c, w in zip(line, widths)).rstrip())
+        return out
+
+    console = fmt("  ")
+    print("session summary (since",
+          time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(since)), ")")
+    for line in console:
+        print(" ", line)
+    print(
+        f"  files imported: {stats['files_imported']}, "
+        f"unmapped archived: {stats['files_unmapped']}"
+    )
+    if stats["undecided"]:
+        print("  still undecided:")
+        for n in stats["undecided"]:
+            print(f"    - {n}")
+
+    md = ["# Session report", "",
+          f"Since {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(since))}",
+          "", "| " + " | ".join(header) + " |",
+          "|---|" + "---|" * len(header)]
+    for line in body:
+        md.append("| " + " | ".join(line) + " |")
+    md += ["", f"Files imported: {stats['files_imported']}  |  "
+               f"Unmapped archived: {stats['files_unmapped']}"]
+    if stats["undecided"]:
+        md += ["", "## Still undecided", ""]
+        md += [f"- {n}" for n in stats["undecided"]]
+    path = os.path.join(reports_dir(), "session-report.md")
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(md) + "\n")
+    print("session report:", path)
+    return 0
 
 
 def verify(state: dict) -> dict:

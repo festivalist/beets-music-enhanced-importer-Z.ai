@@ -79,7 +79,20 @@ the run, the **cleanup step** archives the leftover packaging (.nfo/.sfv/.m3u)
 of imported albums to `_trash\source-cleanup\` and deletes folders left
 empty — including the dropped root folder once nothing at all remains in it
 (folders whose albums still wait in review keep their audio and are never
-touched).
+touched). Finally a **session summary** totals the whole action, broken
+down by release kind and how each was decided:
+
+```
+kind    direct  enhanced  own-tags  undecided  deferred  duplicate  failed  total
+album       15         3         1          1         0          0      0     20
+ep           3         0         0          2         0          0      0      5
+files imported: 318, unmapped archived: 1
+```
+
+(EPs/singles come from the matched MusicBrainz `albumtype`; own-tag imports
+use a track-count heuristic — 1 track = single, 2–6 = EP, more = album;
+one-file live sets count as `mix`.) The same table is written to
+`reports\session-report.md`, including the names of anything still undecided.
 
 Command line equivalent:
 

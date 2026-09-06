@@ -26,6 +26,10 @@ set /a TOTAL=0
 set /a IDX=0
 for %%X in (%*) do set /a TOTAL+=1
 
+rem Start a session: everything decided until the summary is attributed
+rem to this drag && drop action.
+"%PY%" "%TOOLDIR%\musik.py" session-begin
+
 :loop
 if "%~1"=="" goto done
 set /a IDX+=1
@@ -58,6 +62,11 @@ echo ------------------------------------------------------------
 shift
 goto loop
 :done
+echo.
+echo ============================================================
+echo  session summary - what this drag && drop action did
+echo ============================================================
+"%PY%" "%TOOLDIR%\musik.py" summary
 echo.
 "%PY%" "%TOOLDIR%\musik.py" report --verify
 echo.

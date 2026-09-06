@@ -76,6 +76,11 @@ def main(argv: list[str] | None = None) -> int:
     p_rep = sub.add_parser("report", help="write reports; --verify checks the library DB")
     p_rep.add_argument("--verify", action="store_true")
 
+    sub.add_parser("session-begin",
+                   help="mark the start of an import session (import-here.bat does this)")
+    sub.add_parser("summary",
+                   help="totals of everything decided since the session started")
+
     p_ded = sub.add_parser("dedupe", help="resolve duplicates in the library by quality")
     p_ded.add_argument("--dry-run", action="store_true")
 
@@ -158,6 +163,16 @@ def main(argv: list[str] | None = None) -> int:
             v = report_mod.verify(st)
             print("verification:", v)
         return 0
+
+    if args.cmd == "session-begin":
+        from . import report as report_mod
+
+        return report_mod.cmd_session_begin()
+
+    if args.cmd == "summary":
+        from . import report as report_mod
+
+        return report_mod.cmd_summary()
 
     if args.cmd == "dedupe":
         from . import dedupe

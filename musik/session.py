@@ -86,6 +86,7 @@ def chosen_info(match) -> dict:
     info = match.info
     out = candidate_preview(match)
     out["track_title"] = (getattr(info, "title", "") or "")[:120]
+    out["albumtype"] = getattr(info, "albumtype", None)
     return out
 
 

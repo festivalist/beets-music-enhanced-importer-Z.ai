@@ -197,10 +197,49 @@ def _protocol_lines(unit: dict, results: list[dict]) -> tuple[list[str], str]:
     return lines, summary
 
 
+def _release_kind(unit: dict, outcome: dict | None = None) -> str:
+    """Album / ep / single / compilation / mix for the session summary.
+    Matched releases report their own albumtype; own-tag imports use a
+    track-count heuristic."""
+    if "onefile-live" in (unit.get("hints") or []):
+        return "mix"
+    at = None
+    for r in (outcome or {}).get("results", []):
+        at = r.get("albumtype") or at
+    if at in ("album", "ep", "single", "compilation"):
+        return at
+    n = unit.get("n_files", 0)
+    if n <= 1:
+        return "single"
+    if n <= 6:
+        return "ep"
+    return "album"
+
+
+def _decision_type(unit: dict, outcome: dict) -> str:
+    """direct / enhanced / own-tags / undecided / failed / duplicate."""
+    status = unit.get("status")
+    if status == "auto":
+        fm = (outcome.get("results") or [{}])[0].get("file_map") or []
+        kinds = {e.get("kind") for e in fm}
+        return "enhanced" if "enhanced" in kinds else "direct"
+    if status == "asis":
+        return "own-tags"
+    if status in ("review", "unmatched"):
+        return "undecided"
+    if status == "network":
+        return "deferred"
+    if status == "duplicate":
+        return "duplicate"
+    return "failed"
+
+
 def _merge_result(unit: dict, outcome: dict) -> None:
     unit["status"] = outcome["status"]
     unit["reason"] = outcome.get("reason", "")
     unit["updated"] = time.time()
+    unit["decision_kind"] = _release_kind(unit, outcome)
+    unit["decision_type"] = _decision_type(unit, outcome)
     if outcome.get("unmapped_files"):
         unit["unmapped_files"] = outcome["unmapped_files"]
     if unit.get("singleton") or unit.get("split_into_singletons"):

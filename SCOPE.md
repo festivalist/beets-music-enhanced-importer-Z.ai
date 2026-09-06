@@ -101,6 +101,7 @@ a clean, consistent base for a later Plexamp setup.
 
 - Import report with counts and per-item logs: identified/auto-accepted / review-queued / unmatched / non-audio. Every imported unit carries a **track-by-track protocol** (`direct` MusicBrainz match vs `enhanced`-acceptance vs `unmapped` archived) and an album summary line.
 - **`musik cleanup`**: after import, packaging junk (.nfo/.sfv/.m3u/…) of albums whose audio has moved is archived to `_trash\source-cleanup\`; emptied folders are removed; a dropped source root is deleted only once nothing at all remains inside it. Folders whose units still wait in review keep their audio and are never touched.
+- **Session summary**: a drag & drop action marks its start; at the end `musik summary` totals everything that action decided, broken down by release kind (album/EP/single/compilation/mix) and decision type (direct / enhanced / own-tags / undecided / deferred / duplicate / failed), written to `reports/session-report.md`.
 - Final verification pass: tree matches the config.yaml templates, cover art and genres present, every item from `unsorted` accounted for.
 
 ## 5. Acceptance criteria
