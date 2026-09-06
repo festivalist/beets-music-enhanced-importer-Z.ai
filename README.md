@@ -65,7 +65,8 @@ All commands run from the tool folder via the `musik.bat` shim. Where
 prefix, so a whole drive path or a single album folder both work.
 
 **Drag & drop:** the quickest way is to drag a folder of new music onto
-**`import-here.bat`** (in the tool folder). It runs the full cycle and pauses
+**`import-here.bat`** (in the tool folder) — several folders at once work
+too and are processed one after another. It runs the full cycle and pauses
 at the end — scan → import → interactive review → cleanup → report. For
 hard-doubt albums it stops and asks per unit with the usual beets-style
 options: accept a candidate, search again, apply a MusicBrainz ID,
