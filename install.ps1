@@ -108,6 +108,9 @@ if (Test-Path (Join-Path $ProjectDir "config.yaml")) {
 } else {
     Write-Step "Setup wizard: choose your music library root and (optionally) a Discogs token"
     & $PyExe musik.py setup
+    if ($LASTEXITCODE -ne 0) {
+        throw "setup wizard failed (exit code $LASTEXITCODE) - run '.venv\Scripts\python.exe musik.py setup' manually to see the error."
+    }
 }
 
 # --- 5. Done ------------------------------------------------------------------
