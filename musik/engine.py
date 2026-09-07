@@ -219,7 +219,7 @@ def _release_kind(unit: dict, outcome: dict | None = None) -> str:
 def _decision_type(unit: dict, outcome: dict) -> str:
     """direct / enhanced / own-tags / undecided / failed / duplicate."""
     status = unit.get("status")
-    if status == "auto":
+    if status in ("auto", "review-apply"):
         fm = (outcome.get("results") or [{}])[0].get("file_map") or []
         kinds = {e.get("kind") for e in fm}
         return "enhanced" if "enhanced" in kinds else "direct"

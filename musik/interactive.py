@@ -113,6 +113,15 @@ def cmd_review(only: str | None = None) -> int:
         _show(unit)
 
         while True:
+            # If the unit's audio is already gone, it was imported earlier
+            # in this session (or left behind) — don't re-run lookups on it.
+            if unit.get("files") and not any(os.path.isfile(f) for f in unit["files"]):
+                chosen = unit.get("chosen") or {}
+                print(f"  already imported: {chosen.get('artist', '?')} - "
+                      f"{chosen.get('album') or chosen.get('track_title', '?')}")
+                done += 1
+                break
+
             choice = _ask_choice(unit)
 
             if choice == "q":
@@ -200,7 +209,9 @@ def cmd_review(only: str | None = None) -> int:
 
             state_mod.save(st)
             chosen = unit.get("chosen") or {}
-            if status in ("auto", "asis"):
+            # "review-apply" is a SUCCESSFUL forced accept (by candidate id,
+            # override search or MBID) — it must count as imported.
+            if status in ("auto", "asis", "review-apply"):
                 print(f"  imported: {chosen.get('artist', '?')} - "
                       f"{chosen.get('album') or chosen.get('track_title', '?')}")
                 done += 1
