@@ -26,9 +26,10 @@ AUDIO_EXTS = {
 }
 PLAYLIST_EXTS = {".m3u", ".m3u8"}
 
-# Mirrors beets' own multi-disc collapsing patterns.
+# Mirrors beets' own multi-disc collapsing patterns (plus 'lp' for
+# double-vinyl rips like 'Artist - Album [US Vinyl 2LP]\LP1').
 MULTIDISC_RE = re.compile(
-    r"^(.*(?:dis[ck]|cd|cassette|digital\s+media|vinyl)[\W_]*)\d$", re.I
+    r"^(.*(?:dis[ck]|cd|cassette|digital\s+media|vinyl|lp)[\W_]*)\d$", re.I
 )
 VINYL_HINT_RE = re.compile(r"(?i)(side\s*[ab]|vinyl|[abcd][1-9]\b)")
 ONETOONE_LONG_SECONDS = 1200  # a single file this long is likely a live dump
@@ -191,7 +192,7 @@ def parse_folder_guess(path: str) -> dict:
     # (checked on the raw name: the numeric-prefix strip below would eat
     # the year and break the anchor)
     m = re.match(
-        r"^\s*(\d{4})\s*-\s*.*?\u2022\s*(.+?)\s*-\s*(.+?)\s*"
+        r"^\s*(\d{4})\s*-\s*.*?\u2022\s*(.+?)\s*[-\u2013\u2014]\s*(.+?)\s*"
         r"(?:\[[^\]]*\])?\s*$",
         base,
     )
@@ -308,11 +309,18 @@ def classify(root: str) -> tuple[list[dict], list[str]]:
             return
 
         if subdirs:
-            matched = [MULTIDISC_RE.match(os.path.basename(s)) for s in subdirs]
-            if all(matched) and len({m.group(1).lower() for m in matched}) == 1:
+            # Only audio-holding subdirs count for the multi-disc check:
+            # an 'Artwork' sibling must not block an LP1/LP2 collapse.
+            audio_subs = [s for s in subdirs if audio_files_in(s)]
+            matched = [MULTIDISC_RE.match(os.path.basename(s)) for s in audio_subs]
+            if (
+                audio_subs
+                and all(matched)
+                and len({m.group(1).lower() for m in matched}) == 1
+            ):
                 # One multi-disc album: import the parent so beets collapses.
                 nested = []
-                for s in subdirs:
+                for s in audio_subs:
                     nested.extend(collect_audio_tree(s))
                 units.append(make_unit(d, d, nested, "multidisc"))
                 return
@@ -465,7 +473,10 @@ def cmd_scan(root: str) -> int:
         print("note:", n)
     if junk_files:
         print(f"non-audio files recorded: {len(junk_files)} (see scan report)")
-    corrupt = sum(len(u.get("unreadable_files") or []) for u in existing.values())
+    corrupt = sum(
+        1 for u in existing.values() for f in (u.get("unreadable_files") or [])
+        if os.path.isfile(f)
+    )
     if corrupt:
         print(f"corrupt audio files excluded from units: {corrupt} "
               "(archived to _trash/corrupt after their unit's import)")
