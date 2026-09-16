@@ -183,6 +183,45 @@ units the automatic rule rejects (contradictory tags, middle-band
 candidates), `musik.bat asis --unit <folder>` remains the explicit escape
 hatch, and `review` / `review.csv` + `apply` the deliberate routes.
 
+### Mixed batches: the import playbook
+
+Large mixed drops (albums + chart dumps + label compilations + vintage
+collections) import best in phases — different material needs different
+sources and different modes:
+
+| Phase | Material | Mode | Sources |
+|---|---|---|---|
+| 1 | artist albums / EPs / singles | normal import | all |
+| 2 | VA compilations (Ministry of Sound, The Annual, …) | normal import — the **VA rule** handles them | musicbrainz, discogs |
+| 3 | chart / "best new" dumps (many artists, no real album) | singleton import (`--sources musicbrainz,beatport4` — beatport4 for electronic material) | per flag |
+| 4 | vintage / mixed-tag collections | `tools\pretag_from_folder.py <root> --unify-album` then `musik.bat asis --pending --unit <root>` | none |
+
+Rules baked in (no manual work needed):
+
+- **VA rule** (decider): album units without a meaningful release credit
+  (albumartist missing/"Various" and ≥3 distinct track artists) skip the
+  artist comparison — VA and DJ-mixed releases are credited to "Various
+  Artists"/the mixer by design. Identity rests on album title (loosened to
+  0.15), a near-complete track mapping, year and the distance cap.
+- **Split rule** (scan): loose multi-artist folders split into singletons
+  only when their album tags are missing or inconsistent. A folder with
+  one consistent album tag across many artists is a real compilation and
+  imports as an album.
+- **`--sources` flag** (`import`/`retry`): limits metadata plugins per run,
+  e.g. `--sources musicbrainz,beatport4`. Discogs is excluded from
+  singleton passes automatically when you pass sources without it — its
+  release-level matches would write album data into singles.
+- **Corrupt gate** (scan): files mutagen cannot parse are excluded from
+  units and archived to `_trash\corrupt` after their unit's import.
+- **`beatport4` token** (preflight): an expired access token is refreshed
+  automatically from the stored refresh token before the import starts
+  (`tools\beatport_refresh.py` does the same standalone).
+- **`report --verify --fix`**: removes library DB rows whose files are
+  gone (phantom rows from playlist-referenced files).
+- **`tools\va_asis_prepare.py`**: last step for stubborn VA-album reviews —
+  completes tags (albumartist=Various Artists, per-CD album tag variants)
+  so `asis --pending` can file them.
+
 ## Rate limiting & reliability
 
 - MusicBrainz is throttled to its mandated 1 request/second; Discogs,

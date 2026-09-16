@@ -92,6 +92,12 @@ def preflight() -> dict:
     if beatport is not None:
         out["beatport"] = False
         try:
+            from . import beatport as beatport_mod
+
+            # An expired access token would push the plugin into its
+            # interactive fallback; refresh it before anything loads it.
+            beatport_mod.ensure_fresh_token(log=beatport._log)
+
             import json as _json
 
             from beetsplug.beatport4.client import Beatport4Client
@@ -403,10 +409,36 @@ def _unit_label(u: dict) -> str:
     return os.path.basename(u["import_path"])
 
 
+_METADATA_SOURCES = {"musicbrainz", "discogs", "beatport4", "deezer", "spotify"}
+
+
+def restrict_sources(allowed: list[str] | None) -> None:
+    """Limit the metadata source plugins beets loads.
+
+    Must run before setup_beets(). Sources not named in `allowed` are
+    dropped from the plugin list; enrichment plugins (chroma, fetchart,
+    lastgenre, ...) always stay. Used for singleton passes where discogs
+    would write release-level album data into singles.
+    """
+    if not allowed:
+        return
+    from beets import config as beets_config
+
+    allowed_set = {a.strip().lower() for a in allowed if a.strip()}
+    plugins = list(beets_config["plugins"].as_str_seq())
+    kept = [
+        p for p in plugins
+        if p.lower() not in _METADATA_SOURCES or p.lower() in allowed_set
+    ]
+    beets_config["plugins"] = kept
+
+
 def cmd_import(dry_run: bool = False, statuses: list[str] | None = None,
                limit: int | None = None, only: str | None = None,
                excludes: list[str] | None = None,
+               sources: list[str] | None = None,
                rounds: int | None = None, quiet: bool = False) -> int:
+    restrict_sources(sources)
     setup_beets()
     cfg = musik_config()
     rounds = rounds if rounds is not None else int(cfg["retry_rounds"])
@@ -530,6 +562,7 @@ def cmd_import(dry_run: bool = False, statuses: list[str] | None = None,
     return 0
 
 
-def cmd_retry(rounds: int | None = None, include_unmatched: bool = False) -> int:
+def cmd_retry(rounds: int | None = None, include_unmatched: bool = False,
+              sources: list[str] | None = None) -> int:
     statuses = ["network"] + (["unmatched"] if include_unmatched else [])
-    return cmd_import(statuses=statuses, rounds=rounds or 0)
+    return cmd_import(statuses=statuses, rounds=rounds or 0, sources=sources)

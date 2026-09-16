@@ -114,7 +114,10 @@ def should_split(files: list[str], kind: str) -> bool:
 
     Conservative: a collapsed multi-disc dir is never split; untagged
     folders stay album units (a wrong album guess lands in review, but a
-    wrongly split album would scatter to Singles).
+    wrongly split album would scatter to Singles). A CONSISTENT non-empty
+    album tag across files marks a real VA compilation (Ministry of Sound
+    style) — those import as one album so the sources can match the
+    release; only chart dumps with missing/varying album tags split.
     """
     if kind in ("multidisc", "loose", "playlist"):
         return False
@@ -125,6 +128,13 @@ def should_split(files: list[str], kind: str) -> bool:
     tagged = [t for t in tags if t]
     if len(tagged) < 0.6 * n:
         return False  # mostly untagged -> try as album, review decides
+    album_tags = {
+        tag_of(f, "album").strip().lower()
+        for f in files if os.path.isfile(f)
+    }
+    album_tags.discard("")
+    if len(album_tags) == 1:
+        return False  # one shared album title: a compilation, not a dump
     distinct = len(set(tagged))
     top_share = Counter(tagged).most_common(1)[0][1] / len(tagged)
     return distinct >= 3 and top_share < 0.5
@@ -200,6 +210,7 @@ def parse_folder_guess(path: str) -> dict:
         return {"artist": m.group(2).strip(), "album": m.group(3).strip()}
     base = YEAR_RE.sub("", base)
     base = re.sub(r"^\s*\d+[\.\s]+", "", base).strip()
+    base = base.lstrip("-").strip()  # numeric strip ate '1993 ', left '- MOS'
     if " - " in base:
         artist, album = base.split(" - ", 1)
         return {"artist": artist.strip().replace("_", " ").strip(),

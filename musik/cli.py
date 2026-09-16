@@ -56,6 +56,9 @@ def main(argv: list[str] | None = None) -> int:
     p_imp.add_argument("--unit", default=None, help="process exactly this unit path")
     p_imp.add_argument("--exclude", action="append", default=None,
                        help="skip units at or under this folder prefix (repeatable)")
+    p_imp.add_argument("--sources", default=None,
+                       help="comma-separated metadata sources to enable "
+                            "(e.g. musicbrainz,beatport4; default: all configured)")
     p_imp.add_argument("--status", action="append", default=None,
                        help="unit statuses to process (repeatable; default: pending)")
     p_imp.add_argument("--rounds", type=int, default=None,
@@ -65,6 +68,8 @@ def main(argv: list[str] | None = None) -> int:
     p_ret = sub.add_parser("retry", help="retry network-deferred (and optionally unmatched) units")
     p_ret.add_argument("--include-unmatched", action="store_true")
     p_ret.add_argument("--rounds", type=int, default=None)
+    p_ret.add_argument("--sources", default=None,
+                       help="comma-separated metadata sources (see import --sources)")
 
     p_app = sub.add_parser("apply", help="process decisions from review.csv")
     p_app.add_argument("--csv", default=None)
@@ -76,6 +81,8 @@ def main(argv: list[str] | None = None) -> int:
     p_rev.add_argument("--unit", default=None, help="folder prefix or exact unit path")
 
     p_rep = sub.add_parser("report", help="write reports; --verify checks the library DB")
+    p_rep.add_argument("--fix", action="store_true",
+                       help="with --verify: remove DB rows whose files are gone")
     p_rep.add_argument("--verify", action="store_true")
 
     sub.add_parser("session-begin",
@@ -136,6 +143,7 @@ def main(argv: list[str] | None = None) -> int:
             limit=args.limit,
             only=args.unit,
             excludes=args.exclude,
+            sources=(args.sources.split(",") if args.sources else None),
             rounds=args.rounds,
             quiet=args.quiet,
         )
@@ -144,7 +152,8 @@ def main(argv: list[str] | None = None) -> int:
         from . import engine
 
         return engine.cmd_retry(
-            rounds=args.rounds, include_unmatched=args.include_unmatched
+            rounds=args.rounds, include_unmatched=args.include_unmatched,
+            sources=(args.sources.split(",") if args.sources else None),
         )
 
     if args.cmd == "apply":
@@ -165,7 +174,7 @@ def main(argv: list[str] | None = None) -> int:
         path = report_mod.write_import_report(st)
         print("report:", path)
         if args.verify:
-            v = report_mod.verify(st)
+            v = report_mod.verify(st, fix=args.fix)
             print("verification:", v)
         return 0
 

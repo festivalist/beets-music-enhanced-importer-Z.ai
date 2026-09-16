@@ -250,13 +250,54 @@ class Decider:
                 return True, ""
         return False, f"artist mismatch ('{cur}' vs '{getattr(info, 'artist', '')}')"
 
+    def _va_like(self) -> bool:
+        """True for album units whose file tags carry no meaningful
+        release credit: no/blank albumartist with several distinct track
+        artists, or an albumartist that already says "various" (VA
+        compilations, DJ-mixed albums). On these the artist-vs-credit
+        comparison is meaningless — the track artists belong to
+        individual tracks, not to the release."""
+        u = self.unit or {}
+        hints = u.get("hints") or []
+        if "multi-artist-dir" in hints or "va-album" in hints:
+            return True
+        from .scan import tag_of
+
+        first = next(
+            (f for f in u.get("files", []) if os.path.isfile(f)), None
+        )
+        aa = tag_of(first, "albumartist") if first else ""
+        if aa and aa.strip().lower() in (
+            "various artists", "various", "va", "v.a.",
+        ):
+            return True
+        seen = u.get("artists_seen") or []
+        if len(seen) < 3:
+            return False
+        return first is not None and (not aa)
+
+    # Album-title looseness for va_like units: the tags often carry the
+    # full retail title ("…Volume 1 Compiled By X (catalog#)") while the
+    # release is titled terser. A near-complete track mapping (enforced
+    # via TRACK_COUNT_TOLERANCE in _passes_all) plus this bound keeps the
+    # identity safe.
+    VA_ALBUM_TOLERANCE = 0.15
+
     def _names_ok(self, task, match) -> tuple[bool, str]:
         """Verify album identity: title strict, artist via variants."""
         info = match.info
         pen = dict(match.distance)
         album_pen = pen.get("album", 0)
-        if album_pen > self.ALBUM_TOLERANCE:
+        va = self._va_like()
+        limit = self.VA_ALBUM_TOLERANCE if va else self.ALBUM_TOLERANCE
+        if album_pen > limit:
             return False, f"album title mismatch ({album_pen:.3f})"
+
+        if va:
+            # Track-artist tags belong to individual tracks, not to the
+            # release credit; identity rests on album title + the
+            # near-complete track mapping enforced by _passes_all.
+            return True, ""
 
         cur = (getattr(task, "cur_artist", "") or "").strip()
         if cur:

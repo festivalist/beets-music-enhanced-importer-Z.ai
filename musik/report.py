@@ -278,8 +278,13 @@ def cmd_summary() -> int:
     return 0
 
 
-def verify(state: dict) -> dict:
-    """Library sanity checks against the beets DB."""
+def verify(state: dict, fix: bool = False) -> dict:
+    """Library sanity checks against the beets DB.
+
+    With fix=True, items whose files are gone (e.g. phantom rows from
+    m3u-referenced files later archived by cleanup) are removed from the
+    DB (the files are already lost, so nothing is deleted on disk).
+    """
     from .engine import setup_beets
 
     setup_beets()
@@ -296,6 +301,7 @@ def verify(state: dict) -> dict:
         "albums_missing_art": 0,
         "albums_missing_genre": 0,
         "items_missing_path": 0,
+        "removed_dead_items": 0,
     }
     albums = list(lib.albums())
     out["albums"] = len(albums)
@@ -308,4 +314,11 @@ def verify(state: dict) -> dict:
     for item in lib.items():
         if not os.path.isfile(os.fsdecode(item.path)):
             out["items_missing_path"] += 1
+            if fix:
+                print(f"verify --fix: removing dead item #{item.id} "
+                      f"{item.artist} - {item.title}")
+                item.remove(delete=False)
+                out["removed_dead_items"] += 1
+    if fix:
+        out["items"] = len(list(lib.items()))
     return out
