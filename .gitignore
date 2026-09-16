@@ -1,6 +1,7 @@
 # --- personal / machine-specific: never commit -------------------------
 config.yaml
 discogs_token.json
+beatport_token.json
 state/
 reports/
 bin/

@@ -81,6 +81,42 @@ def preflight() -> dict:
         except Exception as exc:
             out["notes"].append(f"Discogs token check failed: {exc}")
 
+    beatport = next(
+        (
+            p
+            for p in beets_plugins.find_plugins()
+            if getattr(p, "data_source", "") == "Beatport"
+        ),
+        None,
+    )
+    if beatport is not None:
+        out["beatport"] = False
+        try:
+            import json as _json
+
+            from beetsplug.beatport4.client import Beatport4Client
+            from beetsplug.beatport4.models import BeatportOAuthToken
+
+            token = None
+            try:
+                with open(beatport._tokenfile(), encoding="utf-8") as fh:
+                    token = BeatportOAuthToken.from_api_response(
+                        _json.load(fh)
+                    )
+            except Exception:
+                token = None
+            client = Beatport4Client(
+                log=beatport._log,
+                client_id=beatport.config["client_id"].get(),
+                username=beatport.config["username"].get(),
+                password=beatport.config["password"].get(),
+                beatport_token=token,
+            )
+            client.get_my_account()
+            out["beatport"] = True
+        except Exception as exc:
+            out["notes"].append(f"Beatport auth check failed: {exc}")
+
     return out
 
 
@@ -101,6 +137,18 @@ def build_decider(unit: dict | None = None, forced: dict | None = None) -> Decid
 
 def _item_paths(items) -> list[str]:
     return [os.fsdecode(i.path) for i in items]
+
+
+def _trash_unreadable(unit: dict, context: str) -> int:
+    """Archive corrupt files the scan excluded from this unit."""
+    bad = [f for f in (unit.get("unreadable_files") or []) if os.path.isfile(f)]
+    if not bad:
+        return 0
+    trash_mod.trash_files(
+        bad, "corrupt", f"unreadable audio file ({context}: {unit['path']})"
+    )
+    trash_mod.prune_empty_dirs(bad, unit["import_path"])
+    return len(bad)
 
 
 def run_unit_dry(unit: dict, decider: Decider) -> dict:
@@ -141,6 +189,10 @@ def run_unit_real(lib, unit: dict, decider: Decider) -> dict:
         session.run()
     finally:
         pass
+
+    # Corrupt files the scan excluded never import; archive them now so
+    # their folder can empty out and cleanup can remove it.
+    _trash_unreadable(unit, "import")
 
     # New files that lost a duplicate comparison go to _trash.
     if session.duplicate_losers:
@@ -313,12 +365,16 @@ def _rehome_after_asis(lib) -> None:
 
 
 def _select(state: dict, statuses: list[str] | None, limit: int | None,
-            only: str | None) -> list[dict]:
+            only: str | None, excludes: list[str] | None = None) -> list[dict]:
+    excl = [
+        os.path.normcase(os.path.normpath(e))
+        for e in (excludes or []) if e
+    ]
     sel = []
     want = os.path.normcase(os.path.normpath(only)) if only else None
     for u in state_mod.units(state).values():
+        upath = os.path.normcase(os.path.normpath(u["path"]))
         if want:
-            upath = os.path.normcase(os.path.normpath(u["path"]))
             ipath = os.path.normcase(
                 os.path.normpath(u.get("import_path") or u["path"])
             )
@@ -327,6 +383,10 @@ def _select(state: dict, statuses: list[str] | None, limit: int | None,
                 want + os.sep
             ):
                 continue
+        if any(
+            upath == e or upath.startswith(e + os.sep) for e in excl
+        ):
+            continue
         if statuses and u.get("status") not in statuses:
             continue
         sel.append(u)
@@ -345,6 +405,7 @@ def _unit_label(u: dict) -> str:
 
 def cmd_import(dry_run: bool = False, statuses: list[str] | None = None,
                limit: int | None = None, only: str | None = None,
+               excludes: list[str] | None = None,
                rounds: int | None = None, quiet: bool = False) -> int:
     setup_beets()
     cfg = musik_config()
@@ -352,16 +413,19 @@ def cmd_import(dry_run: bool = False, statuses: list[str] | None = None,
     cooldown = float(cfg["retry_cooldown_seconds"])
 
     st = state_mod.load()
-    selected = _select(st, statuses or ["pending"], limit, only)
+    selected = _select(st, statuses or ["pending"], limit, only, excludes)
     if not selected:
         print("nothing to import for the given filters")
         return 0
 
     pf = preflight()
-    print(
+    pf_line = (
         f"preflight: musicbrainz={'ok' if pf['musicbrainz'] else 'FAIL'}"
         f" discogs={'ok' if pf['discogs'] else 'FAIL'}"
     )
+    if "beatport" in pf:
+        pf_line += f" beatport={'ok' if pf['beatport'] else 'FAIL'}"
+    print(pf_line)
     for n in pf["notes"]:
         print("  note:", n)
     if dry_run:

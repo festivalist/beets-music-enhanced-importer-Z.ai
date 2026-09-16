@@ -6,6 +6,7 @@ fpcalc.exe. Must run before `import beets` anywhere in the process.
 """
 
 import os
+import socket
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_FILE = os.path.join(PROJECT_DIR, "config.yaml")
@@ -29,6 +30,11 @@ def bootstrap() -> None:
     os.environ["BEETSDIR"] = PROJECT_DIR
     if os.path.isfile(FPCALC):
         os.environ["FPCALC"] = FPCALC
+    # Bound every TCP operation process-wide. Not all metadata sources
+    # set an explicit requests timeout (musicbrainzngs does not); without
+    # this a stalled connection hangs the import forever instead of
+    # surfacing as a retryable network error.
+    socket.setdefaulttimeout(30)
 
 
 def _musik_config() -> dict:

@@ -64,7 +64,8 @@ def _fill_empty_original_years(lib) -> int:
     return fixed
 
 
-def cmd_asis(only: str | None = None, dry_run: bool = False) -> int:
+def cmd_asis(only: str | None = None, dry_run: bool = False,
+             include_pending: bool = False) -> int:
     from . import state as state_mod
     from . import trash as trash_mod
     from .engine import setup_beets
@@ -73,10 +74,13 @@ def cmd_asis(only: str | None = None, dry_run: bool = False) -> int:
     setup_beets()
     st = state_mod.load()
     want = os.path.normcase(os.path.normpath(only)) if only else None
+    statuses = ("review", "unmatched", "network")
+    if include_pending:
+        statuses += ("pending",)
 
     selected = []
     for u in state_mod.units(st).values():
-        if u.get("status") not in ("review", "unmatched", "network"):
+        if u.get("status") not in statuses:
             continue
         if want:
             upath = os.path.normcase(os.path.normpath(u["path"]))
@@ -148,6 +152,8 @@ def cmd_asis(only: str | None = None, dry_run: bool = False) -> int:
                 trash_mod.prune_empty_dirs(session.duplicate_losers, unit["import_path"])
 
             from . import engine as _engine
+
+            _engine._trash_unreadable(unit, "asis")
 
             unit["decision_kind"] = _engine._release_kind(unit)
             unit["decision_type"] = "own-tags"

@@ -78,6 +78,16 @@ def file_duration(path: str) -> float | None:
     return None
 
 
+def readable_file(path: str) -> bool:
+    """False for corrupt/unparseable audio (e.g. 'can't sync to MPEG
+    frame'). Such a file can never be imported; scan excludes it from
+    the unit and the engine archives it to _trash/corrupt."""
+    try:
+        return mutagen.File(openable(path)) is not None
+    except Exception:
+        return False
+
+
 def tag_of(path: str, field: str) -> str:
     try:
         m = mutagen.File(openable(path), easy=True)
@@ -141,6 +151,13 @@ def parse_folder_guess(path: str) -> dict:
 
 def make_unit(path: str, import_path: str, files: list[str], kind: str,
               source: str = "scan") -> dict:
+    # Corrupt files never enter the unit: beets would error the whole
+    # import task on them; the engine trashes them after the run.
+    good: list[str] = []
+    bad: list[str] = []
+    for f in files:
+        (good if readable_file(f) else bad).append(f)
+    files = good
     durs = [file_duration(f) for f in files]
     total = sum(d for d in durs if d)
     hints = []
@@ -170,8 +187,12 @@ def make_unit(path: str, import_path: str, files: list[str], kind: str,
         "artists_seen": seen,
         "year_guess": guess_year(import_path),
         "guessed": parse_folder_guess(import_path),
+        "unreadable_files": [os.path.normpath(f) for f in bad],
         "status": "pending" if n else "ignored",
-        "reason": "" if n else "no audio files found (cue-only rip?)",
+        "reason": "" if n else (
+            "all audio files unreadable (corrupt)" if bad
+            else "no audio files found (cue-only rip?)"
+        ),
     }
     return unit
 
@@ -348,7 +369,7 @@ def cmd_scan(root: str) -> int:
             for k in ("files", "n_files", "total_duration", "hints",
                       "artists_seen", "import_path", "kind", "source",
                       "singleton", "split_into_singletons", "year_guess",
-                      "guessed"):
+                      "guessed", "unreadable_files"):
                 if k in u:
                     old[k] = u[k]
             # A newly-detected dead unit (e.g. cue-only rip) that never
@@ -377,4 +398,8 @@ def cmd_scan(root: str) -> int:
         print("note:", n)
     if junk_files:
         print(f"non-audio files recorded: {len(junk_files)} (see scan report)")
+    corrupt = sum(len(u.get("unreadable_files") or []) for u in existing.values())
+    if corrupt:
+        print(f"corrupt audio files excluded from units: {corrupt} "
+              "(archived to _trash/corrupt after their unit's import)")
     return 0

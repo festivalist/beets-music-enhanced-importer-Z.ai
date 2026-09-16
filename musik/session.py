@@ -24,6 +24,11 @@ from beets.importer.session import ImportSession
 from . import quality
 
 _PLUGIN_ERROR_RE = re.compile(r"Error in '([^']+)'")
+# beatport4 catches its own API errors inside candidates()/item_candidates()
+# and only logs a WARNING ("API Error: ..."), which beets never re-logs as
+# "Error in '...'". Without matching those, a rate-limited Beatport would
+# look like "no candidates found".
+_BEATPORT_ERROR_RE = re.compile(r"API Error|Error connecting to Beatport", re.I)
 
 
 class NetworkErrorRecorder(logging.Handler):
@@ -35,7 +40,7 @@ class NetworkErrorRecorder(logging.Handler):
     """
 
     def __init__(self) -> None:
-        super().__init__(level=logging.ERROR)
+        super().__init__(level=logging.WARNING)
         self._lock = threading.Lock()
         self.errors: list[tuple[str, str]] = []
 
@@ -48,6 +53,10 @@ class NetworkErrorRecorder(logging.Handler):
         if m:
             with self._lock:
                 self.errors.append((m.group(1), msg))
+            return
+        if _BEATPORT_ERROR_RE.search(msg):
+            with self._lock:
+                self.errors.append(("Beatport", msg))
 
     def install(self) -> None:
         logging.getLogger("beets").addHandler(self)
@@ -119,6 +128,12 @@ class Decider:
             if len(msg) > 300:
                 msg = msg[:300] + "..."
             return "network", f"MusicBrainz lookup failed: {msg}"
+        bp_errors = NetworkErrorRecorder.errors_from(errors, "beatport")
+        if bp_errors:
+            msg = bp_errors[0]
+            if len(msg) > 300:
+                msg = msg[:300] + "..."
+            return "network", f"Beatport lookup failed: {msg}"
         other = errors[0][1] if errors else ""
         return "unmatched", (
             f"no candidates from any source"

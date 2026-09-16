@@ -54,6 +54,8 @@ def main(argv: list[str] | None = None) -> int:
                        help="lookups and decisions only; nothing moves")
     p_imp.add_argument("--limit", type=int, default=None, help="process at most N units")
     p_imp.add_argument("--unit", default=None, help="process exactly this unit path")
+    p_imp.add_argument("--exclude", action="append", default=None,
+                       help="skip units at or under this folder prefix (repeatable)")
     p_imp.add_argument("--status", action="append", default=None,
                        help="unit statuses to process (repeatable; default: pending)")
     p_imp.add_argument("--rounds", type=int, default=None,
@@ -97,6 +99,8 @@ def main(argv: list[str] | None = None) -> int:
         help="file review/unmatched units with complete tags using their own tags (explicit opt-in)",
     )
     p_asis.add_argument("--unit", default=None, help="folder prefix or exact unit path")
+    p_asis.add_argument("--pending", action="store_true",
+                        help="also include pending units (aggressive as-is, no lookup)")
     p_asis.add_argument("--dry-run", action="store_true", help="list eligible units only")
 
     args = parser.parse_args(argv)
@@ -131,6 +135,7 @@ def main(argv: list[str] | None = None) -> int:
             statuses=args.status,
             limit=args.limit,
             only=args.unit,
+            excludes=args.exclude,
             rounds=args.rounds,
             quiet=args.quiet,
         )
@@ -182,7 +187,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "asis":
         from . import asis
 
-        return asis.cmd_asis(only=args.unit, dry_run=args.dry_run)
+        return asis.cmd_asis(
+            only=args.unit, dry_run=args.dry_run, include_pending=args.pending
+        )
 
     if args.cmd == "cleanup":
         from . import cleanup

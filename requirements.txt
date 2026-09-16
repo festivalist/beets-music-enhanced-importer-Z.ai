@@ -1,4 +1,5 @@
 beets>=2.13
+beets-beatport4
 pyacoustid
 discogs-client
 PyYAML
