@@ -130,22 +130,89 @@ def should_split(files: list[str], kind: str) -> bool:
 
 
 YEAR_RE = re.compile(r"\((\d{4})\)")
+BARE_YEAR_RE = re.compile(r"(?<![0-9])((?:19|20)\d{2})(?![0-9])")
+
+# Scene-name noise: catalog numbers in parens, media keywords, bare years,
+# and pure numbers — the tail of 'Artist-Album-(CAT)-WEB-2026-GROUP'.
+
+
+def _scene_noise(tok: str) -> bool:
+    t = tok.strip()
+    if not t:
+        return True
+    if t[0] in "([" and t[-1] in ")]":
+        return True  # catalog number, media note
+    tl = t.lower()
+    if re.fullmatch(r"(?:19|20)\d{2}", tl):
+        return True
+    if re.fullmatch(r"\d{1,2}", tl):
+        return True
+    if tl in {
+        "web", "single", "ep", "lp", "cdep", "cds", "cd", "vls", "sat",
+        "promo", "vinyl", "dvd", "cable", "7inch", "12inch", "7", "12",
+        "remixes", "deluxe", "limited", "edition", "reissue", "int",
+        "front", "back",
+    }:
+        return True
+    return False
+
+
+def _clean_scene_album(album_part: str) -> str:
+    """'Arriba-(TIPSY083)-SINGLE-WEB-2026-iDC' -> 'Arriba'."""
+    toks = [t for t in album_part.replace("_", " ").split("-") if t.strip()]
+    keep = []
+    for t in toks:
+        if _scene_noise(t):
+            break
+        keep.append(t.strip())
+    return " ".join(keep).strip()
 
 
 def guess_year(path: str) -> int | None:
-    m = YEAR_RE.search(os.path.basename(os.path.normpath(path)))
+    base = os.path.basename(os.path.normpath(path))
+    m = YEAR_RE.search(base)
+    if m:
+        return int(m.group(1))
+    m = BARE_YEAR_RE.search(base)
     return int(m.group(1)) if m else None
 
 
 def parse_folder_guess(path: str) -> dict:
-    """Extract 'Artist - Album' from a folder name like
-    '0701. Slint - Spiderland (1991)'."""
+    """Extract 'Artist - Album' from a folder name.
+
+    Handles two shapes:
+    - '0701. Slint - Spiderland (1991)' — plain display names
+    - scene dumps: '1783-Severe-(SL009)-WEB-2026-PTC',
+      '2HOT2PLAY__Armin_Hermann_-_Arriba-(TIPSY083)-SINGLE-WEB-2026-iDC'
+      (underscores read as spaces, media/catalog tail stripped)
+    """
     base = os.path.basename(os.path.normpath(path))
+    # '1958 - GREATEST HITS • Doris Day - Greatest Hits [US Vinyl Mono LP]'
+    # (checked on the raw name: the numeric-prefix strip below would eat
+    # the year and break the anchor)
+    m = re.match(
+        r"^\s*(\d{4})\s*-\s*.*?\u2022\s*(.+?)\s*-\s*(.+?)\s*"
+        r"(?:\[[^\]]*\])?\s*$",
+        base,
+    )
+    if m:
+        return {"artist": m.group(2).strip(), "album": m.group(3).strip()}
     base = YEAR_RE.sub("", base)
     base = re.sub(r"^\s*\d+[\.\s]+", "", base).strip()
     if " - " in base:
         artist, album = base.split(" - ", 1)
-        return {"artist": artist.strip(), "album": album.strip()}
+        return {"artist": artist.strip().replace("_", " ").strip(),
+                "album": _clean_scene_album(album)}
+    flat = base.replace("_", " ")
+    toks = [t for t in flat.split("-") if t.strip()]
+    if len(toks) >= 2:
+        album_toks = []
+        for t in toks[1:]:
+            if _scene_noise(t):
+                break
+            album_toks.append(t.strip())
+        if album_toks:
+            return {"artist": toks[0].strip(), "album": " ".join(album_toks)}
     return {"artist": "", "album": base.strip()}
 
 
