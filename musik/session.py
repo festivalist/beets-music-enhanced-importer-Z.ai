@@ -701,8 +701,13 @@ class MusikSession(ImportSession):
         ]
         old_files: list[str] = []
         old_models = []
+        # found_duplicates are Albums for album imports but plain Items for
+        # singletons — an Item also has a Model.items() (dict view, yields
+        # tuples), so decide on the type, not on the attribute.
+        from beets.library import Album
+
         for dup in found_duplicates:
-            items = list(dup.items()) if hasattr(dup, "items") else [dup]
+            items = list(dup.items()) if isinstance(dup, Album) else [dup]
             old_models.append((dup, items))
             old_files.extend(os.fsdecode(i.path) for i in items)
 
