@@ -4,3 +4,5 @@ pyacoustid
 discogs-client
 PyYAML
 requests
+Pillow  # embedart
+pylast  # lastgenre

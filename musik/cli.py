@@ -134,6 +134,31 @@ def main(argv: list[str] | None = None) -> int:
     p_doc.add_argument("--limit", type=int, default=None,
                        help="decode-test at most N files spread across the library (spot check)")
 
+    sub.add_parser("stats", help="library statistics (totals, formats, decades, top artists)")
+
+    p_sim = sub.add_parser(
+        "similar",
+        help="similar-artist suggestions from ListenBrainz for artists you don't have yet",
+    )
+    p_sim.add_argument("--top", type=int, default=30, help="size of the top list (default 30)")
+    p_sim.add_argument("--refresh", action="store_true",
+                       help="re-query all artists, ignoring the cache")
+
+    p_rel = sub.add_parser(
+        "releases",
+        help="new releases of your library artists since the last run (MusicBrainz)",
+    )
+    p_rel.add_argument("--since", default=None,
+                       help="override lookback start (YYYY-MM-DD; default: last run or 90 days)")
+
+    p_ret2 = sub.add_parser(
+        "retag",
+        help="re-check as-is-imported albums against MusicBrainz (report only)",
+    )
+    p_ret2.add_argument("--limit", type=int, default=None, help="only check N albums")
+    p_ret2.add_argument("--max-distance", type=float, default=0.10,
+                        help="distance under which a match counts as strong (default 0.10)")
+
     args = parser.parse_args(argv)
 
     if args.cmd != "setup" and not os.path.isfile(
@@ -242,5 +267,25 @@ def main(argv: list[str] | None = None) -> int:
         from . import doctor
 
         return doctor.cmd_doctor(fix=args.fix, quick=args.quick, limit=args.limit)
+
+    if args.cmd == "stats":
+        from . import stats
+
+        return stats.cmd_stats()
+
+    if args.cmd == "similar":
+        from . import similar
+
+        return similar.cmd_similar(top=args.top, refresh=args.refresh)
+
+    if args.cmd == "releases":
+        from . import releases
+
+        return releases.cmd_releases(since=args.since)
+
+    if args.cmd == "retag":
+        from . import retag
+
+        return retag.cmd_retag(limit=args.limit, max_distance=args.max_distance)
 
     parser.error(f"unknown command {args.cmd}")

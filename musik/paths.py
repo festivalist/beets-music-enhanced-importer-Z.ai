@@ -30,6 +30,11 @@ def bootstrap() -> None:
     os.environ["BEETSDIR"] = PROJECT_DIR
     if os.path.isfile(FPCALC):
         os.environ["FPCALC"] = FPCALC
+    # replaygain's ffmpeg backend resolves 'ffmpeg' via PATH; put the
+    # bundled one first so imports and backfills work without a system-wide
+    # ffmpeg installation. Inherited by every subprocess we spawn.
+    if os.path.isdir(BIN_DIR):
+        os.environ["PATH"] = BIN_DIR + os.pathsep + os.environ.get("PATH", "")
     # Bound every TCP operation process-wide. Not all metadata sources
     # set an explicit requests timeout (musicbrainzngs does not); without
     # this a stalled connection hangs the import forever instead of
