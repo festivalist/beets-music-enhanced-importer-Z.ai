@@ -205,7 +205,10 @@ def cmd_doctor(fix: bool = False, quick: bool = False, limit: int | None = None)
             fixed.append(err)
         elif missing_art:
             fixed.append(f"fetchart backfill run for {len(missing_art)} album(s)")
-        err = _backfill("lastgenre", ["lastgenre", "-f", "genre:"]) if missing_genre else None
+        # no -f: without it lastgenre only fills albums that have NO genre
+        # (with -f it force-overwrites and WIPES genres when last.fm has
+        # no page for an album — burned us once, see tools/restore_genres…)
+        err = _backfill("lastgenre", ["lastgenre", "genre:"]) if missing_genre else None
         if err:
             fixed.append(err)
         elif missing_genre:
