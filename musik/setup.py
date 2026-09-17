@@ -84,7 +84,7 @@ match:
 
 paths:
     default: $albumartist\\$original_year - $album%aunique{{}}\\%if{{$multidisc,$disc-}}$track $title
-    singleton: Singles\\$artist\\$year - $title
+    singleton: Singles\\$artist\\$year - $title%aunique{{}}
     comp: Compilations\\$original_year - $album%aunique{{}}\\%if{{$multidisc,$disc-}}$track $title
 
 # ---------------------------------------------------------------------------

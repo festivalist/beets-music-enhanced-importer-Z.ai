@@ -16,7 +16,8 @@ def _album_score(album) -> tuple:
     return quality.score_files(paths)
 
 
-def cmd_dedupe(dry_run: bool = False) -> int:
+def cmd_dedupe(dry_run: bool = False,
+               fingerprint: bool = False, apply: bool = False) -> int:
     from .engine import setup_beets
 
     setup_beets()
@@ -27,6 +28,9 @@ def cmd_dedupe(dry_run: bool = False) -> int:
         beets_config["library"].as_filename(),
         beets_config["directory"].as_filename(),
     )
+
+    if fingerprint:
+        return _dedupe_fingerprint(lib, apply=apply)
 
     groups: dict[tuple, list] = defaultdict(list)
     for album in lib.albums():
@@ -68,5 +72,67 @@ def cmd_dedupe(dry_run: bool = False) -> int:
     print(
         f"dedupe {'(dry run) ' if dry_run else ''}done: {trashed} file(s) "
         f"{'would go' if dry_run else 'moved'} to _trash"
+    )
+    return 0
+
+
+def _dedupe_fingerprint(lib, apply: bool = False) -> int:
+    """Track-level dupe hunt via AcoustID (report by default, --apply to trash).
+
+    Same recording under different metadata is invisible to the album-level
+    dedupe; chroma stores acoustid_id / acoustid_fingerprint on items, so we
+    can group by those. Groups spanning one album folder only are skipped
+    (that is the album dedupe's job).
+    """
+    groups: dict[str, list] = defaultdict(list)
+    no_fp = 0
+    for item in lib.items():
+        key = item.get("acoustid_id")
+        if not key:
+            fp = item.get("acoustid_fingerprint")
+            if not fp:
+                no_fp += 1
+                continue
+            # fingerprints of the same audio share long prefixes
+            key = "fp:" + fp[:24]
+        groups[key].append(item)
+
+    trashed = 0
+    reported = 0
+    for key, members in sorted(groups.items()):
+        if len(members) < 2:
+            continue
+        folders = {os.path.dirname(os.fsdecode(i.path)) for i in members}
+        if len(folders) < 2:
+            continue  # same-album copies are the album dedupe's territory
+        reported += 1
+        members.sort(key=lambda i: quality.score(os.fsdecode(i.path)), reverse=True)
+        winner, losers = members[0], members[1:]
+        print(f"fingerprint group {key[:16]}…: "
+              f"keep {winner.artist} - {winner.title} "
+              f"({quality.describe(quality.score(os.fsdecode(winner.path)))})")
+        for i in members:
+            mark = "  keep " if i is winner else "  LOSE "
+            print(f"{mark} [{i.albumartist} / {i.album}] "
+                  f"{i.artist} - {i.title} "
+                  f"({quality.describe(quality.score(os.fsdecode(i.path)))}) "
+                  f"{os.fsdecode(i.path)}")
+        if not apply:
+            continue
+        for loser in losers:
+            path = os.fsdecode(loser.path)
+            if os.path.isfile(path):
+                detail = (f"lost fingerprint dedupe against "
+                          f"{os.fsdecode(winner.path)}")
+                trashed_files = trash_mod.trash_files([path], "duplicate", detail)
+                trash_mod.prune_empty_dirs(trashed_files, os.fsdecode(lib.directory))
+                trashed += len(trashed_files)
+            loser.remove(with_album=False)
+
+    print(
+        f"fingerprint dedupe: {reported} cross-album group(s), {no_fp} item(s) "
+        "without fingerprint skipped"
+        + ("" if apply else " — report only, re-run with --apply to trash losers")
+        + (f", {trashed} file(s) moved to _trash" if apply else "")
     )
     return 0

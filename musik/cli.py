@@ -92,6 +92,11 @@ def main(argv: list[str] | None = None) -> int:
 
     p_ded = sub.add_parser("dedupe", help="resolve duplicates in the library by quality")
     p_ded.add_argument("--dry-run", action="store_true")
+    p_ded.add_argument("--fingerprint", action="store_true",
+                       help="track-level dupe hunt via AcoustID "
+                            "(same recording under different metadata; report only)")
+    p_ded.add_argument("--apply", action="store_true",
+                       help="with --fingerprint: actually trash the lower-quality copies")
 
     p_clean = sub.add_parser(
         "cleanup",
@@ -210,7 +215,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "dedupe":
         from . import dedupe
 
-        return dedupe.cmd_dedupe(dry_run=args.dry_run)
+        return dedupe.cmd_dedupe(
+            dry_run=args.dry_run, fingerprint=args.fingerprint, apply=args.apply
+        )
 
     if args.cmd == "asis":
         from . import asis

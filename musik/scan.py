@@ -251,6 +251,10 @@ def make_unit(path: str, import_path: str, files: list[str], kind: str,
     split_hint = should_split(files, kind)
     if split_hint:
         hints.append("multi-artist-dir")
+    if files and max(len(f) for f in files) > 240:
+        # source already near MAXPATH; the move destination will be at least
+        # as deep — beets' move can silently fail on these
+        hints.append("long-path")
     seen = sorted(set(artist_values(files)) - {""})[:10]
     try:
         names = os.listdir(import_path)
@@ -379,6 +383,13 @@ def classify(root: str) -> tuple[list[dict], list[str]]:
         units = [u for u in units if not u.get("dropped")]
 
     # Root itself may hold loose audio files (handled by visit via files branch).
+    long_path_units = [u for u in units if "long-path" in (u.get("hints") or [])]
+    if long_path_units:
+        notes.append(
+            f"{len(long_path_units)} unit(s) flagged long-path: source paths over "
+            "240 chars — the move to the library may fail silently; check "
+            "reports and shorten if an import errors"
+        )
     return units, notes
 
 
