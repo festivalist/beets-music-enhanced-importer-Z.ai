@@ -86,6 +86,11 @@ def cmd_releases(since: str | None = None) -> int:
         }
         try:
             r = requests.get(BROWSE_URL, params=params, headers=HEADERS, timeout=30)
+            for attempt in range(2):  # MB 503 hiccups are transient
+                if r.status_code < 500:
+                    break
+                time.sleep(5 * (attempt + 1))
+                r = requests.get(BROWSE_URL, params=params, headers=HEADERS, timeout=30)
         except requests.RequestException as e:
             print(f"  {name}: network error ({e.__class__.__name__}) — "
                   "stopping early; timestamp NOT advanced, re-run resumes")
