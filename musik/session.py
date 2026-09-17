@@ -360,6 +360,26 @@ class Decider:
 
     # -- tier 3: own-metadata fallback ---------------------------------------
 
+    # A recorded candidate "contradicts" the files when identity fails on
+    # artist or title level (not on structural noise like track counts or
+    # bare distance). When ALL of the top candidates contradict and the
+    # own tags are complete, the sources demonstrably don't know this
+    # release — import on own tags instead of parking it in review.
+    CONTRADICTION_REASONS = ("artist mismatch", "album title mismatch",
+                             "folder name", "track title mismatch")
+
+    def _contradicts(self, task, cand) -> bool:
+        ok, why = self._names_ok(task, cand)
+        if ok:
+            # Names agree but the release is a different recording (year
+            # veto) — that is a contradiction too, not a review case.
+            return not self._year_ok(cand.info)
+        return why.startswith(self.CONTRADICTION_REASONS)
+
+    def _all_candidates_contradict(self, task, candidates) -> bool:
+        top = candidates[:3]
+        return bool(top) and all(self._contradicts(task, c) for c in top)
+
     def _tier3_check(self) -> dict | None:
         """An 'asis' decision record when the files' own metadata is the
         best available source: lookup genuinely found nothing usable, the
@@ -504,6 +524,17 @@ class Decider:
                 f" candidate {getattr(best.info, 'year', None)}:"
                 f" '{getattr(best.info, 'album', '')}')"
             )
+        # User rule: when the top candidates all contradict the files'
+        # identity (artist/title level), the sources demonstrably don't
+        # know this release — own tags beat a pointless review slot.
+        if self._all_candidates_contradict(task, candidates):
+            tier3 = self._tier3_check()
+            if tier3 is not None:
+                tier3["reason"] = (
+                    "own metadata: all top candidates contradict the tags "
+                    "(artist/title level) — imported as-is by user rule"
+                )
+                return "apply-asis", tier3
         return "skip", {
             "status": "review",
             "reason": "below auto-accept confidence: " + "; ".join(reasons),
@@ -566,6 +597,14 @@ class Decider:
         ok, why = self._item_names_ok(task, best)
         if not ok:
             reasons.append(why)
+        if self._all_candidates_contradict(task, candidates):
+            tier3 = self._tier3_check()
+            if tier3 is not None:
+                tier3["reason"] = (
+                    "own metadata: all top candidates contradict the tags "
+                    "(artist/title level) — imported as-is by user rule"
+                )
+                return "apply-asis", tier3
         return "skip", {
             "status": "review",
             "reason": "below auto-accept confidence: " + "; ".join(reasons),

@@ -13,26 +13,31 @@ from . import state as state_mod
 
 
 def _show(unit: dict) -> None:
+    bar = "=" * 78
+    print("\n" + bar)
+    print(f">>> REVIEW  {unit.get('n_files', '?')} file(s)")
+    print(f"    folder: {os.path.normpath(unit['import_path'])}")
     g = unit.get("guessed") or {}
-    print("=" * 70)
-    print(os.path.basename(unit["import_path"]))
-    print(
-        f"  {unit.get('n_files', '?')} files | guess: "
-        f"{g.get('artist', '?')} - {g.get('album', '?')}"
-    )
+    print(f"    guess : {g.get('artist', '?')} - {g.get('album', '?')}")
     if unit.get("reason"):
-        print(f"  why here: {unit['reason'][:150]}")
+        print(f"    why   : {unit['reason'][:200]}")
+    files = [f for f in (unit.get("files") or []) if os.path.isfile(f)]
+    for f in files[:8]:
+        print(f"    file  : {os.path.basename(f)}")
+    if len(files) > 8:
+        print(f"    … +{len(files) - 8} more")
     cands = unit.get("candidates") or []
     if unit.get("singleton") or unit.get("split_into_singletons"):
-        print("  (singleton unit — choose S, W, X or Q)")
+        print("    (singleton unit — choose S, W, X or Q)")
     for i, c in enumerate(cands[:3], 1):
         print(
-            f"  [{i}] {c.get('source', '?')}: {c.get('artist', '?')} - "
+            f"    [{i}] {c.get('source', '?')}: {c.get('artist', '?')} - "
             f"{c.get('album', '?')} ({c.get('year', '?')}) "
             f"distance {c.get('distance')}"
         )
     if not cands:
-        print("  (no candidates recorded)")
+        print("    (no candidates recorded)")
+    print(bar)
 
 
 def _ask_choice(unit: dict) -> str:

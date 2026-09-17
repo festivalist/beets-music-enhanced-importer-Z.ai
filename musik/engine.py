@@ -418,9 +418,11 @@ def restrict_sources(allowed: list[str] | None) -> None:
     Must run before setup_beets(). Sources not named in `allowed` are
     dropped from the plugin list; enrichment plugins (chroma, fetchart,
     lastgenre, ...) always stay. Used for singleton passes where discogs
-    would write release-level album data into singles.
+    would write release-level album data into singles. `allowed=[]`
+    removes ALL metadata sources (asis imports need none); `None` keeps
+    everything.
     """
-    if not allowed:
+    if allowed is None:
         return
     from beets import config as beets_config
 
@@ -494,6 +496,13 @@ def cmd_import(dry_run: bool = False, statuses: list[str] | None = None,
                 state_mod.set_status(unit, unit.get("status", "pending"),
                                      f"dry-run: {outcome['status']}")
             else:
+                if unit.get("meta_files"):
+                    from .asis import enrich_from_meta_files
+
+                    n = enrich_from_meta_files(unit)
+                    if n:
+                        print(f"[{i}/{len(selected)}] nfo      {label}: "
+                              f"{n} file(s) completed from .nfo/.txt tracklist")
                 outcome = run_unit_real(lib, unit, decider)
                 _merge_result(unit, outcome)
                 state_mod.set_status(unit, outcome["status"],
@@ -503,6 +512,9 @@ def cmd_import(dry_run: bool = False, statuses: list[str] | None = None,
             print("\ninterrupted — state saved; rerun the same command to resume")
             return 130
         except Exception as exc:
+            import traceback
+
+            traceback.print_exc()
             state_mod.set_status(unit, "error", f"{type(exc).__name__}: {exc}")
             print(f"[{i}/{len(selected)}] ERROR  {unit['import_path']}: {exc}")
 

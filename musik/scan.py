@@ -252,6 +252,16 @@ def make_unit(path: str, import_path: str, files: list[str], kind: str,
     if split_hint:
         hints.append("multi-artist-dir")
     seen = sorted(set(artist_values(files)) - {""})[:10]
+    try:
+        names = os.listdir(import_path)
+    except OSError:
+        names = []
+    meta_files = [
+        os.path.normpath(os.path.join(import_path, n))
+        for n in sorted(names)
+        if os.path.splitext(n)[1].lower() in (".nfo", ".txt")
+        and os.path.isfile(os.path.join(import_path, n))
+    ][:3]
     unit = {
         "path": os.path.normpath(path),
         "import_path": os.path.normpath(import_path),
@@ -267,6 +277,7 @@ def make_unit(path: str, import_path: str, files: list[str], kind: str,
         "year_guess": guess_year(import_path),
         "guessed": parse_folder_guess(import_path),
         "unreadable_files": [os.path.normpath(f) for f in bad],
+        "meta_files": meta_files,
         "status": "pending" if n else "ignored",
         "reason": "" if n else (
             "all audio files unreadable (corrupt)" if bad
@@ -455,7 +466,7 @@ def cmd_scan(root: str) -> int:
             for k in ("files", "n_files", "total_duration", "hints",
                       "artists_seen", "import_path", "kind", "source",
                       "singleton", "split_into_singletons", "year_guess",
-                      "guessed", "unreadable_files"):
+                      "guessed", "unreadable_files", "meta_files"):
                 if k in u:
                     old[k] = u[k]
             # A newly-detected dead unit (e.g. cue-only rip) that never
