@@ -138,6 +138,50 @@ musik.bat report --verify
 Finished albums land in your library root as `<Artist>\<year - Album>\<disc-><track> <title>`,
 with `Singles\` and `Compilations\` branches — all configurable in `config.yaml`.
 
+## Library care & discovery
+
+Once the importing is done, these commands keep the library healthy and
+help it grow. Everything is **report-only by default** — writing happens
+only with `--fix` / `--apply`.
+
+```bat
+musik.bat snapshot                          :: zip up DB+config+state+tokens
+                                            ::    into <library>\_backups (rotating,
+                                            ::    last 10 by default); --list shows them
+musik.bat doctor                            :: health check: dead DB rows, orphan files,
+                                            ::    FLAC bitrot decode test, missing art/genre,
+                                            ::    long paths -> reports\doctor-report.md
+musik.bat doctor --quick                    :: skip files already decode-tested
+musik.bat doctor --limit 100                :: decode-test only ~100 files (spot check)
+musik.bat doctor --fix                      :: remove dead rows, backfill art/genre
+musik.bat stats                             :: totals, formats, decades, top artists,
+                                            ::    monthly additions -> library-stats.md
+musik.bat similar                           :: artists you don't have yet, based on
+                                            ::    ListenBrainz similarity of your MB IDs
+                                            ::    -> similar-artists.md (--refresh re-queries)
+musik.bat releases                          :: new album/EP release groups of your library
+                                            ::    artists since the last run -> new-releases.md
+musik.bat retag                             :: re-check as-is albums against the sources
+                                            ::    (report only) -> retag-report.md
+musik.bat dedupe --fingerprint              :: same recording under different metadata
+                                            ::    (AcoustID), report only; --apply trashes
+                                            ::    the lower-quality copy
+```
+
+Notes:
+
+- **Plexamp/Plex**: the library folder is meant to be used directly as a
+  Plex/Plexamp music source. The layout (`Artist\year - Album\`, embedded
+  artwork, ReplayGain tags) is Plex-friendly; after an import session,
+  let Plex scan the folder so new albums show up on the RPi endpoint.
+- ReplayGain (`replaygain` plugin, bundled `bin\ffmpeg.exe`) is applied
+  automatically to future imports and was backfilled once over the whole
+  library; VLC and Plexamp both pick the tags up. `embedart` embeds the
+  fetched cover into every file at import time.
+- FLAC integrity is checked by actually decoding every file against its
+  internal MD5 — the first full `doctor` run takes a while, `--quick`
+  (mtime/size cache) is what the monthly routine uses.
+
 ## How decisions are made
 
 Identification runs as a **priority chain** — the first tier that accepts a
@@ -244,9 +288,12 @@ Rules baked in (no manual work needed):
 | `discogs_token.json` | your Discogs token (written by `setup`, local only) |
 | `.venv\` | the Python environment the installer creates |
 | `bin\fpcalc.exe` | acoustic fingerprinter (downloaded by the installer) |
+| `bin\flac.exe` | FLAC decoder for `doctor` bitrot tests (downloaded by the installer) |
+| `bin\ffmpeg.exe` | loudness analysis for ReplayGain (downloaded by the installer) |
 | `state\state.json` | per-unit progress; crash-safe, resumable |
-| `reports\` | `import-report.md`, `dry-run-report.md`, `scan-report.md`, `review.csv`, `unidentified.csv` |
+| `reports\` | `import-report.md`, `dry-run-report.md`, `scan-report.md`, `review.csv`, `unidentified.csv`, `doctor-report.md`, `library-stats.md`, `similar-artists.md`, `new-releases.md`, `retag-report.md` |
 | `<library>\_trash\` | displaced files + `manifest.csv` for audit/restore |
+| `<library>\_backups\` | `musik snapshot` ZIPs (rotating; move somewhere safe!) |
 | `<library>\beets-library.db` | the beets database |
 
 ## Tuning
@@ -260,6 +307,8 @@ All thresholds live in `config.yaml` under `musik:`:
 | `retry_rounds` | 2 | automatic retry rounds for failed lookups |
 | `retry_cooldown_seconds` | 20 | pause between retry rounds |
 | `trash_dir` | `<library>\_trash` | where displaced files go |
+| `backup_dir` | `<library>\_backups` | where `musik snapshot` stores its ZIPs |
+| `backup_keep` | 10 | how many snapshots to keep (oldest rotated away) |
 
 Beets-level knobs (`match:`, `paths:`, `fetchart:` …) are documented in the
 [beets docs](https://beets.readthedocs.io/); the generated config already

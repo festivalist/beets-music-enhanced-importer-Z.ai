@@ -1,0 +1,4 @@
+- die aktuell 19 offenen review Themen würde ich alle as-is importieren da die 3 besten Kandidaten offensichtlich alle falsch sind. hier möchte ich, dass in solchen Fällen automatisch als as-is importiert wird.
+- in Ordnern kann es sein, dass es bei scene releases .nfo, .txt dateien gibt, die aufschluss auf die tracks geben. Wenn beets, discogs und beatport keinen match finden, die eigenen tags nicht ausschlaggebend genug sind, dann sollen auch die dateien im ordner mit geprüft werden
+- wenn doch manuelles review nötig wird so muss, dann muss der betreffende Track / Album etwas deutlicher sichtbar sein. Das ist aktuell noch mit viel suchen im Text verbunden
+- Analysiere inwieweit wir mit diesem Tool vom normalen Import- und Katalogisierungsstandard von beets abweichen

@@ -102,6 +102,58 @@ if (Test-Path $FpcalcExe) {
     }
 }
 
+# --- 3b. flac (decode tests for `musik doctor` bitrot checks) ----------------
+$FlacUrl = "https://github.com/xiph/flac/releases/download/1.5.0/flac-1.5.0-win.zip"
+$FlacExe = Join-Path $ProjectDir "bin\flac.exe"
+if (Test-Path $FlacExe) {
+    Write-Step "flac already present"
+} else {
+    Write-Step "Downloading flac (1.5.0, for `musik doctor` bitrot checks)"
+    New-Item -ItemType Directory -Force -Path (Join-Path $ProjectDir "bin") | Out-Null
+    $zip = Join-Path $env:TEMP "flac-win.zip"
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri $FlacUrl -OutFile $zip -UseBasicParsing
+        Expand-Archive -Path $zip -DestinationPath (Join-Path $env:TEMP "flac-win") -Force
+        # flac.exe links dynamically — the DLL must sit next to it
+        foreach ($name in @("flac.exe", "libFLAC.dll", "libFLAC++.dll")) {
+            $f = Get-ChildItem (Join-Path $env:TEMP "flac-win") -Recurse -Filter $name |
+                Where-Object { $_.Directory.Name -eq "Win64" } | Select-Object -First 1
+            if ($f) { Copy-Item $f.FullName (Join-Path $ProjectDir "bin\$name") }
+        }
+        Remove-Item $zip -ErrorAction SilentlyContinue
+        Remove-Item (Join-Path $env:TEMP "flac-win") -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Ok "flac installed to bin\flac.exe"
+    } catch {
+        Write-Host "    WARNING: flac download failed ($($_.Exception.Message))" -ForegroundColor Yellow
+        Write-Host "    `musik doctor` will skip FLAC bitrot checks; everything else works." -ForegroundColor Yellow
+    }
+}
+
+# --- 3c. ffmpeg (replaygain loudness tags via the ffmpeg backend) ------------
+$FfmpegUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+$FfmpegExe = Join-Path $ProjectDir "bin\ffmpeg.exe"
+if (Test-Path $FfmpegExe) {
+    Write-Step "ffmpeg already present"
+} else {
+    Write-Step "Downloading ffmpeg (essentials build, for ReplayGain tags)"
+    New-Item -ItemType Directory -Force -Path (Join-Path $ProjectDir "bin") | Out-Null
+    $zip = Join-Path $env:TEMP "ffmpeg-essentials.zip"
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri $FfmpegUrl -OutFile $zip -UseBasicParsing
+        Expand-Archive -Path $zip -DestinationPath (Join-Path $env:TEMP "ffmpeg-essentials") -Force
+        $exe = Get-ChildItem (Join-Path $env:TEMP "ffmpeg-essentials") -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
+        Copy-Item $exe.FullName $FfmpegExe
+        Remove-Item $zip -ErrorAction SilentlyContinue
+        Remove-Item (Join-Path $env:TEMP "ffmpeg-essentials") -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Ok "ffmpeg installed to bin\ffmpeg.exe"
+    } catch {
+        Write-Host "    WARNING: ffmpeg download failed ($($_.Exception.Message))" -ForegroundColor Yellow
+        Write-Host "    ReplayGain is disabled; remove 'replaygain' from config plugins to silence the warning." -ForegroundColor Yellow
+    }
+}
+
 # --- 4. Setup wizard (writes config.yaml for this machine) -------------------
 if (Test-Path (Join-Path $ProjectDir "config.yaml")) {
     Write-Step "config.yaml already exists - keeping it (re-run 'musik setup' to regenerate)"

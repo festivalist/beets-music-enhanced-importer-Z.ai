@@ -13,14 +13,16 @@ a clean, consistent base for a later Plexamp setup.
 
 ## 2. Out of scope
 
-- **Everything Plexamp**: install, configuration, library scanning, sonic analysis, uploads, Plexamp-side playlists. Not this project.
+- **Everything Plexamp**: install, configuration, library scanning, sonic analysis, uploads, Plexamp-side playlists. Not this project. (The library folder remains a clean Plex source; see §4.9.)
 - Acquiring music: ripping, downloading, converting.
-- Audio transcoding/re-encoding, ReplayGain/loudness processing.
-- Splitting cue sheets or one-file recordings into individual tracks.
+- Audio transcoding/re-encoding, splitting cue sheets or one-file recordings into individual tracks.
 - Contributing corrections back to MusicBrainz/Discogs.
 - A GUI — this is a CLI tool.
 - Deezer integration (stays commented out in config unless enabled later).
 - General file management of non-audio files (.nfo, logs, images ≠ cover) beyond ignoring them.
+
+*Scope change 2026-09-17: ReplayGain/loudness tagging moved into scope (§4.9) — it is
+metadata, not audio processing, and both VLC and Plexamp consume the tags.*
 
 ## 3. Binding decisions from config.yaml
 
@@ -30,8 +32,8 @@ a clean, consistent base for a later Plexamp setup.
 - Import **moves** files (no copy) and **writes tags** into the files.
 - Layout templates:
   - Albums: `$albumartist\$original_year - $album%aunique{}\%if{$multidisc,$disc-}$track $title`
-  - Singles: `Singles\$artist\$year - $title`
-  - Compilations: `Compilations\$original_year - $album\%if{$multidisc,$disc-}$track $title`
+  - Singles: `Singles\$artist\$year - $title%aunique{}`
+  - Compilations: `Compilations\$original_year - $album%aunique{}\%if{$multidisc,$disc-}$track $title`
 - Genres: lastgenre (album-level, 3 genres, canonical, specific preferred) with Discogs style appended.
 - Art: `cover.*`, sources filesystem → coverart → itunes → amazon → albumart.
 - Discogs credentials are sourced from a local `discogs_token.json` — never hardcoded or committed.
@@ -47,7 +49,7 @@ a clean, consistent base for a later Plexamp setup.
   lastgenre, chroma, fromfilename, duplicates, fetchart, inline), the
   chromaprint `fpcalc` binary, and the per-machine `config.yaml` via the
   setup wizard.
-- A first-run safety gate: the first pass over the real library is preceded by a dry-run report (classification + match preview, no files touched) and a backup/snapshot recommendation.
+- A first-run safety gate: the first pass over the real library is preceded by a dry-run report (classification + match preview, no files touched) and a backup/snapshot recommendation. Implemented as **`musik snapshot`** (2026-09-17): rotating ZIPs of the beets DB (consistent copy via sqlite3 backup API), config, run state and tokens into `<library>\_backups\` (config `musik: backup_dir:` / `backup_keep:`).
 
 ### 4.2 Input material the tool must handle
 
@@ -104,6 +106,35 @@ a clean, consistent base for a later Plexamp setup.
 - **Session summary**: a drag & drop action marks its start; at the end `musik summary` totals everything that action decided, broken down by release kind (album/EP/single/compilation/mix) and decision type (direct / enhanced / own-tags / undecided / deferred / duplicate / failed), written to `reports/session-report.md`.
 - Final verification pass: tree matches the config.yaml templates, cover art and genres present, every item from `unsorted` accounted for.
 
+### 4.9 Library care & growth (added 2026-09-17)
+
+All commands are report-only by default; anything that writes is gated behind
+`--fix` / `--apply` / an explicit command.
+
+- **`musik snapshot`** — rotating backups (see §4.1).
+- **`musik doctor`** — library health check: dead DB rows, orphan audio files vs
+  still-unimported files in `unsorted\`, FLAC bitrot via decode test (`bin\flac.exe`;
+  non-FLAC via `fpcalc`, fingerprint-holding items trusted between changes),
+  missing art/genre counts, paths >240 chars. `--fix` removes dead rows and
+  backfills art/genre; `--quick` uses an mtime/size pass-cache; `--limit N` spot-checks.
+- **`musik stats`** — collection totals, formats, decades, top artists, monthly
+  additions, genre spread → `reports/library-stats.md`.
+- **`musik similar`** — artists you don't have yet, derived from the ListenBrainz
+  similarity dataset over the library's MusicBrainz artist IDs (per-artist cache in
+  state.json; `--refresh` re-queries) → `reports/similar-artists.md`.
+- **`musik releases`** — new official album/EP release groups of library artists
+  since the last run (MusicBrainz browse, 1 req/s) → `reports/new-releases.md`.
+- **`musik retag`** — re-checks as-is albums against the sources; v1 is
+  report-only (`reports/retag-report.md`). The apply step stays in §8.
+- **Track-level duplicates** — `musik dedupe --fingerprint` groups items by
+  AcoustID/fingerprint prefix (same recording under different metadata);
+  report-only until `--apply`. `dedupe --dry-run` still covers album-level.
+- **Loudness** — `replaygain` plugin (ffmpeg backend, bundled `bin\ffmpeg.exe`)
+  tags RG track/album gain at import and via one-off backfill; VLC and Plexamp
+  consume the tags.
+- **Embedded art** — `embedart` writes the fetched `cover.*` into the files
+  (phones/car/players that ignore folder art); one-off backfill done 2026-09-17.
+
 ## 5. Acceptance criteria
 
 1. After a run, every audio file is in exactly one state — tagged+moved, review-queued, or unmatched-listed. No silent skips.
@@ -131,4 +162,4 @@ test for §4.2. The tool must work for any mix of material, not just these.
 
 ## 8. Future (explicitly not now)
 
-Plexamp project · Deezer plugin · scheduled re-scans · a `retag` command to revisit `asis`-imported units once MusicBrainz indexes them · any web UI.
+Plexamp project · Deezer plugin · scheduled re-scans · `retag --apply` (re-file as-is albums that gained a strong MusicBrainz match — needs a careful move-out/re-import/row-swap flow) · `musik similar` via a user-provided last.fm key as alternative data source · any web UI.

@@ -16,7 +16,7 @@ mit Bewertung (OK / Vorsicht / Abweichung mit Risiko).
 | 6 | Quellen | alle konfigurierten Plugins, immer | `--sources` pro Lauf (Singleton-Pässe ohne Discogs: Release-Ebenen-Datenmüll) | OK — Config bleibt Quelle der Wahrheit, Flag filtert nur |
 | 7 | Tag-Schreiben | `write: yes` Standard | `write: yes` | identisch |
 | 8 | Datei-Handling | `copy` (Standard) ODER `move` | `move: yes, copy: no` | Vorsicht — Nutzerentscheid (Platz); `_trash` + Manifest kompensiert das fehlende Original |
-| 9 | Pfade | `$albumartist/$year - $album` etc. mit `%aunique{}` | `default` mit `%aunique{}`, **`singleton`/`comp` OHNE `%aunique{}`** | ABWEICHUNG MIT RISIKO — Namenskollisionen (gleiches Album zweimal) erzeugen `.1`-Suffixe nur im default-Pfad; in `Compilations\`/`Singles\` kollidieren Pfade still (beets meldet, Pfad wird numeriert, aber DB zeigt alte Pfade). Empfehlung: `%aunique{}` nachrüsten ( kostet nichts, ändert nur Kollisionen ) |
+| 9 | Pfade | `$albumartist/$year - $album` etc. mit `%aunique{}` | alle drei Templates (`default`/`singleton`/`comp`) mit `%aunique{}` (2026-09-17 nachgerüstet; Bestand evtl. via `beet move` migrieren) | OK — Kollisionsrisiko in `Singles\`/`Compilations\` behoben |
 | 10 | `original_year` | MB-Original-Jahr | asis-Imports: `original_year` aus Tag-Jahr nachgefüllt (`_rehome_after_asis`), sonst `0000 -`-Pfade | OK — bekannte asis-Lücke, dokumentiert |
 | 11 | Duplikate | `duplicate_action: ask` | Qualitätsvergleich, Verlierer → `_trash` | OK — deterministischer als ask; Konfig `duplicate_action: skip` bleibt als Sicherheitsnetz für manuelle `beet import` |
 | 12 | Quiet-Fallback | `skip` | `skip` | identisch |
@@ -41,11 +41,12 @@ mit Bewertung (OK / Vorsicht / Abweichung mit Risiko).
 
 ## 3. Empfehlungen aus der Analyse
 
-- `%aunique{}` in `paths.singleton` und `paths.comp` nachrüsten
-  (einzige offen empfohlene Config-Änderung).
-- Bei asis-Reihen (`0000 -`-Pfade) fehlen Jahre — zukünftiges `retag`
-  (SCOPE §8) kann MB-Jahre nachziehen, sobald Releases indexiert sind.
+- ~~`%aunique{}` in `paths.singleton` und `paths.comp` nachrüsten~~
+  **erledigt 2026-09-17** (config + setup-Template).
+- Bei asis-Reihen (`0000 -`-Pfade) fehlen Jahre — `musik retag` (Report
+  seit 2026-09-17) zeigt, welche Alben inzwischen einen MB-Match hätten;
+  der Apply-Schritt (Umbau der Pfade) bleibt SCOPE §8.
 - Langpfad-Disziplin: Quelldateien ≥260 Zeichen bewegen nicht automatisch
   (beets schweigt) — `fix_stuck_moves.py`-Muster als Werkzeug behalten;
-  idealerweise Scan-Warnung bei Unit-Pfaden >240 ausgeben (existiert für
-  `openable`, nicht für Move).
+  Scan-Warnung bei Unit-Pfaden >240 **eingebaut 2026-09-17** (hint
+  `long-path` + Note im Scan-Report).

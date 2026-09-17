@@ -23,7 +23,16 @@ plugins:
     - fromfilename
     - duplicates
     - fetchart
+    - embedart
+    - replaygain
     - inline
+
+embedart:
+    auto: yes
+
+replaygain:
+    auto: yes
+    backend: ffmpeg
 
 item_fields:
     multidisc: 1 if disctotal > 1 else 0
