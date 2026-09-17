@@ -110,6 +110,25 @@ def main(argv: list[str] | None = None) -> int:
                         help="also include pending units (aggressive as-is, no lookup)")
     p_asis.add_argument("--dry-run", action="store_true", help="list eligible units only")
 
+    p_snap = sub.add_parser(
+        "snapshot",
+        help="zip up beets DB, config, run state and tokens (rotating backup)",
+    )
+    p_snap.add_argument("--list", action="store_true", help="list existing snapshots")
+    p_snap.add_argument("--keep", type=int, default=None,
+                        help="keep this many snapshots (default from config)")
+
+    p_doc = sub.add_parser(
+        "doctor",
+        help="library health check: dead rows, orphans, bitrot, art/genre (report-only by default)",
+    )
+    p_doc.add_argument("--fix", action="store_true",
+                       help="remove dead DB rows, backfill missing art/genre")
+    p_doc.add_argument("--quick", action="store_true",
+                       help="skip files already decode-tested (mtime/size cache)")
+    p_doc.add_argument("--limit", type=int, default=None,
+                       help="decode-test at most N files spread across the library (spot check)")
+
     args = parser.parse_args(argv)
 
     if args.cmd != "setup" and not os.path.isfile(
@@ -206,5 +225,15 @@ def main(argv: list[str] | None = None) -> int:
         return cleanup.cmd_cleanup(
             root=args.root, dry_run=args.dry_run, trash_base=args.trash_base
         )
+
+    if args.cmd == "snapshot":
+        from . import backup
+
+        return backup.cmd_snapshot(list_only=args.list, keep=args.keep)
+
+    if args.cmd == "doctor":
+        from . import doctor
+
+        return doctor.cmd_doctor(fix=args.fix, quick=args.quick, limit=args.limit)
 
     parser.error(f"unknown command {args.cmd}")
