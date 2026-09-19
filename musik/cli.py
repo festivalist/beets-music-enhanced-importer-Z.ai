@@ -159,6 +159,16 @@ def main(argv: list[str] | None = None) -> int:
     p_ret2.add_argument("--max-distance", type=float, default=0.10,
                         help="distance under which a match counts as strong (default 0.10)")
 
+    p_fetch = sub.add_parser(
+        "fetch",
+        help="download a Spotify link (spotDL) or YouTube/YT-Music link / "
+             "free-text search (SomeDL) into <library>/_incoming/",
+    )
+    p_fetch.add_argument("inputs", nargs="*",
+                         help="Spotify/YouTube URL(s) or 'artist - title' search text")
+    p_fetch.add_argument("--self-test", action="store_true",
+                         help="verify spotdl/somedl/ffmpeg are installed and exit")
+
     args = parser.parse_args(argv)
 
     if args.cmd != "setup" and not os.path.isfile(
@@ -287,5 +297,10 @@ def main(argv: list[str] | None = None) -> int:
         from . import retag
 
         return retag.cmd_retag(limit=args.limit, max_distance=args.max_distance)
+
+    if args.cmd == "fetch":
+        from . import fetch
+
+        return fetch.cmd_fetch(inputs=args.inputs, self_test=args.self_test)
 
     parser.error(f"unknown command {args.cmd}")

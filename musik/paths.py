@@ -84,3 +84,19 @@ def trash_dir() -> str:
     d = musik_config()["trash_dir"]
     os.makedirs(d, exist_ok=True)
     return d
+
+
+def library_root() -> str:
+    """The beets `directory:` from config.yaml (plain yaml, no beets)."""
+    import yaml
+
+    with open(CONFIG_FILE, encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    return data.get("directory") or os.path.join(os.path.expanduser("~"), "Music")
+
+
+def incoming_dir() -> str:
+    """Staging root for remote downloads (`musik fetch`)."""
+    d = musik_config().get("incoming_dir") or os.path.join(library_root(), "_incoming")
+    os.makedirs(d, exist_ok=True)
+    return d
