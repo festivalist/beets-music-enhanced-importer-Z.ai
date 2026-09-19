@@ -105,6 +105,19 @@ musik:
     review_candidates: 3
     retry_rounds: 2
     retry_cooldown_seconds: 20
+
+    # --- remote-download pipeline (`musik fetch` / `musik bot`) ---
+    # Downloads land under <library>/_incoming/ before import.
+    # Telegram bot: token lives in {telegram_tokenfile}
+    # ({{"token": "123:ABC"}}); these chat ids may submit jobs.
+    # Ask the bot once — its denial reply contains your chat id.
+    bot_allowlist: []
+    # Plex (optional): refresh this library section after imports so new
+    # albums show up in Plexamp without manual scans.
+    plex:
+        # url: http://plexpi:32400
+        # token: YOUR-X-PLEX-TOKEN
+        # section: Musik
 """
 
 
@@ -168,12 +181,25 @@ def cmd_setup(library: str | None = None, discogs_token: str | None = None,
             discogs_line = ""
             print("  discogs            : disabled (add the token later, then re-run setup)")
 
+    telegram_tokenfile = os.path.join(paths.PROJECT_DIR, "telegram_token.json")
+    if not os.path.isfile(telegram_tokenfile):
+        telegram_token = _ask(
+            "Telegram bot token from @BotFather (empty = skip; `musik bot` later)"
+        ).strip()
+        if telegram_token:
+            with open(telegram_tokenfile, "w", encoding="utf-8") as f:
+                json.dump({"token": telegram_token}, f)
+            print(f"  telegram token     : stored in {telegram_tokenfile}")
+    else:
+        print(f"  telegram token     : found existing {telegram_tokenfile}")
+
     cfg = CONFIG_TEMPLATE.format(
         library=library,
         db_file=db_path,
         trash_dir=trash_dir,
         tokenfile=tokenfile,
         discogs_line=discogs_line,
+        telegram_tokenfile=telegram_tokenfile,
     )
     with open(paths.CONFIG_FILE, "w", encoding="utf-8") as f:
         f.write(cfg)
@@ -185,6 +211,8 @@ def cmd_setup(library: str | None = None, discogs_token: str | None = None,
         "  2. python musik.py import --dry-run --unit \"<folder>\"\n"
         "  3. python musik.py import --unit \"<folder>\"\n"
         "  4. python musik.py report --verify\n"
+        "remote downloads: musik.py fetch --import \"<spotify/youtube link>\"\n"
+        "telegram bot    : musik.py bot  (allowlist siehe config.yaml)\n"
         "see README.md for the full workflow, review.csv and the asis command."
     )
     return 0

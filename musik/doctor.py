@@ -11,6 +11,7 @@ Report-only by default; writing happens only with --fix:
 """
 
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -19,7 +20,9 @@ from . import state as state_mod
 from .paths import BIN_DIR, FPCALC, PROJECT_DIR, reports_dir
 from .scan import openable
 
-FLAC_EXE = os.path.join(BIN_DIR, "flac.exe")
+FLAC_EXE = os.path.join(BIN_DIR, "flac.exe") if os.name == "nt" else (
+    shutil.which("flac") or ""
+)
 LONG_PATH_LIMIT = 240
 BEETS_ENV = {**os.environ, "BEETSDIR": PROJECT_DIR}
 

@@ -58,6 +58,81 @@ python -m venv .venv
 .venv\Scripts\python musik.py setup
 ```
 
+**Linux / Raspberry Pi:** run `bash install.sh` instead — same steps
+(Python ≥ 3.10, `.venv`, all dependencies, self test, setup wizard) plus a
+`musik-bot.service` systemd unit for the Telegram bot. Native tools come
+from apt (`ffmpeg`, `libchromaprint-tools`, `flac`).
+
+## Remote downloads: link in, album in the library
+
+Send a Spotify or YouTube link — from anywhere, no local network needed —
+and the pipeline does the rest: download → tag via the full musik chain
+(MusicBrainz etc.) → file into the library → optional Plex scan so it
+shows up in Plexamp. No manual steps in between.
+
+```
+musik.bat fetch --import "https://open.spotify.com/album/4yP0..."   :: album
+musik.bat fetch --import "https://open.spotify.com/playlist/37i..." :: playlist
+musik.bat fetch --import "https://youtu.be/dQw4w9WgXcQ"             :: single track
+musik.bat fetch --import "Rick Astley - Never Gonna Give You Up"    :: free-text search
+musik.bat fetch --self-test                                        :: tool check
+```
+
+Routing: **Spotify** links go through *spotDL*, **YouTube/YT-Music** links
+and free-text searches through *SomeDL* (both pinned in
+`requirements.txt`). Downloads land as `.m4a` in `<library>\_incoming\`,
+one folder per link; albums import as MusicBrainz-matched albums,
+playlists split into `Singles\`, one-track links become singletons.
+Failed tracks are retried automatically; whatever remains is reported.
+
+### The Telegram bot (`musik bot`)
+
+1. Create a bot with [@BotFather](https://t.me/BotFather) (`/newbot`), put
+   its token into `telegram_token.json` next to `config.yaml`:
+   `{"token": "123456:ABC-DEF..."}` (the setup wizard can store it too).
+2. Start the bot: **`musik-bot.bat`** (Windows) or `systemctl start
+   musik-bot` (Pi). It uses long polling — no port forwarding, no tunnel.
+3. Send it any message; the denial reply contains your chat id. Put that
+   id into `config.yaml` under `musik: bot_allowlist: [123...]` and
+   restart the bot.
+4. Now send links: you get progress updates (`⬇️ download`, `📦 N tracks`,
+   import) and a summary per album. `/status` shows queue and history.
+
+This bot is **independent** of the ZCode desktop Telegram relay — it runs
+as its own service with its own token.
+
+### Plex / Plexamp refresh (optional)
+
+Add to `config.yaml` (under `musik:`):
+
+```yaml
+    plex:
+        url: http://plexpi:32400
+        token: YOUR-X-PLEX-TOKEN
+        section: Musik          # optional; first music library if omitted
+```
+
+After each successful import the bot triggers a section scan; the
+"available in Plexamp" follow-up follows with the next Plexamp sync.
+
+### Runbook
+
+- **YouTube breakage** (`YT-DLP download error` on many tracks): update
+  the pinned tools: `.venv\Scripts\python -m pip install -U spotdl somedl`
+  — they carry their own `yt-dlp`. Transient failures already get two
+  automatic retry rounds per job.
+- **Bot detection on unattended servers**: if downloads keep failing,
+  exporting YouTube cookies helps (yt-dlp Netscape format); weigh the
+  risk to the account. Not configured by default.
+- **Big playlists**: SomeDL sleeps between requests; expect a playlist of
+  hundreds of tracks to take a while. Every job is capped at 60 minutes.
+- **Logs**: `reports\fetch\<job>.log` (full downloader output),
+  `.errors` (failed tracks), state of the queue in `state\bot-jobs.json`.
+- **Duplicates**: if a better copy (e.g. FLAC) is already in the library,
+  the download loses the quality comparison and is archived to
+  `_trash\duplicate\` — the bot message says so.
+
+
 ## Usage
 
 All commands run from the tool folder via the `musik.bat` shim. Where

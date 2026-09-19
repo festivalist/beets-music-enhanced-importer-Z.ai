@@ -32,3 +32,4 @@ Thumbs.db
 # --- workspace / assistant tooling --------------------------------------
 .zcode/
 AGENTS.md
+telegram_token.json
