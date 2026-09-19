@@ -168,6 +168,9 @@ def main(argv: list[str] | None = None) -> int:
                          help="Spotify/YouTube URL(s) or 'artist - title' search text")
     p_fetch.add_argument("--self-test", action="store_true",
                          help="verify spotdl/somedl/ffmpeg are installed and exit")
+    p_fetch.add_argument("--import", dest="do_import", action="store_true",
+                         help="after downloading: scan + import + asis fallback + "
+                              "cleanup (full unattended chain)")
 
     args = parser.parse_args(argv)
 
@@ -301,6 +304,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "fetch":
         from . import fetch
 
-        return fetch.cmd_fetch(inputs=args.inputs, self_test=args.self_test)
+        return fetch.cmd_fetch(
+            inputs=args.inputs, self_test=args.self_test,
+            do_import=args.do_import,
+        )
 
     parser.error(f"unknown command {args.cmd}")
