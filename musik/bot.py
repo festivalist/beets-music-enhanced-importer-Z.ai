@@ -160,6 +160,11 @@ async def _post_init(app) -> None:
 
 async def _deny(update: Update) -> None:
     cid = _chat_id(update)
+    # surfaced in the service log so the operator can lift the id into
+    # bot_allowlist without asking the user to copy it around
+    print(f"bot: unauthorized message from chat {cid} "
+          f"(@{(update.effective_user or None) and update.effective_user.username})",
+          flush=True)
     await update.effective_message.reply_text(
         f"🚫 Nicht autorisiert.\n"
         f"Deine Chat-ID ist {cid} — trage sie in config.yaml ein unter\n"
