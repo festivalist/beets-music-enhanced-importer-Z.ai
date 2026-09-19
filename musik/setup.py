@@ -112,6 +112,14 @@ musik:
     # ({{"token": "123:ABC"}}); these chat ids may submit jobs.
     # Ask the bot once — its denial reply contains your chat id.
     bot_allowlist: []
+    # Retry policy for failed tracks (failed tracks are retried targeted,
+    # after a cooldown, with fewer threads and alternate audio providers).
+    fetch:
+        retry_rounds: 3
+        retry_cooldown: 60
+        retry_threads: 1
+        retry_audio: youtube,soundcloud
+        somedl_sleep: 3
     # Plex (optional): refresh this library section after imports so new
     # albums show up in Plexamp without manual scans.
     plex:

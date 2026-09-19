@@ -58,6 +58,10 @@ step "Installing dependencies (beets, spotdl, somedl, telegram bot)"
 "$PY_EXE" -m pip install -r requirements.txt
 ok "dependencies installed"
 
+step "Downloading Deno runtime (yt-dlp needs it for some YouTube videos)"
+"$PY_EXE" -m spotdl --download-deno \
+    || echo "    WARNING: Deno download failed - some YouTube tracks may fail."
+
 # --- 4. Self test -------------------------------------------------------------
 step "Self test (spotdl / somedl / ffmpeg / fpcalc)"
 "$PY_EXE" musik.py fetch --self-test

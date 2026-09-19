@@ -21,10 +21,27 @@ import sysconfig
 import time
 from dataclasses import dataclass, field
 
-from .paths import bootstrap, incoming_dir, reports_dir
+from .paths import bootstrap, incoming_dir, musik_config, reports_dir
 
 VERSION_TIMEOUT = 60
 DOWNLOAD_TIMEOUT = 3600  # per job; the bot wants bounded runs
+
+# Retry policy defaults (config.yaml `musik: fetch:` overrides):
+# Persistent per-video failures ("YT-DLP download error" on the same videos
+# every run) are usually JS-challenge/lockout issues, not rate limits —
+# hence the provider switch and low thread count on retries.
+FETCH_DEFAULTS = {
+    "retry_rounds": 3,          # retry rounds after the initial download
+    "retry_cooldown": 60.0,     # seconds to wait before each retry round
+    "retry_threads": 1,         # spotdl --threads during retries (initial: 4)
+    "retry_audio": "youtube,soundcloud",  # alternate provider order on retries
+    "somedl_sleep": 3,          # SomeDL --sleep on retries (randomized by SomeDL)
+}
+
+
+def _fetch_config() -> dict:
+    cfg = (musik_config().get("fetch") or {})
+    return {k: (cfg.get(k, d)) for k, d in FETCH_DEFAULTS.items()}
 
 _URL_RE = re.compile(r"https?://\S+", re.I)
 _TRAIL_RE = re.compile(r"[)\].,;:!?\"'\u2019\u201d]+$")
@@ -165,6 +182,7 @@ class FetchJob:
     returncode: int = -1
     timed_out: bool = False
     outcomes: list[tuple[str, str]] = field(default_factory=list)  # (unit status, label)
+    prep_notes: list[str] = field(default_factory=list)  # gap-fill/duplicate notes
 
     @property
     def ok(self) -> bool:
@@ -190,26 +208,69 @@ def _new_job_dir(kind: str, query: str) -> str:
     return base
 
 
-def _tool_argv(job: FetchJob, errors_file: str) -> list[str]:
+def _tool_argv(job: FetchJob, errors_file: str, threads: int | None = None,
+               audio: str | None = None, sleep: int | None = None) -> list[str]:
     if job.kind == "spotify":
         # No --archive across jobs: a track downloaded as a single before
         # must not leave a hole in an album later. Within one job dir both
         # tools skip existing files on their own (spotdl overwrite=skip,
         # somedl check_if_file_exists), which is all the retry logic needs.
-        return [
+        argv = [
             *spotdl_cmd(), "download", job.query,
             "--output", os.path.join(job.job_dir, "{artists} - {title}.{output-ext}"),
             "--format", "m4a",
             "--print-errors", "--save-errors", errors_file,
-            "--threads", "4",
+            "--threads", str(threads if threads is not None else 4),
         ]
+        if audio:
+            argv += ["--audio", audio]
+        return argv
     # youtube link or free-text search -> SomeDL (flat default template)
-    return [
+    argv = [
         *somedl_cmd(), job.query,
         "-o", job.job_dir,
         "-f", "best/m4a",
         "--disable-report",
     ]
+    if sleep:
+        argv += ["--sleep", str(sleep)]
+    return argv
+
+
+def _failed_spotify_urls(errors: list[str]) -> list[str]:
+    """Spotify track URLs out of spotDL's error lines (for targeted retries)."""
+    urls: list[str] = []
+    for line in errors:
+        m = re.match(r"(https://open\.spotify\.com/(?:intl-[a-z]{2}/)?track/\S+?)\s+-\s",
+                     line)
+        if m:
+            urls.append(m.group(1))
+    return urls
+
+
+def _retry_argv(job: FetchJob, errors_file: str, rcfg: dict) -> tuple[list[str], int]:
+    """(argv, n_targets) for a retry round — only the failed tracks when we
+    can identify them, with gentler settings (fewer threads, provider
+    fallback / sleep) to get past per-video lockouts."""
+    if job.kind == "spotify":
+        urls = _failed_spotify_urls(job.errors)
+        if urls:
+            argv = [
+                *spotdl_cmd(), "download", *urls,
+                "--output", os.path.join(job.job_dir,
+                                         "{artists} - {title}.{output-ext}"),
+                "--format", "m4a",
+                "--print-errors", "--save-errors", errors_file,
+                "--threads", str(rcfg["retry_threads"]),
+                # --audio takes separate tokens, not a comma string
+                "--audio", *str(rcfg["retry_audio"]).replace(",", " ").split(),
+            ]
+            return argv, len(urls)
+    # SomeDL (or unparseable spotDL errors): re-run the original query;
+    # already-downloaded files are skipped, --sleep adds pacing.
+    return (_tool_argv(job, errors_file,
+                       threads=rcfg["retry_threads"], sleep=rcfg["somedl_sleep"]),
+            0)
 
 
 def _run_logged(argv: list[str], log_path: str, job: FetchJob,
@@ -217,7 +278,7 @@ def _run_logged(argv: list[str], log_path: str, job: FetchJob,
     """Run a subprocess, streaming output to the log file and console."""
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     timed_out = False
-    with open(log_path, "w", encoding="utf-8", errors="replace") as log:
+    with open(log_path, "a", encoding="utf-8", errors="replace") as log:
         log.write("$ " + " ".join(argv) + "\n")
         log.flush()
         proc = subprocess.Popen(
@@ -251,11 +312,14 @@ def _collect(job: FetchJob, errors_file: str) -> None:
 
     job.files = collect_audio_tree(job.job_dir)
     # spotDL's --save-errors file accumulates across retry rounds; count
-    # unique lines so repeated failures don't inflate the error count.
+    # unique lines (its timestamp header is not an error) so repeated
+    # failures don't inflate the error count.
     if os.path.isfile(errors_file):
         with open(errors_file, encoding="utf-8", errors="replace") as fh:
             job.errors = list(dict.fromkeys(
-                l.strip() for l in fh if l.strip()
+                l.strip() for l in fh
+                if l.strip() and not re.fullmatch(
+                    r"\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}", l.strip())
             ))
     # SomeDL has no error file; its end-of-run summary carries the count
     # (last occurrence = most recent retry round).
@@ -270,7 +334,7 @@ def _collect(job: FetchJob, errors_file: str) -> None:
 
 
 def run_fetch(inputs: list[str], timeout_s: float | None = DOWNLOAD_TIMEOUT,
-              retry_rounds: int = 2, quiet: bool = False) -> list[FetchJob]:
+              quiet: bool = False) -> list[FetchJob]:
     bootstrap()
     missing = [k for k, v in tool_versions().items() if not v]
     if missing:
@@ -305,28 +369,38 @@ def run_fetch(inputs: list[str], timeout_s: float | None = DOWNLOAD_TIMEOUT,
         print(f"fetch: [{tool}] {query}")
         print(f"  -> {job.job_dir}")
 
-        # Retry rounds: YouTube hiccups (bot checks, throttling) are often
-        # transient. Existing files in the job dir are skipped by the tools,
-        # so re-running is idempotent. Stop when nothing improved.
+        # Retry rounds: YouTube per-video failures (JS challenges without
+        # Deno, bot lockouts, throttling) are often transient or
+        # provider-specific. Failed tracks are retried targeted, with a
+        # cooldown, lower thread count and alternate audio providers.
+        # Existing files in the job dir are skipped, so this is idempotent.
+        rcfg = _fetch_config()
         deadline = time.monotonic() + timeout_s if timeout_s else None
         job.returncode = _run_logged(
             _tool_argv(job, errors_file), job.log_path, job, deadline_s=deadline,
         )
         _collect(job, errors_file)
-        for round_no in range(1, retry_rounds + 1):
-            prev = (len(job.files), len(job.errors), job.returncode)
-            if not job.errors and job.returncode == 0:
+        rounds_left = rcfg["retry_rounds"]
+        while rounds_left > 0 and (job.errors or job.returncode != 0):
+            if deadline is not None and time.monotonic() > deadline:
+                job.errors.append("time budget exhausted before retry")
                 break
-            print(f"  retry round {round_no} "
-                  f"({len(job.errors)} error line(s) so far)")
+            prev = (len(job.files), len(job.errors))
+            argv, n_targets = _retry_argv(job, errors_file, rcfg)
+            targets = f"{n_targets} fehlgeschlagene Track(s)" if n_targets \
+                else "komplette Anfrage"
+            print(f"  retry in {rcfg['retry_cooldown']:.0f}s "
+                  f"({targets}, runde {rcfg['retry_rounds'] - rounds_left + 1}) …")
+            time.sleep(rcfg["retry_cooldown"])
             with open(job.log_path, "a", encoding="utf-8") as log:
-                log.write(f"\n===== retry round {round_no} =====\n")
+                log.write(f"\n===== retry round {rcfg['retry_rounds'] - rounds_left + 1} =====\n")
             job.returncode = _run_logged(
-                _tool_argv(job, errors_file), job.log_path, job,
+                argv, job.log_path, job,
                 deadline_s=(time.monotonic() + timeout_s if timeout_s else None),
             )
             _collect(job, errors_file)
-            if (len(job.files), len(job.errors), job.returncode) == prev:
+            rounds_left -= 1
+            if (len(job.files), len(job.errors)) == prev:
                 print("  no progress, stopping retries")
                 break
         jobs.append(job)
@@ -398,6 +472,195 @@ def _unit_label(u: dict) -> str:
     return artists[0] if artists else os.path.basename(u.get("path", ""))
 
 
+def _norm_title(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", (s or "").lower())
+
+
+def _tag_trackno(path: str) -> int | None:
+    from .scan import tag_of
+
+    v = tag_of(path, "tracknumber") or ""
+    m = re.match(r"(\d+)", v)
+    return int(m.group(1)) if m else None
+
+
+def _insert_gap_tracks(files: list[str], target, lib) -> tuple[list[str], list[str]]:
+    """Insert missing tracks of an album that is already in the library.
+
+    Bypasses the import engine (which decides duplicates at album level and
+    would discard them wholesale): items get the existing album_id, move to
+    the template path inside the album folder, then per-track replaygain +
+    art embedding. Returns (inserted, failed) file paths.
+    """
+    from beets.library import Item
+
+    inserted: list[str] = []
+    inserted_tracks: list[int] = []
+    failed: list[str] = []
+    for f in files:
+        # read tags while the file still exists in staging
+        tn = _tag_trackno(f)
+        item = None
+        try:
+            from beets.library import Item
+
+            item = Item.from_path(os.fsencode(f))
+            item.album_id = target.id
+            # Align album-level fields with the album row so the paths
+            # template resolves into the existing album folder.
+            item.albumartist = target.albumartist
+            item.album = target.album
+            if not item.original_year:
+                item.original_year = target.year
+            if not item.year:
+                item.year = target.year
+            # add first (move requires a DB row), move second; a failed
+            # move must not leave a phantom row pointing into staging
+            item.add(lib)
+            item.move(with_album=False)
+            item.store()
+            inserted.append(f)
+            if tn:
+                inserted_tracks.append(tn)
+        except Exception as e:
+            print(f"import: gap insert failed for {f}: {e}")
+            if item is not None and item.id is not None:
+                try:
+                    item.remove(delete=False)
+                except Exception:
+                    pass
+            failed.append(f)
+
+    if inserted:
+        bootstrap()
+        env = dict(os.environ)
+        for tn in inserted_tracks:
+            for args in (("replaygain",), ("embedart",)):
+                subprocess.run(
+                    [sys.executable, "-m", "beets", *args,
+                     f"album_id:{target.id}", f"track:{tn}"],
+                    env=env, capture_output=True, timeout=300,
+                )
+    return inserted, failed
+
+
+def _prepare_units(root: str) -> list[str]:
+    """Pre-import pass over this job's pending units (state must be saved
+    afterwards by the caller):
+
+    - album already in the library: re-downloaded known tracks are trashed
+      right away and only the MISSING tracks stay in the unit — that is how
+      a re-fetch fills gaps instead of losing the album-level duplicate
+      comparison as a whole. One-track gap fills keep album kind (they
+      belong into the album folder, not Singles\\).
+    - otherwise: a unit that produced a single track (track links, or an
+      album where all but one download failed) imports as a singleton.
+
+    Returns human-readable notes for the job summary.
+    """
+    from . import state as state_mod
+    from .engine import setup_beets
+    from .scan import tag_of
+    from .trash import trash_files
+
+    st = state_mod.load()
+    units = state_mod.units(st)
+    root_key = os.path.normcase(os.path.normpath(root))
+
+    setup_beets()
+    from beets import config as beets_config
+    from beets.library import Library
+
+    lib = Library(beets_config["library"].as_filename(),
+                  beets_config["directory"].as_filename())
+    lib_albums = list(lib.albums())
+
+    def find_album(artist: str, album: str):
+        best = None
+        for a in lib_albums:
+            if _norm_title(a.album) != _norm_title(album):
+                continue
+            if artist and _norm_title(a.albumartist) == _norm_title(artist):
+                return a
+            best = best or a
+        return best
+
+    notes: list[str] = []
+    changed = False
+    for key, u in units.items():
+        k = os.path.normcase(os.path.normpath(key))
+        if k != root_key and not k.startswith(root_key + os.sep):
+            continue
+        if u.get("status") != "pending" or u.get("split_into_singletons"):
+            continue
+        files = u.get("files") or []
+        if not files:
+            continue
+
+        artist = tag_of(files[0], "albumartist") or tag_of(files[0], "artist")
+        album = tag_of(files[0], "album")
+        target = find_album(artist, album) if album else None
+
+        if target is not None:
+            existing: dict[int, str] = {}
+            for it in target.items():
+                existing[int(it.track or 0)] = _norm_title(it.title)
+            titles = {t for t in existing.values() if t}
+            keep, known = [], []
+            for f in files:
+                tn = _tag_trackno(f)
+                title = _norm_title(tag_of(f, "title"))
+                if tn and title and existing.get(tn) == title:
+                    known.append(f)
+                elif title and not tn and title in titles:
+                    known.append(f)
+                else:
+                    keep.append(f)
+            if known:
+                trash_files(
+                    known, "duplicate",
+                    f"re-download of a track already in the library "
+                    f"({artist} - {album})",
+                )
+                u["files"] = [f for f in files if f in set(keep)]
+                u["n_files"] = len(u["files"])
+                changed = True
+            if not u["files"]:
+                u["status"] = "duplicate"
+                u["reason"] = "album already complete in the library"
+                u["guessed"] = {"artist": artist, "album": album}
+                changed = True
+                notes.append(f"• {artist} - {album}: bereits vollständig "
+                             f"vorhanden ({len(known)} Re-Download(s) verworfen)")
+            else:
+                # Fill the gaps straight into the existing album row; only
+                # files the inserter could not handle fall back to the
+                # normal import chain.
+                inserted, failed = _insert_gap_tracks(u["files"], target, lib)
+                u["files"] = failed
+                u["n_files"] = len(failed)
+                changed = True
+                if inserted and not failed:
+                    u["status"] = "auto"
+                    u["reason"] = (f"{len(inserted)} gap track(s) inserted "
+                                   f"into the existing album")
+                    u["guessed"] = {"artist": artist, "album": album}
+                    notes.append(
+                        f"• {artist} - {album}: {len(inserted)} fehlende "
+                        f"Track(s) ins vorhandene Album ergänzt")
+                elif inserted:
+                    notes.append(
+                        f"• {artist} - {album}: {len(inserted)} Track(s) "
+                        f"ergänzt, {len(failed)} über normalen Import")
+        elif u.get("n_files", 0) == 1 and not u.get("singleton"):
+            u["singleton"] = True
+            changed = True
+
+    if changed:
+        state_mod.save(st)
+    return notes
+
+
 def _import_job(job: FetchJob) -> list[tuple[str, str]]:
     """Run the full non-interactive chain for one fetch job's folder.
 
@@ -416,24 +679,13 @@ def _import_job(job: FetchJob) -> list[tuple[str, str]]:
     print(f"import: scanning {root}")
     scan_mod.cmd_scan(root)
 
-    # A link that produced a single track (track links, or an album where
-    # all but one download failed) imports as a singleton -> Singles\ path,
-    # not as a one-track "album" folder. Scoped to this job's units only.
-    st = state_mod.load()
-    units = state_mod.units(st)
-    root_key = os.path.normcase(root)
-    patched = 0
-    for key, u in units.items():
-        k = os.path.normcase(os.path.normpath(key))
-        if k != root_key and not k.startswith(root_key + os.sep):
-            continue
-        if u.get("n_files", 0) == 1 and not u.get("singleton"):
-            u["singleton"] = True
-            u["split_into_singletons"] = False
-            patched += 1
-    if patched:
-        state_mod.save(st)
-        print(f"import: {patched} single-track unit(s) import as singletons")
+    # Gap-aware pre-pass: album already in the library -> only missing
+    # tracks stay in the unit; single-track units (no such album) become
+    # singletons -> Singles\ path, not a one-track "album" folder.
+    prep_notes = _prepare_units(root)
+    job.prep_notes = prep_notes
+    for note in prep_notes:
+        print(f"import: {note}")
 
     print("import: running import (musicbrainz chain)")
     engine.cmd_import(only=root)
@@ -522,6 +774,7 @@ def summarize_job(job: "FetchJob") -> str:
         lines.append(f"{failed} Fehler/fehlgeschlagene Track(s) — Log: {job.log_path}")
     if job.timed_out:
         lines.append("Zeitlimit erreicht, Job wurde abgebrochen")
+    lines.extend(job.prep_notes)
     for status, label in job.outcomes:
         note = {
             "auto": "importiert (MusicBrainz-Match)",
@@ -529,6 +782,6 @@ def summarize_job(job: "FetchJob") -> str:
             "duplicate": "Duplikat — bessere Kopie existierte schon",
         }.get(status, f"Status {status} — liegt weiter in _incoming")
         lines.append(f"• {label}: {note}")
-    if not job.outcomes:
+    if not job.outcomes and not job.prep_notes:
         lines.append("kein Import (nichts Klassifizierbares heruntergeladen)")
     return "\n".join(lines)

@@ -79,6 +79,16 @@ Write-Step "Installing dependencies (beets and friends)"
 if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
 Write-Ok "dependencies installed"
 
+# --- 2b. Deno (yt-dlp needs it for some YouTube videos; without it those
+#         fail with sporadic "YT-DLP download error") ------------------------
+Write-Step "Downloading Deno runtime (for spotDL/SomeDL YouTube downloads)"
+& $PyExe -m spotdl --download-deno
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "    WARNING: Deno download failed - some YouTube tracks may fail." -ForegroundColor Yellow
+} else {
+    Write-Ok "Deno installed (into %USERPROFILE%\.spotdl)"
+}
+
 # --- 3. fpcalc (acoustic fingerprinter for the chroma plugin) ---------------
 $FpcalcExe = Join-Path $ProjectDir "bin\fpcalc.exe"
 if (Test-Path $FpcalcExe) {

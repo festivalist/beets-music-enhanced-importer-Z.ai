@@ -117,10 +117,18 @@ After each successful import the bot triggers a section scan; the
 
 ### Runbook
 
-- **YouTube breakage** (`YT-DLP download error` on many tracks): update
-  the pinned tools: `.venv\Scripts\python -m pip install -U spotdl somedl`
-  — they carry their own `yt-dlp`. Transient failures already get two
-  automatic retry rounds per job.
+- **`YT-DLP download error` on individual tracks**: the #1 cause is a
+  missing **Deno** runtime — yt-dlp needs it to solve YouTube's JS
+  challenges on certain videos, and without it those same videos fail
+  every run. The installers fetch Deno automatically; manual fix:
+  `.venv\Scripts\python -m spotdl --download-deno`. Failed tracks are
+  retried automatically: 3 rounds, 60 s cooldown, single-threaded, only
+  the failed tracks, with alternate audio providers
+  (`musik: fetch:` in config.yaml tunes all of this).
+- **Mass breakage** (nearly all tracks fail): YouTube changed something —
+  update the pinned tools:
+  `.venv\Scripts\python -m pip install -U spotdl somedl` (they carry
+  their own `yt-dlp`).
 - **Bot detection on unattended servers**: if downloads keep failing,
   exporting YouTube cookies helps (yt-dlp Netscape format); weigh the
   risk to the account. Not configured by default.
