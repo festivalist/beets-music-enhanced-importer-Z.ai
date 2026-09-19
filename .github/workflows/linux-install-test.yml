@@ -29,36 +29,16 @@ jobs:
       - name: Run install.sh
         run: |
           set -o pipefail
-          bash install.sh --no-systemd --library "$HOME/Music" 2>&1 | tee install.log
-
-      # Log download needs repo-admin rights, so failures report themselves
-      # as an issue (publicly readable) with the log tail attached.
-      - name: Report failure as issue
-        if: failure()
-        run: |
-          python3 - <<'EOF'
-          import json, os, urllib.request
-          body = open("install.log", encoding="utf-8", errors="replace").read()
-          req = urllib.request.Request(
-              "https://api.github.com/repos/" + os.environ["REPO"] + "/issues",
-              data=json.dumps({
-                  "title": "linux-install-test failed (" + os.environ["RUNNER"] + ")",
-                  "body": "```\n" + body[-6000:] + "\n```\n_Auto-created by CI._",
-              }).encode(),
-              headers={
-                  "Authorization": "token " + os.environ["TOKEN"],
-                  "Accept": "application/vnd.github+json",
-              })
-          try:
-              urllib.request.urlopen(req)
-              print("failure issue created")
-          except Exception as e:
-              print("could not create issue:", e)
-          EOF
-        env:
-          REPO: ${{ github.repository }}
-          RUNNER: ${{ matrix.runner }}
-          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          if bash install.sh --no-systemd --library "$HOME/Music" 2>&1 | tee install.log; then
+            exit 0
+          fi
+          # surface the log tail as error annotations (readable via the
+          # public check-runs API when log download needs auth;
+          # GitHub caps annotations at 10 per step)
+          tail -n 10 install.log | while IFS= read -r line; do
+            printf '::error::%s\n' "${line//'%'/'%25'}"
+          done
+          exit 1
 
       - name: Self test (spotdl / somedl / ffmpeg / fpcalc)
         run: .venv/bin/python musik.py fetch --self-test
