@@ -61,4 +61,12 @@ jobs:
           EOF
 
       - name: doctor quick run (library bootstrap on Linux)
-        run: .venv/bin/python musik.py doctor --quick --limit 3
+        run: |
+          set -o pipefail
+          if .venv/bin/python musik.py doctor --quick --limit 3 2>&1 | tee doctor.log; then
+            exit 0
+          fi
+          tail -n 10 doctor.log | while IFS= read -r line; do
+            printf '::error::%s\n' "${line//'%'/'%25'}"
+          done
+          exit 1
