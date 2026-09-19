@@ -25,7 +25,7 @@ ok()   { printf '    %s\n' "$1"; }
 # --- 1. System packages ------------------------------------------------------
 step "Installing system packages (python3-venv, ffmpeg, fpcalc, flac)"
 SUDO=""
-[[ $EUID -ne 0 ]] && SUDO="sudo"
+if [[ $EUID -ne 0 ]]; then SUDO="sudo"; fi
 if command -v apt-get >/dev/null 2>&1; then
     $SUDO apt-get update -qq
     $SUDO apt-get install -y -qq python3 python3-venv python3-pip \
