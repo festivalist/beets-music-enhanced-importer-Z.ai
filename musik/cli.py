@@ -172,6 +172,11 @@ def main(argv: list[str] | None = None) -> int:
                          help="after downloading: scan + import + asis fallback + "
                               "cleanup (full unattended chain)")
 
+    sub.add_parser(
+        "bot",
+        help="run the Telegram bot service (link in -> music in the library)",
+    )
+
     args = parser.parse_args(argv)
 
     if args.cmd != "setup" and not os.path.isfile(
@@ -308,5 +313,10 @@ def main(argv: list[str] | None = None) -> int:
             inputs=args.inputs, self_test=args.self_test,
             do_import=args.do_import,
         )
+
+    if args.cmd == "bot":
+        from . import bot
+
+        return bot.cmd_bot()
 
     parser.error(f"unknown command {args.cmd}")
