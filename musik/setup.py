@@ -156,9 +156,13 @@ def cmd_setup(library: str | None = None, discogs_token: str | None = None,
     print("  state/reports      : inside the tool folder")
     print()
 
-    if not os.path.isdir(library):
-        # The folder may arrive later; beets needs it before the first import.
-        print(f"note: {library} does not exist yet — create it before importing.")
+    # beets/sqlite cannot create the DB inside a folder that doesn't exist
+    # (fresh CI machines, not-yet-mounted Pi USB paths) — create it here.
+    try:
+        os.makedirs(library, exist_ok=True)
+    except OSError as e:
+        print(f"warning: could not create {library} ({e}) — "
+              "create it before the first import.")
 
     if unsorted:
         print(f"  incoming folder    : {os.path.abspath(unsorted)}")
