@@ -62,11 +62,7 @@ step "Downloading Deno runtime (yt-dlp needs it for some YouTube videos)"
 "$PY_EXE" -m spotdl --download-deno \
     || echo "    WARNING: Deno download failed - some YouTube tracks may fail."
 
-# --- 4. Self test -------------------------------------------------------------
-step "Self test (spotdl / somedl / ffmpeg / fpcalc)"
-"$PY_EXE" musik.py fetch --self-test
-
-# --- 5. Setup wizard ----------------------------------------------------------
+# --- 5. Setup wizard (before the self test: fetch needs config.yaml) --------
 if [[ -f "$PROJECT_DIR/config.yaml" ]]; then
     step "config.yaml already exists - keeping it (re-run 'musik setup' to regenerate)"
 else
@@ -78,7 +74,11 @@ else
     fi
 fi
 
-# --- 6. systemd service for the bot -------------------------------------------
+# --- 6. Self test -------------------------------------------------------------
+step "Self test (spotdl / somedl / ffmpeg / fpcalc)"
+"$PY_EXE" musik.py fetch --self-test
+
+# --- 7. systemd service for the bot -------------------------------------------
 if [[ $NO_SYSTEMD -eq 0 ]] && command -v systemctl >/dev/null 2>&1; then
     step "Installing systemd service (musik-bot.service)"
     RUN_USER="${SUDO_USER:-$(id -un)}"
@@ -112,7 +112,7 @@ else
     step "Skipping systemd service (--no-systemd or no systemctl)"
 fi
 
-# --- 7. Done -------------------------------------------------------------------
+# --- 8. Done -------------------------------------------------------------------
 step "Ready."
 cat <<'EOF'
 

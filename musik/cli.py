@@ -179,7 +179,9 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
 
-    if args.cmd != "setup" and not os.path.isfile(
+    if args.cmd != "setup" and not (
+        args.cmd == "fetch" and args.self_test
+    ) and not os.path.isfile(
         os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                      "config.yaml")
     ):
