@@ -6,3 +6,8 @@ PyYAML
 requests
 Pillow  # embedart
 pylast  # lastgenre
+
+# remote-download pipeline (`musik fetch` / `musik bot`)
+spotdl~=4.5.2    # Spotify links -> YouTube audio (yt-dlp bundled)
+somedl~=1.7.1    # YouTube/YT-Music links + free-text searches
+python-telegram-bot~=22.0  # own bot, long polling (no port forwarding)

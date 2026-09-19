@@ -154,6 +154,12 @@ def _backfill(what: str, args: list[str]) -> str | None:
 
 
 def cmd_doctor(fix: bool = False, quick: bool = False, limit: int | None = None) -> int:
+    from .fetch import tool_versions
+
+    tools = tool_versions()
+    for name, ver in tools.items():
+        print(f"fetch tool {name}: {ver if ver else 'MISSING'}")
+
     lib = _open_library()
     items = list(lib.items())
     albums = list(lib.albums())
@@ -232,6 +238,8 @@ def cmd_doctor(fix: bool = False, quick: bool = False, limit: int | None = None)
         f"| albums missing genre | {len(missing_genre)} |",
         f"| items over {LONG_PATH_LIMIT} chars | {len(long_paths)} |",
     ]
+    for name, ver in tools.items():
+        lines.append(f"| fetch tool {name} | {ver if ver else 'MISSING (musik fetch disabled — re-run install)'} |")
     if audio_note:
         lines.append(f"| {audio_note} | - |")
     if fix:
