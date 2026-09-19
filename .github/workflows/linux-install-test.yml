@@ -1,0 +1,53 @@
+# Tests install.sh on clean Ubuntu VMs — x64 and arm64 (arm64 matches the
+# Raspberry Pi target). Validates the whole Linux install path: apt tools,
+# venv, pip deps (spotdl/somedl), Deno, setup wizard (non-interactive),
+# fetch self-test.
+name: linux-install-test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "install.sh"
+      - "requirements.txt"
+      - "musik/**"
+      - ".github/workflows/linux-install-test.yml"
+  workflow_dispatch:
+
+jobs:
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest        # x86-64
+          - runner: ubuntu-24.04-arm     # aarch64 (Raspberry Pi arch)
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run install.sh
+        run: bash install.sh --no-systemd --library "$HOME/Music"
+
+      - name: Self test (spotdl / somedl / ffmpeg / fpcalc)
+        run: .venv/bin/python musik.py fetch --self-test
+
+      - name: CLI smoke test (classify + config render)
+        run: |
+          .venv/bin/python - <<'EOF'
+          from musik.fetch import classify
+          from musik.setup import CONFIG_TEMPLATE
+          assert classify("https://open.spotify.com/album/4yP0hdKOZPNshxUOjY0cZj") == [
+              ("spotify", "https://open.spotify.com/album/4yP0hdKOZPNshxUOjY0cZj")]
+          assert classify("https://youtu.be/dQw4w9WgXcQ")[0][0] == "youtube"
+          assert classify("Nirvana - Smells Like Teen Spirit") == [
+              ("search", "Nirvana - Smells Like Teen Spirit")]
+          cfg = CONFIG_TEMPLATE.format(
+              library="X", db_file="Y", trash_dir="Z", tokenfile="T",
+              discogs_line="", telegram_tokenfile="tt.json")
+          assert "bot_allowlist" in cfg and "retry_rounds" in cfg
+          print("classify + config template OK")
+          EOF
+
+      - name: doctor quick run (library bootstrap on Linux)
+        run: .venv/bin/python musik.py doctor --quick --limit 3
