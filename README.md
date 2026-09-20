@@ -58,7 +58,7 @@ python -m venv .venv
 .venv\Scripts\python musik.py setup
 ```
 
-**Linux / Raspberry Pi:** run `bash install.sh` instead — same steps
+**Linux / Raspberry Pi:** see [DEPLOY-RASPBERRY-PI.md](DEPLOY-RASPBERRY-PI.md) for a full from-scratch walkthrough. Short version: run `bash install.sh` — same steps
 (Python ≥ 3.10, `.venv`, all dependencies, self test, setup wizard) plus a
 `musik-bot.service` systemd unit for the Telegram bot. Native tools come
 from apt (`ffmpeg`, `libchromaprint-tools`, `flac`).
