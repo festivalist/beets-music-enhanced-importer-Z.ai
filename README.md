@@ -129,9 +129,17 @@ After each successful import the bot triggers a section scan; the
   update the pinned tools:
   `.venv\Scripts\python -m pip install -U spotdl somedl` (they carry
   their own `yt-dlp`).
-- **Bot detection on unattended servers**: if downloads keep failing,
-  exporting YouTube cookies helps (yt-dlp Netscape format); weigh the
-  risk to the account. Not configured by default.
+- **YouTube Premium (higher quality, fewer challenges)**: export cookies
+  from a browser where you are logged into YouTube (Music) Premium —
+  browser extension "Get cookies.txt LOCALLY" (or any yt-dlp-compatible
+  exporter) on `https://music.youtube.com`, Netscape format — and save the
+  file as `cookies.txt` in the tool folder (config `musik: fetch:
+  cookies_file`, gitignored). This unlocks **256 kbps** for spotDL
+  (instead of the free 128 kbps), reduces bot challenges and covers
+  age-restricted videos. Note: YouTube may flag accounts used for
+  automated downloads — your call; a re-export is needed after logging
+  out or a password change (expired cookies simply fall back to anonymous
+  downloads with a warning in the log).
 - **Big playlists**: SomeDL sleeps between requests; expect a playlist of
   hundreds of tracks to take a while. Every job is capped at 60 minutes.
 - **Logs**: `reports\fetch\<job>.log` (full downloader output),

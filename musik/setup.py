@@ -120,6 +120,10 @@ musik:
         retry_threads: 1
         retry_audio: youtube,soundcloud
         somedl_sleep: 3
+        # YouTube (Music) Premium: export cookies from your logged-in
+        # browser (Netscape format) to this file -> 256 kbps downloads,
+        # fewer bot challenges, age-restricted videos. See README runbook.
+        cookies_file: cookies.txt
     # Plex (optional): refresh this library section after imports so new
     # albums show up in Plexamp without manual scans.
     plex:

@@ -36,12 +36,32 @@ FETCH_DEFAULTS = {
     "retry_threads": 1,         # spotdl --threads during retries (initial: 4)
     "retry_audio": "youtube,soundcloud",  # alternate provider order on retries
     "somedl_sleep": 3,          # SomeDL --sleep on retries (randomized by SomeDL)
+    # Netscape-format cookies exported from a browser logged into YouTube
+    # (Music) Premium. Unlocks 256 kbps for spotDL, fewer bot challenges and
+    # age-restricted videos. Empty = anonymous downloads (128 kbps).
+    "cookies_file": "",
 }
 
 
 def _fetch_config() -> dict:
     cfg = (musik_config().get("fetch") or {})
     return {k: (cfg.get(k, d)) for k, d in FETCH_DEFAULTS.items()}
+
+
+def _cookie_path(rcfg: dict) -> str | None:
+    """Resolved cookies file or None. Relative paths resolve against the
+    project dir (the bot may run from anywhere)."""
+    raw = str(rcfg.get("cookies_file") or "").strip()
+    if not raw:
+        return None
+    from .paths import PROJECT_DIR
+
+    path = raw if os.path.isabs(raw) else os.path.join(PROJECT_DIR, raw)
+    if not os.path.isfile(path):
+        print(f"fetch: WARNING cookies_file configured but missing: {path} "
+              f"— downloading anonymously")
+        return None
+    return path
 
 _URL_RE = re.compile(r"https?://\S+", re.I)
 _TRAIL_RE = re.compile(r"[)\].,;:!?\"'\u2019\u201d]+$")
@@ -209,7 +229,8 @@ def _new_job_dir(kind: str, query: str) -> str:
 
 
 def _tool_argv(job: FetchJob, errors_file: str, threads: int | None = None,
-               audio: str | None = None, sleep: int | None = None) -> list[str]:
+               audio: str | None = None, sleep: int | None = None,
+               cookies: str | None = None) -> list[str]:
     if job.kind == "spotify":
         # No --archive across jobs: a track downloaded as a single before
         # must not leave a hole in an album later. Within one job dir both
@@ -224,6 +245,8 @@ def _tool_argv(job: FetchJob, errors_file: str, threads: int | None = None,
         ]
         if audio:
             argv += ["--audio", audio]
+        if cookies:
+            argv += ["--cookie-file", cookies]
         return argv
     # youtube link or free-text search -> SomeDL (flat default template)
     argv = [
@@ -234,6 +257,8 @@ def _tool_argv(job: FetchJob, errors_file: str, threads: int | None = None,
     ]
     if sleep:
         argv += ["--sleep", str(sleep)]
+    if cookies:
+        argv += ["--cookies", cookies]
     return argv
 
 
@@ -248,7 +273,8 @@ def _failed_spotify_urls(errors: list[str]) -> list[str]:
     return urls
 
 
-def _retry_argv(job: FetchJob, errors_file: str, rcfg: dict) -> tuple[list[str], int]:
+def _retry_argv(job: FetchJob, errors_file: str, rcfg: dict,
+                cookies: str | None = None) -> tuple[list[str], int]:
     """(argv, n_targets) for a retry round — only the failed tracks when we
     can identify them, with gentler settings (fewer threads, provider
     fallback / sleep) to get past per-video lockouts."""
@@ -265,11 +291,14 @@ def _retry_argv(job: FetchJob, errors_file: str, rcfg: dict) -> tuple[list[str],
                 # --audio takes separate tokens, not a comma string
                 "--audio", *str(rcfg["retry_audio"]).replace(",", " ").split(),
             ]
+            if cookies:
+                argv += ["--cookie-file", cookies]
             return argv, len(urls)
     # SomeDL (or unparseable spotDL errors): re-run the original query;
     # already-downloaded files are skipped, --sleep adds pacing.
     return (_tool_argv(job, errors_file,
-                       threads=rcfg["retry_threads"], sleep=rcfg["somedl_sleep"]),
+                       threads=rcfg["retry_threads"], sleep=rcfg["somedl_sleep"],
+                       cookies=cookies),
             0)
 
 
@@ -375,9 +404,13 @@ def run_fetch(inputs: list[str], timeout_s: float | None = DOWNLOAD_TIMEOUT,
         # cooldown, lower thread count and alternate audio providers.
         # Existing files in the job dir are skipped, so this is idempotent.
         rcfg = _fetch_config()
+        cookies = _cookie_path(rcfg)
+        if cookies:
+            print(f"  using YouTube cookies: {cookies}")
         deadline = time.monotonic() + timeout_s if timeout_s else None
         job.returncode = _run_logged(
-            _tool_argv(job, errors_file), job.log_path, job, deadline_s=deadline,
+            _tool_argv(job, errors_file, cookies=cookies),
+            job.log_path, job, deadline_s=deadline,
         )
         _collect(job, errors_file)
         rounds_left = rcfg["retry_rounds"]
@@ -386,7 +419,7 @@ def run_fetch(inputs: list[str], timeout_s: float | None = DOWNLOAD_TIMEOUT,
                 job.errors.append("time budget exhausted before retry")
                 break
             prev = (len(job.files), len(job.errors))
-            argv, n_targets = _retry_argv(job, errors_file, rcfg)
+            argv, n_targets = _retry_argv(job, errors_file, rcfg, cookies=cookies)
             targets = f"{n_targets} fehlgeschlagene Track(s)" if n_targets \
                 else "komplette Anfrage"
             print(f"  retry in {rcfg['retry_cooldown']:.0f}s "
