@@ -136,10 +136,27 @@ After each successful import the bot triggers a section scan; the
   file as `cookies.txt` in the tool folder (config `musik: fetch:
   cookies_file`, gitignored). This unlocks **256 kbps** for spotDL
   (instead of the free 128 kbps), reduces bot challenges and covers
-  age-restricted videos. Note: YouTube may flag accounts used for
-  automated downloads — your call; a re-export is needed after logging
-  out or a password change (expired cookies simply fall back to anonymous
+  age-restricted videos. A re-export is needed after logging out or a
+  password change (expired cookies simply fall back to anonymous
   downloads with a warning in the log).
+
+  Keeping the risk to the account low — what's already built in:
+  authenticated runs use at most 2 download threads, SomeDL paces its
+  requests (`--sleep`), failed-track retries wait 60 s+, and a detected
+  YouTube bot challenge stretches the pause five-fold (`musik: fetch:`
+  `auth_threads` / `botcheck_cooldown_factor`). What you can do:
+  - use a **dedicated browser profile** (same account, no new login
+    needed) that exists only for the cookie export — if YouTube
+    invalidates that session, your everyday browser stays untouched;
+    re-export = log in again in that profile;
+  - if you have a **Premium family plan**, carry the cookies on a family
+    member's account so your main account never touches downloads;
+  - keep volumes personal (a few albums a day, not thousand-track
+    marathons) and keep the tools updated (runbook above).
+
+  Automated downloading is against YouTube's ToS — at personal volumes
+  the realistic worst case is session invalidation, but the residual
+  risk stays yours to accept.
 - **Big playlists**: SomeDL sleeps between requests; expect a playlist of
   hundreds of tracks to take a while. Every job is capped at 60 minutes.
 - **Logs**: `reports\fetch\<job>.log` (full downloader output),

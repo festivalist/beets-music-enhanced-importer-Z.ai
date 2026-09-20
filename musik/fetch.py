@@ -40,6 +40,10 @@ FETCH_DEFAULTS = {
     # (Music) Premium. Unlocks 256 kbps for spotDL, fewer bot challenges and
     # age-restricted videos. Empty = anonymous downloads (128 kbps).
     "cookies_file": "",
+    # authenticated runs stay gentle: max threads and SomeDL request spacing
+    "auth_threads": 2,
+    # multiplier on retry_cooldown when a YouTube bot challenge is detected
+    "botcheck_cooldown_factor": 5,
 }
 
 
@@ -203,6 +207,7 @@ class FetchJob:
     timed_out: bool = False
     outcomes: list[tuple[str, str]] = field(default_factory=list)  # (unit status, label)
     prep_notes: list[str] = field(default_factory=list)  # gap-fill/duplicate notes
+    warnings: list[str] = field(default_factory=list)  # bot challenges etc.
 
     @property
     def ok(self) -> bool:
@@ -362,6 +367,20 @@ def _collect(job: FetchJob, errors_file: str) -> None:
             )
 
 
+def _bot_challenge_detected(job: FetchJob) -> bool:
+    """YouTube's 'sign in to confirm you're not a bot' gate in errors/log."""
+    pat = re.compile(
+        r"(?i)sign in to confirm|confirm you.{0,4}re not a bot|not a bot"
+    )
+    texts = list(job.errors)
+    try:
+        with open(job.log_path, encoding="utf-8", errors="replace") as fh:
+            texts.append(fh.read()[-4000:])
+    except OSError:
+        pass
+    return any(pat.search(t) for t in texts)
+
+
 def run_fetch(inputs: list[str], timeout_s: float | None = DOWNLOAD_TIMEOUT,
               quiet: bool = False) -> list[FetchJob]:
     bootstrap()
@@ -406,10 +425,15 @@ def run_fetch(inputs: list[str], timeout_s: float | None = DOWNLOAD_TIMEOUT,
         rcfg = _fetch_config()
         cookies = _cookie_path(rcfg)
         if cookies:
-            print(f"  using YouTube cookies: {cookies}")
+            print(f"  using YouTube cookies: {cookies} "
+                  f"(threads<={rcfg['auth_threads']}, paced)")
+        # authenticated runs stay gentle from the very first request
+        init_threads = min(4, int(rcfg["auth_threads"])) if cookies else None
+        init_sleep = int(rcfg["somedl_sleep"]) if cookies else None
         deadline = time.monotonic() + timeout_s if timeout_s else None
         job.returncode = _run_logged(
-            _tool_argv(job, errors_file, cookies=cookies),
+            _tool_argv(job, errors_file, threads=init_threads,
+                       sleep=init_sleep, cookies=cookies),
             job.log_path, job, deadline_s=deadline,
         )
         _collect(job, errors_file)
@@ -422,9 +446,16 @@ def run_fetch(inputs: list[str], timeout_s: float | None = DOWNLOAD_TIMEOUT,
             argv, n_targets = _retry_argv(job, errors_file, rcfg, cookies=cookies)
             targets = f"{n_targets} fehlgeschlagene Track(s)" if n_targets \
                 else "komplette Anfrage"
-            print(f"  retry in {rcfg['retry_cooldown']:.0f}s "
+            cooldown = float(rcfg["retry_cooldown"])
+            if _bot_challenge_detected(job):
+                cooldown *= float(rcfg["botcheck_cooldown_factor"])
+                note = (f"YouTube-Bot-Prüfung erkannt — Pause auf "
+                        f"{cooldown:.0f}s verlängert")
+                print(f"  ⚠ {note}")
+                job.warnings.append(note)
+            print(f"  retry in {cooldown:.0f}s "
                   f"({targets}, runde {rcfg['retry_rounds'] - rounds_left + 1}) …")
-            time.sleep(rcfg["retry_cooldown"])
+            time.sleep(cooldown)
             with open(job.log_path, "a", encoding="utf-8") as log:
                 log.write(f"\n===== retry round {rcfg['retry_rounds'] - rounds_left + 1} =====\n")
             job.returncode = _run_logged(
@@ -807,6 +838,7 @@ def summarize_job(job: "FetchJob") -> str:
         lines.append(f"{failed} Fehler/fehlgeschlagene Track(s) — Log: {job.log_path}")
     if job.timed_out:
         lines.append("Zeitlimit erreicht, Job wurde abgebrochen")
+    lines.extend(f"⚠️ {w}" for w in job.warnings)
     lines.extend(job.prep_notes)
     for status, label in job.outcomes:
         note = {
