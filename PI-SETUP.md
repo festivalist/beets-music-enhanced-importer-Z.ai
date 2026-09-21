@@ -182,20 +182,31 @@ Danach: `/start` → Begrüßung, `/status` → „gerade läuft nichts". Fertig
 > echt (`CD665CBA0E2F88B7373F7CB997203C7B3ADCA79D`), nur Plex kann das durch
 > einen neu signierten Key beheben. Bis dahin wird der Key lokal mit einer
 > eigenen SHA256-Zertifizierung neu gebunden (Wegwerf-Key, gilt nur für
-> diesen Key — es wird nichts global abgeschwächt). Sobald Plex einen neuen
-> Key veröffentlicht, zurück zum Standard:
+> diesen Key — es wird nichts global abgeschwächt). **Wichtig dabei:** sqv
+> prüft zeitscharf — die Bindung muss schon **vor dem Signaturzeitpunkt** der
+> Plex-Metadaten (2025-09-22) existieren, deshalb werden Wegwerf-Key und
+> Zertifizierung auf 2025-06-01 zurückdatiert (`--faked-system-time`, nur
+> lokal). Die „Are you sure…"-Rückfrage ist normal und wird über das
+> gepipete `y` automatisch beantwortet. Sobald Plex einen neuen Key
+> veröffentlicht, zurück zum Standard:
 > `curl https://downloads.plex.tv/plex-keys/PlexSign.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/plex.gpg`
 
 ```bash
 sudo apt install -y curl gnupg
 echo deb https://downloads.plex.tv/repo/deb public main | sudo tee /etc/apt/sources.list.d/plexmediaserver.list
 
-# SHA1-Workaround (siehe Kasten oben): Plex-Key per SHA256-Zertifikat neu binden
+# SHA1-Workaround (siehe Kasten oben): Plex-Key per zurückdatiertem
+# SHA256-Zertifikat neu binden
 export GNUPGHOME=$(mktemp -d)
 curl -fsSL https://downloads.plex.tv/plex-keys/PlexSign.key | gpg --import
-gpg --batch --passphrase '' --quick-generate-key "musik-pi apt resign" ed25519 sign never
-gpg --batch --yes -u "musik-pi apt resign" --cert-digest-algo SHA256 \
+FAKE=20250601T120000
+gpg --batch --passphrase '' --faked-system-time $FAKE \
+    --quick-generate-key "musik-pi apt resign" ed25519 sign never
+echo y | gpg --batch --yes --command-fd 0 --faked-system-time $FAKE \
+    -u "musik-pi apt resign" --cert-digest-algo SHA256 \
     --sign-key CD665CBA0E2F88B7373F7CB997203C7B3ADCA79D
+echo "--- Kontrolle: muss eine Signatur von 'musik-pi apt resign' zeigen ---"
+gpg --list-sigs CD665CBA0E2F88B7373F7CB997203C7B3ADCA79D
 gpg --export CD665CBA0E2F88B7373F7CB997203C7B3ADCA79D "musik-pi apt resign" \
     | sudo tee /etc/apt/trusted.gpg.d/plex.gpg > /dev/null
 rm -rf "$GNUPGHOME"
