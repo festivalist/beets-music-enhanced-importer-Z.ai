@@ -101,7 +101,7 @@ Failed tracks are retried automatically; whatever remains is reported.
 This bot is **independent** of the ZCode desktop Telegram relay — it runs
 as its own service with its own token.
 
-### Plex / Plexamp refresh (optional)
+### Plex / Plexamp refresh + playlists (optional)
 
 Add to `config.yaml` (under `musik:`):
 
@@ -110,10 +110,32 @@ Add to `config.yaml` (under `musik:`):
         url: http://plexpi:32400
         token: YOUR-X-PLEX-TOKEN
         section: Musik          # optional; first music library if omitted
+        # playlists: true           # playlist upload (default)
+        # playlist_attempts: 5      # retries while PMS scans the new tracks
+        # playlist_wait: 10         # seconds between retries
+        # playlist_dir: ...         # default: <library>/_playlists
 ```
 
 After each successful import the bot triggers a section scan; the
 "available in Plexamp" follow-up follows with the next Plexamp sync.
+
+**Playlist links become Plex playlists.** A Spotify/YouTube *playlist*
+link (not album/track) additionally produces a Plex playlist with the
+original order and name: spotDL writes an m3u8 sidecar into the job dir
+(`--m3u`), after the import the tracks' final library paths are matched
+(beets DB id-diff; tolerant of "Remastered" retags), and the resulting
+`.m3u` in `<library>/_playlists/` is uploaded to PMS (`POST
+/playlists/upload` — the same endpoint python-plexapi uses). The upload
+retries while the scan catches up and then reports the track count in
+the bot chat. Tracks still parked in review are left out; a later `/asis`
+import fills them in and re-uploads automatically. Manual retry:
+`musik plex --playlist "Name"` (or `--playlist all`).
+
+YouTube playlist links get their true name and order from yt-dlp
+(bundled with spotDL; cookies from `musik: fetch: cookies_file` are used
+when present) — `watch?v=…&list=…` links download the whole playlist
+(`--get-playlist`). Only when yt-dlp cannot read the playlist (private/
+deleted) does the order fall back to download time (mtime).
 
 ### Runbook
 

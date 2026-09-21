@@ -13,7 +13,7 @@ a clean, consistent base for a later Plexamp setup.
 
 ## 2. Out of scope
 
-- **Everything Plexamp**: install, configuration, library scanning, sonic analysis, uploads, Plexamp-side playlists. Not this project. (The library folder remains a clean Plex source; see §4.9.)
+- **Everything else Plexamp**: install, configuration, sonic analysis, uploads. Not this project. (The library folder remains a clean Plex source; see §4.9. In scope since 2026-09-21: uploading fetched-playlist m3u files as server-side playlists; see the scope changes below.)
 - Acquiring music: ripping, downloading, converting.
 - Audio transcoding/re-encoding, splitting cue sheets or one-file recordings into individual tracks.
 - Contributing corrections back to MusicBrainz/Discogs.
@@ -31,6 +31,14 @@ library) which then run through the normal tagging chain. Also in scope: one
 narrow Plex integration — the bot triggers a library-section refresh via the
 Plex HTTP API after each import (config `musik: plex:`). Still out of scope:
 ripping, transcoding the existing library, and everything else Plexamp-side.*
+
+*Scope change 2026-09-21 (Plex playlists): downloaded **playlist** links
+(Spotify `…/playlist/…`, YouTube `…list=…`) additionally become a real
+server-side Plex playlist — m3u from the download sidecar + final library
+paths, uploaded via `POST /playlists/upload` (same endpoint python-plexapi
+uses), so the playlist shows up in Plexamp with original name/order. Still
+out of scope: creating or managing playlists inside Plex/Plexamp itself,
+smart playlists, playlist export.*
 
 ## 3. Binding decisions from config.yaml
 

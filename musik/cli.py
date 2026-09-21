@@ -136,7 +136,12 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("stats", help="library statistics (totals, formats, decades, top artists)")
 
-    sub.add_parser("plex", help="trigger a Plex library scan (needs musik: plex: config)")
+    p_plex = sub.add_parser(
+        "plex", help="trigger a Plex library scan (needs musik: plex: config)")
+    p_plex.add_argument(
+        "--playlist", metavar="NAME|all", default=None,
+        help="re-upload playlist m3u(s) to Plex instead of scanning "
+             "(e.g. after tracks left review)")
 
     p_sim = sub.add_parser(
         "similar",
@@ -297,6 +302,26 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "plex":
         from . import plex as plex_mod
+
+        if args.playlist:
+            from . import playlists as playlists_mod
+
+            states = (playlists_mod.all_states()
+                      if args.playlist.lower() == "all"
+                      else playlists_mod.find_by_name(args.playlist))
+            if not states:
+                what = ("noch keine Playlist-States (state/playlists/ ist leer)"
+                        if args.playlist.lower() == "all"
+                        else f"keine Playlist „{args.playlist}“ in "
+                             f"{os.path.join('state', 'playlists')}")
+                print(f"plex: {what} — '--playlist all' nimmt alle")
+                return 1
+            print(f"plex: re-uploade {len(states)} Playlist(s) …")
+            rc = 0
+            for msg in playlists_mod.upload(states):
+                print(msg)
+                rc = rc or (0 if msg.startswith("🎵") else 1)
+            return rc
 
         ok, note = plex_mod.refresh_library()
         print(note or "plex: nicht konfiguriert — musik: plex: url/token/section "

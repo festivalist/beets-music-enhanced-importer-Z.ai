@@ -208,6 +208,7 @@ class FetchJob:
     outcomes: list[tuple[str, str]] = field(default_factory=list)  # (unit status, label)
     prep_notes: list[str] = field(default_factory=list)  # gap-fill/duplicate notes
     warnings: list[str] = field(default_factory=list)  # bot challenges etc.
+    playlists: list[dict] = field(default_factory=list)  # plex playlist states
 
     @property
     def ok(self) -> bool:
@@ -248,6 +249,13 @@ def _tool_argv(job: FetchJob, errors_file: str, threads: int | None = None,
             "--print-errors", "--save-errors", errors_file,
             "--threads", str(threads if threads is not None else 4),
         ]
+        # Playlist links: spotDL writes one m3u8 per playlist into the job
+        # dir (order + playlist name for the later Plex upload). Must be
+        # absolute — spotdl resolves a relative name against its cwd.
+        from .playlists import is_playlist_query
+
+        if is_playlist_query(job.query):
+            argv += ["--m3u", os.path.join(job.job_dir, "{list}.m3u8")]
         if audio:
             argv += ["--audio", audio]
         if cookies:
@@ -260,6 +268,12 @@ def _tool_argv(job: FetchJob, errors_file: str, threads: int | None = None,
         "-f", "best/m4a",
         "--disable-report",
     ]
+    # watch?v=…&list=… defaults to --get-song (single video); playlist
+    # links must download the whole list
+    from .playlists import is_playlist_query
+
+    if is_playlist_query(job.query):
+        argv += ["--get-playlist"]
     if sleep:
         argv += ["--sleep", str(sleep)]
     if cookies:
@@ -736,11 +750,17 @@ def _import_job(job: FetchJob) -> list[tuple[str, str]]:
     from . import asis as asis_mod
     from . import cleanup as cleanup_mod
     from . import engine
+    from . import playlists as playlists_mod
     from . import scan as scan_mod
     from . import state as state_mod
 
     root = os.path.normpath(job.job_dir)
     print(f"import: scanning {root}")
+    # Playlist context: sidecar order/name from the (still present)
+    # staging files, item-id snapshot before anything touches the DB —
+    # gap-fill in _prepare_units writes to beets too, so this comes first.
+    pl_specs = playlists_mod.prepare(job)
+    ids_before = playlists_mod.snapshot_ids()
     scan_mod.cmd_scan(root)
 
     # Gap-aware pre-pass: album already in the library -> only missing
@@ -796,6 +816,9 @@ def _import_job(job: FetchJob) -> list[tuple[str, str]]:
     for status, label in outcomes:
         print(f"  [{status}] {label}")
     job.outcomes = outcomes
+    # map playlist entries to their final library paths -> m3u + state
+    # (never fails the import; bot/cli upload it after the plex refresh)
+    job.playlists = playlists_mod.build(job, pl_specs, ids_before)
     return outcomes
 
 
@@ -831,6 +854,8 @@ def _enrich_albums(albums: list[tuple[str, str]]) -> None:
 
 def summarize_job(job: "FetchJob") -> str:
     """One-paragraph result summary (bot messages, session reports)."""
+    from . import playlists as playlists_mod
+
     lines = [f"{job.query}"]
     lines.append(f"{len(job.files)} Track(s) heruntergeladen")
     failed = len(job.errors)
@@ -849,4 +874,6 @@ def summarize_job(job: "FetchJob") -> str:
         lines.append(f"• {label}: {note}")
     if not job.outcomes and not job.prep_notes:
         lines.append("kein Import (nichts Klassifizierbares heruntergeladen)")
+    for pl in job.playlists:
+        lines.append(f"🎵 {playlists_mod.summarize(pl)}")
     return "\n".join(lines)

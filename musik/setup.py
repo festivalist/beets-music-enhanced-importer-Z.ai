@@ -125,7 +125,10 @@ musik:
         # fewer bot challenges, age-restricted videos. See README runbook.
         cookies_file: cookies.txt
     # Plex (optional): refresh this library section after imports so new
-    # albums show up in Plexamp without manual scans.
+    # albums show up in Plexamp without manual scans. Playlist links also
+    # become Plex playlists (m3u under <library>/_playlists, uploaded via
+    # POST /playlists/upload); tune with playlists/playlist_attempts/
+    # playlist_wait/playlist_dir if needed.
     plex:
         # url: http://plexpi:32400
         # token: YOUR-X-PLEX-TOKEN

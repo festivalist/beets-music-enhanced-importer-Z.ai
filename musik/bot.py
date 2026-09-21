@@ -37,6 +37,7 @@ from . import asis as asis_mod
 from . import fetch
 from . import jobs as jobs_mod
 from . import plex as plex_mod
+from . import playlists as playlists_mod
 from . import state as state_mod
 from .paths import PROJECT_DIR, bootstrap, musik_config
 from .scan import artist_values
@@ -116,6 +117,9 @@ def _execute_job(job: dict, send) -> None:
                     send(f"🎧 {note} — neues Album ist gleich in Plexamp sichtbar")
                 elif note:  # configured but failed
                     send(f"⚠️ {note}")
+                # playlist upload waits for the scan it just triggered
+                for msg in playlists_mod.upload(fj.playlists):
+                    send(msg)
             summaries.append(fetch.summarize_job(fj))
             send(summaries[-1])
         jobs_mod.update_job(job["id"], status="done", finished=time.time(),
@@ -156,6 +160,9 @@ def _execute_asis(job: dict, send) -> None:
         lines.append(f"🎧 {note}")
     elif note:
         lines.append(f"⚠️ {note}")
+    # tracks that just arrived fill their playlist entries -> re-upload
+    for msg in playlists_mod.upload(playlists_mod.rebuild(paths)):
+        lines.append(msg)
     summary = "\n".join(lines)[:1500]
     failed = any(l.startswith("❌") for l in lines)
     jobs_mod.update_job(job["id"],
@@ -304,7 +311,8 @@ async def _cmd_asis(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_text(
         "Diese Einheiten können auf eigene Tags importiert werden "
         "(as-is) — antippen:\n"
-        "Playlists landen dabei Track-für-Track in ihren echten Alben.",
+        "Playlists landen dabei Track-für-Track in ihren echten Alben; "
+        "eine zugehörige Plex-Playlist wird automatisch ergänzt.",
         reply_markup=InlineKeyboardMarkup(rows))
 
 

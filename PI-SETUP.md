@@ -258,6 +258,34 @@ Plexamp nur im Heimnetz — Downloads gehen trotzdem (Bot läuft über Telegram)
 `plex`-User, braucht Plex Leserechte auf `/mnt/music`:
 `sudo chmod -R o+rX /mnt/music` (oder Gruppe `plex` ergänzen).
 
+**5.7 Playlists in Plexamp (automatisch):** Ein **Playlist-Link** (Spotify
+„…/playlist/…" oder YouTube „…list=…") erzeugt zusätzlich zur Album-Import-Kette
+eine echte **Plex-Playlist** — gleiche Reihenfolge, gleicher Name wie in
+Spotify/YouTube, sofort in Plexamp sichtbar. Dazu läuft nach dem Import:
+
+1. spotDL schreibt beim Download eine `.m3u8` (Reihenfolge + Name) in den
+   Job-Ordner,
+2. nach dem Import werden die finalen Bibliothekspfade der Tracks ermittelt
+   (beets-DB-Diff) und als `.m3u` nach **`/mnt/music/_playlists/`** geschrieben,
+3. die Datei wird an PMS hochgeladen (`POST /playlists/upload`; der Import
+   matcht per Dateipfad und wiederholt sich, bis der gescannte Scan die
+   Tracks kennt).
+
+Nichts zu tun — es reicht der `plex:`-Block aus 5.5. Feintuning (optional)
+in config.yaml: `playlists: false` (aus), `playlist_attempts`/`playlist_wait`
+(Retry-Verhalten beim Scan), `playlist_dir` (anderer Ablageort). Tracks, die
+noch im Review parken, fehlen in der Playlist zunächst — ein späterer
+`/asis`-Import ergänzt sie und lädt die Playlist neu hoch. Manueller
+Retry: `.venv/bin/python musik.py plex --playlist "Name"` (oder `all`).
+
+**YouTube-Playlists:** SomeDL schreibt keine m3u — Name und Reihenfolge
+kommen stattdessen per yt-dlp (im spotDL-Bundle enthalten; Cookies aus
+Phase 3 werden mitgenutzt, falls vorhanden). Gemischte
+`watch?v=…&list=…`-Links laden jetzt die komplette Playlist
+(`--get-playlist`). Nur wenn yt-dlp die Playlist nicht lesen kann
+(privat/gelöscht), greift die Download-Reihenfolge (Datei-Zeitstempel)
+als Näherung.
+
 ## Phase 6 — Erst-Test (Checkliste)
 
 **Tipp für SSH-Alltag** — einmalig den Alias setzen:
@@ -277,6 +305,12 @@ cd ~/musik
 
 # 3) Bitrate prüfen (Cookie-Effekt): muss ~256000 statt ~128000 zeigen
 ffprobe -v quiet -show_entries format=bit_rate -of csv "/mnt/music/Singles/<Artist>/<file>.m4a"
+
+# 4) Optional — Playlist-Kette (ohne Bot; der Bot macht 4b/4c automatisch):
+.venv/bin/python musik.py fetch --import "https://open.spotify.com/playlist/<id>"
+#    → /mnt/music/_playlists/<Name>.m3u entsteht (N/N Tracks zugeordnet)
+.venv/bin/python musik.py plex && .venv/bin/python musik.py plex --playlist "<Name>"
+#    → Playlist liegt in Plex und taucht in Plexamp auf
 ```
 
 Dann der Bot-Live-Test vom Handy: Album-Link an @<dein-bot-name>
@@ -295,6 +329,7 @@ Nach kurzer Zeit muss das Album in **Plexamp** auftauchen.
 | Cookies neu (nach Logout/Passwortwechsel) | Phase 3 wiederholen (nur Schritt 4-5 + scp) |
 | Review-Einheiten auf eigene Tags importieren | Handy: Bot-`/asis` (Knöpfe antippen) · Terminal: `musik.py asis --pending` |
 | Plex-Scan manuell anstoßen | `.venv/bin/python musik.py plex` (meldet die konkrete Ursache, falls es hakt) |
+| Plex-Playlist neu hochladen | `.venv/bin/python musik.py plex --playlist "Name"` (oder `all`) |
 | apt update: Plex-Key-Fehler („not bound", SHA1) | Workaround-Block in Phase 5.1 erneut ausführen (solange Plex den Key nicht neu signiert hat) |
 | Backup (DB + Config + Tokens) | `.venv/bin/python musik.py snapshot` |
 | Monats-Check | `.venv/bin/python musik.py doctor --quick` |
@@ -310,7 +345,9 @@ ist kein Album für MusicBrainz. Die Auflösung braucht keine ID-Eingabe:
   tag-vollständigen Einheiten auf eigene Tags; `--dry-run` zeigt vorher nur
   die Liste) oder interaktiv `musik.py review` → `W`.
 
-Die Tracks wandern dabei Track-für-Track in ihre echten Spotify-Alben.
+Die Tracks wandern dabei Track-für-Track in ihre echten Spotify-Alben;
+eine zugehörige Plex-Playlist (5.7) wird automatisch ergänzt und neu
+hochgeladen.
 Bei fehlendem Genre/Cover danach: `.venv/bin/python musik.py doctor --fix`.
 
 **Fehlersuche:** einzelne Track-Fehler → erstes Mittel ist immer ein Re-Fetch
@@ -322,6 +359,8 @@ aktualisieren (Zeile oben); Bot antwortet nicht → `journalctl -u musik-bot -n 
 - [ ] Handy im **Mobilfunk** (WLAN aus): Link an den Bot geschickt
 - [ ] Bot meldet Download → Import → „in Plexamp verfügbar"
 - [ ] Album erscheint in Plexamp, Cover + Genre sichtbar, ReplayGain aktiv
+- [ ] Playlist-Link: Bot meldet „🎵 Plex-Playlist „<Name>“: N Track(s)" —
+      Playlist in Plexamp mit Original-Name/Reihenfolge sichtbar
 - [ ] Zweiter Link: Album existiert schon → Meldung „bereits vorhanden /
       fehlende Tracks ergänzt"
 - [ ] `ffprobe` zeigt 256 kbps (Cookies wirksam)
