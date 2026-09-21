@@ -62,6 +62,25 @@ step "Downloading Deno runtime (yt-dlp needs it for some YouTube videos)"
 "$PY_EXE" -m spotdl --download-deno \
     || echo "    WARNING: Deno download failed - some YouTube tracks may fail."
 
+# spotdl hides its Deno in ~/.spotdl — only spotdl itself finds it there.
+# SomeDL/yt-dlp need a JS runtime ON PATH to solve YouTube's n-challenge
+# (without it every YouTube download dies with "Requested format is not
+# available" after "n challenge solving failed"). Best effort:
+DENO_SRC=""
+for cand in "$HOME/.spotdl/deno" "$HOME/.deno/bin/deno"; do
+    [[ -x "$cand" ]] && DENO_SRC="$cand" && break
+done
+if [[ -n "$DENO_SRC" ]] && ! command -v deno >/dev/null 2>&1; then
+    if $SUDO cp "$DENO_SRC" /usr/local/bin/deno 2>/dev/null; then
+        ok "deno -> /usr/local/bin/deno (systemweit sichtbar, auch für den systemd-Service)"
+    elif cp "$DENO_SRC" "$PROJECT_DIR/bin/deno" 2>/dev/null; then
+        echo "    Hinweis: deno nach bin/ kopiert (musik-Prozesse finden ihn über den"
+        echo "    PATH-Bootstrap); für manuelle yt-dlp-Aufrufe: PATH um bin/ ergänzen."
+    fi
+elif command -v deno >/dev/null 2>&1; then
+    ok "deno already on PATH: $(command -v deno)"
+fi
+
 # --- 5. Setup wizard (before the self test: fetch needs config.yaml) --------
 if [[ -f "$PROJECT_DIR/config.yaml" ]]; then
     step "config.yaml already exists - keeping it (re-run 'musik setup' to regenerate)"

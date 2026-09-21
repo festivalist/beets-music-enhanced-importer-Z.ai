@@ -87,6 +87,16 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "    WARNING: Deno download failed - some YouTube tracks may fail." -ForegroundColor Yellow
 } else {
     Write-Ok "Deno installed (into %USERPROFILE%\.spotdl)"
+    # spotdl hides its Deno in ~\.spotdl - SomeDL/yt-dlp need a JS runtime
+    # ON PATH for YouTube's n-challenge. bin\ is prepended to PATH by the
+    # musik bootstrap, so a copy there covers every subprocess we spawn.
+    $SpotDeno = Join-Path $env:USERPROFILE ".spotdl\deno.exe"
+    $BinDeno  = Join-Path $ProjectDir "bin\deno.exe"
+    if ((Test-Path $SpotDeno) -and -not (Test-Path $BinDeno)) {
+        New-Item -ItemType Directory -Force -Path (Join-Path $ProjectDir "bin") | Out-Null
+        Copy-Item $SpotDeno $BinDeno
+        Write-Ok "deno copied to bin\deno.exe (visible to SomeDL/yt-dlp)"
+    }
 }
 
 # --- 3. fpcalc (acoustic fingerprinter for the chroma plugin) ---------------

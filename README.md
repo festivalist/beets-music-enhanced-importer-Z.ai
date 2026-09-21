@@ -139,14 +139,21 @@ deleted) does the order fall back to download time (mtime).
 
 ### Runbook
 
-- **`YT-DLP download error` on individual tracks**: the #1 cause is a
-  missing **Deno** runtime — yt-dlp needs it to solve YouTube's JS
-  challenges on certain videos, and without it those same videos fail
-  every run. The installers fetch Deno automatically; manual fix:
-  `.venv\Scripts\python -m spotdl --download-deno`. Failed tracks are
-  retried automatically: 3 rounds, 60 s cooldown, single-threaded, only
-  the failed tracks, with alternate audio providers
-  (`musik: fetch:` in config.yaml tunes all of this).
+- **`YT-DLP download error` / "n challenge solving failed" → "Requested
+  format is not available"**: yt-dlp needs (a) the **`yt-dlp-ejs` solver
+  scripts** (pip extra: `.venv/bin/python -m pip install -U
+  "yt-dlp[default]"` — in requirements.txt since 2026-09-21) and (b) a
+  **JavaScript runtime on PATH** (Deno recommended; Node works too).
+  spotDL's own Deno lives in `~/.spotdl` where only spotDL finds it —
+  the installers copy it to `/usr/local/bin/deno` (Linux) resp.
+  `bin\deno.exe` (Windows, PATH-Bootstrap). Manual fixes:
+  `python -m spotdl --download-deno`, then
+  Linux: `sudo cp ~/.spotdl/deno /usr/local/bin/deno` ·
+  Windows: `copy "%USERPROFILE%\.spotdl\deno.exe" bin\`.
+  Probe: `python -m yt_dlp -F "<video-url>"` must list `audio only`
+  formats. Failed tracks are retried automatically: 3 rounds, 60 s
+  cooldown, single-threaded, only the failed tracks, with alternate
+  audio providers (`musik: fetch:` in config.yaml tunes all of this).
 - **Mass breakage** (nearly all tracks fail): YouTube changed something —
   update the pinned tools:
   `.venv\Scripts\python -m pip install -U spotdl somedl` (they carry

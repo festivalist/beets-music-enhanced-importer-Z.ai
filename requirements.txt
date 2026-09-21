@@ -10,4 +10,9 @@ pylast  # lastgenre
 # remote-download pipeline (`musik fetch` / `musik bot`)
 spotdl~=4.5.2    # Spotify links -> YouTube audio (yt-dlp bundled)
 somedl~=1.7.1    # YouTube/YT-Music links + free-text searches
+# [default] extra pulls yt-dlp-ejs: YouTube's "n challenge" needs these
+# solver scripts PLUS a JS runtime on PATH (Deno; installers copy spotdl's
+# deno to /usr/local/bin resp. bin\). Without it, downloads die with
+# "n challenge solving failed" -> "Requested format is not available".
+yt-dlp[default]
 python-telegram-bot~=22.0  # own bot, long polling (no port forwarding)
