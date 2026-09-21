@@ -49,15 +49,19 @@ def _sections(cfg: dict) -> list[dict]:
     root = ET.fromstring(r.text)
     out = []
     for d in root.iter("Directory"):
-        if d.get("type") == "artist":  # music libraries
-            # newer PMS builds expose the numeric id only inside `key`
-            # ("/library/sections/3"); older ones carry a plain `id`
-            sid = (d.get("id") or "").strip()
-            if not sid:
-                key = (d.get("key") or "").rstrip("/")
-                sid = key.rsplit("/", 1)[-1] if "/" in key else ""
-            if sid:
-                out.append({"id": sid, "title": d.get("title", "")})
+        if d.get("type") != "artist":  # music libraries only
+            continue
+        # PMS builds differ: older carry a plain numeric `id`, newer put
+        # the id in `key` — either as the section path
+        # ("/library/sections/3") or as the bare number ("3")
+        sid = (d.get("id") or "").strip()
+        if not sid:
+            sid = (d.get("key") or "").rstrip("/").rsplit("/", 1)[-1].strip()
+        entry = {"id": sid, "title": d.get("title", "")}
+        if not sid:
+            entry["raw"] = " ".join(
+                f"{k}={v}" for k, v in sorted(d.attrib.items()))[:200]
+        out.append(entry)
     return out
 
 
@@ -65,10 +69,14 @@ def _resolve_section(cfg: dict) -> tuple[str, str] | None:
     """(section id, title) — by configured name, else the first music one."""
     sections = _sections(cfg)
     for sec in sections:
+        if not sec["id"]:
+            continue  # unresolvable -> cannot be refreshed
         if cfg["section"] and sec["title"].lower() == cfg["section"].lower():
             return sec["id"], sec["title"]
-    if not cfg["section"] and sections:
-        return sections[0]["id"], sections[0]["title"]
+    if not cfg["section"]:
+        for sec in sections:
+            if sec["id"]:
+                return sec["id"], sec["title"]
     return None
 
 
@@ -81,9 +89,14 @@ def refresh_library() -> tuple[bool, str]:
     try:
         sec = _resolve_section(cfg)
         if not sec:
-            names = ", ".join(f"{s['title']} (id {s['id']})" for s in _sections(cfg)) \
-                or "none"
-            return False, f"Plex: keine Musik-Section gefunden (vorhanden: {names})"
+            parts = []
+            for s in _sections(cfg):
+                if s["id"]:
+                    parts.append(f"{s['title']} (id {s['id']})")
+                else:
+                    parts.append(f"{s['title']} — ohne id! Attribute: {s.get('raw', '')}")
+            return False, ("Plex: keine nutzbare Musik-Section gefunden "
+                           f"(vorhanden: {'; '.join(parts) or 'none'})")
         r = requests.post(
             f"{cfg['url']}/library/sections/{sec[0]}/refresh",
             headers=_headers(cfg),
