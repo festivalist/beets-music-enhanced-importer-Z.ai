@@ -176,42 +176,52 @@ Danach: `/start` → Begrüßung, `/status` → „gerade läuft nichts". Fertig
 
 > **Bekanntes Problem (Stand 2026-09-21), betrifft trixie:** Der
 > Plex-Repo-Signatur-Key hat nur SHA1-Selbstsignaturen. Aktuelles Raspberry Pi
-> OS (Debian trixie) prüft apt-Signaturen mit `sqv` und lehnt SHA1 seit dem
-> 2026-02-01-Cutoff ab — `apt update` bricht ab mit „Signing key … is not
-> bound … SHA1 is not considered secure since 2026-02-01". Der Key selbst ist
-> echt (`CD665CBA0E2F88B7373F7CB997203C7B3ADCA79D`), nur Plex kann das durch
-> einen neu signierten Key beheben. Bis dahin wird der Key lokal mit einer
-> eigenen SHA256-Zertifizierung neu gebunden (Wegwerf-Key, gilt nur für
-> diesen Key — es wird nichts global abgeschwächt). **Wichtig dabei:** sqv
-> prüft zeitscharf — die Bindung muss schon **vor dem Signaturzeitpunkt** der
-> Plex-Metadaten (2025-09-22) existieren, deshalb werden Wegwerf-Key und
-> Zertifizierung auf 2025-06-01 zurückdatiert (`--faked-system-time`, nur
-> lokal). Die „Are you sure…"-Rückfrage ist normal und wird über das
-> gepipete `y` automatisch beantwortet. Sobald Plex einen neuen Key
-> veröffentlicht, zurück zum Standard:
-> `curl https://downloads.plex.tv/plex-keys/PlexSign.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/plex.gpg`
+> OS (Debian trixie) prüft apt-Signaturen mit `sqv` (Sequoia), und seit dem
+> 2026-02-01-Cutoff lehnt der SHA1 ab — `apt update` bricht ab mit „Signing
+> key … is not bound … SHA1 is not considered secure since 2026-02-01". Der
+> Key selbst ist echt. **Wichtig:** sqv akzeptiert als Key-Bindung nur
+> **Selbstsignaturen** — der Key lässt sich nicht lokal neu signieren (auch
+> nicht zurückdatiert; getestet, scheitert am selben Fehler). Nur Plex kann
+> den Key heilen. Workaround bis dahin: die SHA1-Policy von sqv über eine
+> Umgebungsvariable lockern (apt-secure bleibt an, es werden nur Alt-Keys
+> wieder akzeptiert). Sobald Plex einen neuen Key veröffentlicht:
+> Übersteuerung entfernen (`sudo sed -i '/SEQUOIA_CRYPTO_POLICY/d'
+> /etc/environment` + Datei löschen) und Original-Key frisch importieren.
 
 ```bash
 sudo apt install -y curl gnupg
 echo deb https://downloads.plex.tv/repo/deb public main | sudo tee /etc/apt/sources.list.d/plexmediaserver.list
+curl -fsSL https://downloads.plex.tv/plex-keys/PlexSign.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/plex.gpg
 
-# SHA1-Workaround (siehe Kasten oben): Plex-Key per zurückdatiertem
-# SHA256-Zertifikat neu binden
-export GNUPGHOME=$(mktemp -d)
-curl -fsSL https://downloads.plex.tv/plex-keys/PlexSign.key | gpg --import
-FAKE=20250601T120000
-gpg --batch --passphrase '' --faked-system-time $FAKE \
-    --quick-generate-key "musik-pi apt resign" ed25519 sign never
-echo y | gpg --batch --yes --command-fd 0 --faked-system-time $FAKE \
-    -u "musik-pi apt resign" --cert-digest-algo SHA256 \
-    --sign-key CD665CBA0E2F88B7373F7CB997203C7B3ADCA79D
-echo "--- Kontrolle: muss eine Signatur von 'musik-pi apt resign' zeigen ---"
-gpg --list-sigs CD665CBA0E2F88B7373F7CB997203C7B3ADCA79D
-gpg --export CD665CBA0E2F88B7373F7CB997203C7B3ADCA79D "musik-pi apt resign" \
-    | sudo tee /etc/apt/trusted.gpg.d/plex.gpg > /dev/null
-rm -rf "$GNUPGHOME"
+# 1) Policy-Übersteuerung anlegen: vorhandene Standard-Policy kopieren und
+#    darin den SHA1-Cutoff hochsetzen; fehlt sie, eine Minimal-Policy schreiben:
+sudo cp /etc/crypto-policies/back-ends/apt-sequoia.config /etc/sequoia-plex-allow-sha1.config 2>/dev/null \
+  && sudo sed -i '/sha1/Is/2026-02-01/2066-01-01/g' /etc/sequoia-plex-allow-sha1.config \
+  || printf '[hash_algorithms]\nsha1.collision_resistance = "always"\nsha1.second_pre_image_resistance = "always"\n' \
+      | sudo tee /etc/sequoia-plex-allow-sha1.config
 
-sudo apt update && sudo apt install -y plexmediaserver
+# 2) Testen — welche der beiden Variablen sqv liest, variiert je nach Stand:
+sudo SEQUOIA_CRYPTO_POLICY=/etc/sequoia-plex-allow-sha1.config apt update \
+  || sudo APT_SEQUOIA_CRYPTO_POLICY=/etc/sequoia-plex-allow-sha1.config apt update
+#    Läuft der Plex-Eintrag jetzt ohne Err durch? → weiter zu 3).
+#    Immer noch SHA1-Fehler? Diagnose:  sudo SEQUOIA_CRYPTO_POLICY="" apt update
+#    (leere Policy = völlig ohne Limit, NUR als Einmal-Test!)
+#      - das geht, die Policy-Datei oben aber nicht → Datei-Format anpassen
+#      - das geht auch nicht → env erreicht sqv nicht → Plan B unten
+
+# 3) Dauerhaft machen (gilt nach Neu-Anmeldung) + installieren:
+echo 'SEQUOIA_CRYPTO_POLICY=/etc/sequoia-plex-allow-sha1.config' | sudo tee -a /etc/environment
+sudo apt install -y plexmediaserver
+```
+
+**Plan B — ganz ohne Repo** (falls die Policy-Übersteuerung auf deinem System
+nicht greift; Updates dann manuell über denselben Block):
+
+```bash
+sudo mv /etc/apt/sources.list.d/plexmediaserver.list{,.disabled}
+URL=$(curl -fsSL https://plex.tv/api/downloads/5.json | python3 -c \
+  "import json,sys;d=json.load(sys.stdin)['computer']['Program'];print(next(r['url'] for r in d['releases'] if r['distro']=='debian' and 'arm64' in r.get('build','')))")
+cd /tmp && curl -fsSLO "$URL" && sudo apt install ./"${URL##*/}"
 ```
 
 **5.2 Server claimen:** Am PC im Netzwerk `http://192.168.50.47:32400/web`
