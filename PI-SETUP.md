@@ -322,7 +322,7 @@ Nach kurzer Zeit muss das Album in **Plexamp** auftauchen.
 | Aufgabe | Befehl |
 |---|---|
 | Bot-Status | `systemctl status musik-bot` |
-| Bot-Log live | `journalctl -u musik-bot -f` |
+| Bot-Log live | `journalctl -u musik-bot -f` (install.sh startet Python mit `-u`; ältere Units ohne `-u` zeigen Fortschritt erst nach Puffer-Flush — Live-Einblick dann über den Fetch-Log: `tail -f ~/musik/reports/fetch/$(ls -t ~/musik/reports/fetch | head -1)`) |
 | Bot neu starten | `sudo systemctl restart musik-bot` |
 | Toolchain aktualisieren (bei YouTube-Ausfällen) | `cd ~/musik && git pull && .venv/bin/python -m pip install -U spotdl somedl && sudo systemctl restart musik-bot` |
 | Komplett-Reinstall nach Repo-Update | `bash install.sh --library /mnt/music` (idempotent, hält config.yaml) |

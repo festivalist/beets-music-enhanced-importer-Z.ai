@@ -121,7 +121,10 @@ Wants=network-online.target
 Type=simple
 User=$RUN_USER
 WorkingDirectory=$PROJECT_DIR
-ExecStart=$PROJECT_DIR/.venv/bin/python musik.py bot
+# -u is load-bearing: without it Python block-buffers stdout under
+# systemd and journalctl stays silent about job progress (only stderr
+# like tracebacks shows up).
+ExecStart=$PROJECT_DIR/.venv/bin/python -u musik.py bot
 Restart=on-failure
 RestartSec=15
 
