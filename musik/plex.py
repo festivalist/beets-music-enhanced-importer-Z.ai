@@ -50,7 +50,14 @@ def _sections(cfg: dict) -> list[dict]:
     out = []
     for d in root.iter("Directory"):
         if d.get("type") == "artist":  # music libraries
-            out.append({"id": d.get("id"), "title": d.get("title", "")})
+            # newer PMS builds expose the numeric id only inside `key`
+            # ("/library/sections/3"); older ones carry a plain `id`
+            sid = (d.get("id") or "").strip()
+            if not sid:
+                key = (d.get("key") or "").rstrip("/")
+                sid = key.rsplit("/", 1)[-1] if "/" in key else ""
+            if sid:
+                out.append({"id": sid, "title": d.get("title", "")})
     return out
 
 
@@ -74,7 +81,8 @@ def refresh_library() -> tuple[bool, str]:
     try:
         sec = _resolve_section(cfg)
         if not sec:
-            names = ", ".join(s["title"] for s in _sections(cfg)) or "none"
+            names = ", ".join(f"{s['title']} (id {s['id']})" for s in _sections(cfg)) \
+                or "none"
             return False, f"Plex: keine Musik-Section gefunden (vorhanden: {names})"
         r = requests.post(
             f"{cfg['url']}/library/sections/{sec[0]}/refresh",
@@ -82,9 +90,9 @@ def refresh_library() -> tuple[bool, str]:
             timeout=TIMEOUT,
         )
         if r.status_code == 200:
-            return True, f"Plex-Scan der Section „{sec[1]}“ angestoßen"
+            return True, f"Plex-Scan der Section „{sec[1]}“ (id {sec[0]}) angestoßen"
         body = (r.text or "").strip()[:150]
-        return False, (f"Plex-Scan fehlgeschlagen (HTTP {r.status_code}"
-                       + (f": {body}" if body else "") + ")")
+        return False, (f"Plex-Scan fehlgeschlagen (Section „{sec[1]}“ id={sec[0]}, "
+                       f"HTTP {r.status_code}" + (f": {body}" if body else "") + ")")
     except requests.RequestException as e:
         return False, f"Plex nicht erreichbar: {str(e)[:120]}"
