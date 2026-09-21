@@ -1,7 +1,7 @@
 # PI-SETUP — Raspberry-Pi-Aufbau: Link → Download → beets → Plexamp
 
 > **Zielgerät:** Raspberry Pi 5, `192.168.50.47` (SSH-Port 22 offen; Stand 2026-09-20)
-> **Annahme:** Raspberry Pi OS (64-bit, Bookworm) mit SSH-Zugang.
+> **Annahme:** Raspberry Pi OS (64-bit, Bookworm oder trixie) mit SSH-Zugang.
 >
 > **Dieses Dokument pflegen:** Es muss *immer* den aktuellen Stand von
 > `install.sh`, den `config.yaml`-Schlüsseln (`musik: fetch:/plex:/bot_allowlist`),
@@ -174,10 +174,32 @@ Danach: `/start` → Begrüßung, `/status` → „gerade läuft nichts". Fertig
 
 **5.1 Installation (ARM64):**
 
+> **Bekanntes Problem (Stand 2026-09-21), betrifft trixie:** Der
+> Plex-Repo-Signatur-Key hat nur SHA1-Selbstsignaturen. Aktuelles Raspberry Pi
+> OS (Debian trixie) prüft apt-Signaturen mit `sqv` und lehnt SHA1 seit dem
+> 2026-02-01-Cutoff ab — `apt update` bricht ab mit „Signing key … is not
+> bound … SHA1 is not considered secure since 2026-02-01". Der Key selbst ist
+> echt (`CD665CBA0E2F88B7373F7CB997203C7B3ADCA79D`), nur Plex kann das durch
+> einen neu signierten Key beheben. Bis dahin wird der Key lokal mit einer
+> eigenen SHA256-Zertifizierung neu gebunden (Wegwerf-Key, gilt nur für
+> diesen Key — es wird nichts global abgeschwächt). Sobald Plex einen neuen
+> Key veröffentlicht, zurück zum Standard:
+> `curl https://downloads.plex.tv/plex-keys/PlexSign.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/plex.gpg`
+
 ```bash
 sudo apt install -y curl gnupg
 echo deb https://downloads.plex.tv/repo/deb public main | sudo tee /etc/apt/sources.list.d/plexmediaserver.list
-curl https://downloads.plex.tv/plex-keys/PlexSign.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/plex.gpg
+
+# SHA1-Workaround (siehe Kasten oben): Plex-Key per SHA256-Zertifikat neu binden
+export GNUPGHOME=$(mktemp -d)
+curl -fsSL https://downloads.plex.tv/plex-keys/PlexSign.key | gpg --import
+gpg --batch --passphrase '' --quick-generate-key "musik-pi apt resign" ed25519 sign never
+gpg --batch --yes -u "musik-pi apt resign" --cert-digest-algo SHA256 \
+    --sign-key CD665CBA0E2F88B7373F7CB997203C7B3ADCA79D
+gpg --export CD665CBA0E2F88B7373F7CB997203C7B3ADCA79D "musik-pi apt resign" \
+    | sudo tee /etc/apt/trusted.gpg.d/plex.gpg > /dev/null
+rm -rf "$GNUPGHOME"
+
 sudo apt update && sudo apt install -y plexmediaserver
 ```
 
@@ -247,6 +269,7 @@ Nach kurzer Zeit muss das Album in **Plexamp** auftauchen.
 | Toolchain aktualisieren (bei YouTube-Ausfällen) | `cd ~/musik && git pull && .venv/bin/python -m pip install -U spotdl somedl && sudo systemctl restart musik-bot` |
 | Komplett-Reinstall nach Repo-Update | `bash install.sh --library /mnt/music` (idempotent, hält config.yaml) |
 | Cookies neu (nach Logout/Passwortwechsel) | Phase 3 wiederholen (nur Schritt 4-5 + scp) |
+| apt update: Plex-Key-Fehler („not bound", SHA1) | Workaround-Block in Phase 5.1 erneut ausführen (solange Plex den Key nicht neu signiert hat) |
 | Backup (DB + Config + Tokens) | `.venv/bin/python musik.py snapshot` |
 | Monats-Check | `.venv/bin/python musik.py doctor --quick` |
 | Download-Logs | `~/musik/reports/fetch/<job>.log` / `.errors` |
