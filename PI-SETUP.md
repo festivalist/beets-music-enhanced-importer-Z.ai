@@ -197,8 +197,10 @@ curl -fsSL https://downloads.plex.tv/plex-keys/PlexSign.key | sudo gpg --dearmor
 #    darin den SHA1-Cutoff hochsetzen; fehlt sie, eine Minimal-Policy schreiben:
 sudo cp /etc/crypto-policies/back-ends/apt-sequoia.config /etc/sequoia-plex-allow-sha1.config 2>/dev/null \
   && sudo sed -i '/sha1/Is/2026-02-01/2066-01-01/g' /etc/sequoia-plex-allow-sha1.config \
-  || printf '[hash_algorithms]\nsha1.collision_resistance = "always"\nsha1.second_pre_image_resistance = "always"\n' \
+  || printf '[hash_algorithms]\nsha1.collision_resistance = "always"\nsha1.second_preimage_resistance = "always"\n' \
       | sudo tee /etc/sequoia-plex-allow-sha1.config
+#    (Keys exakt so — sqv erwartet: second_preimage_resistance, collision_resistance,
+#     default_disposition. Bei Parse-Fehlern schlägt sqv für ALLE Repos fehl!)
 
 # 2) Testen — welche der beiden Variablen sqv liest, variiert je nach Stand:
 sudo SEQUOIA_CRYPTO_POLICY=/etc/sequoia-plex-allow-sha1.config apt update \
