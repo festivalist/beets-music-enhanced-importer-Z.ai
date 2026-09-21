@@ -27,17 +27,30 @@ def _tag(f: str, field: str) -> str:
         return ""
 
 
+def from_fetch(unit: dict) -> bool:
+    """Downloader staging unit (Spotify/YouTube fetch job).
+
+    Per-track tags come from the streaming catalog and are authoritative
+    per file; the album tag intentionally differs between tracks (a
+    best-of playlist spans many releases). Beets groups these by album
+    tag on import, landing every track in its own release's folder.
+    """
+    return os.path.basename(unit.get("path") or "").startswith("fetch-")
+
+
 def tags_complete(unit: dict) -> tuple[bool, str]:
     """Every file needs artist/album/title; album must be consistent.
 
-    Singleton units (chart dumps etc.) carry a different release album
-    tag per track by design — there the album tag is required per file
-    but never compared across files.
+    Singleton units (chart dumps etc.) and fetch-staging units (playlists,
+    multi-release downloads) carry a different release album tag per track
+    by design — there the album tag is neither compared across files nor
+    strictly required per file (matches the singleton behavior).
     """
     if not unit.get("files"):
         return False, "no files"
-    singleton = bool(
+    per_track = bool(
         unit.get("singleton") or unit.get("split_into_singletons")
+        or from_fetch(unit)
     )
     album = None
     for f in unit["files"]:
@@ -46,14 +59,14 @@ def tags_complete(unit: dict) -> tuple[bool, str]:
         artist = _tag(f, "albumartist") or _tag(f, "artist")
         title = _tag(f, "title")
         fa = _tag(f, "album")
-        if not artist or not title or (not fa and not singleton):
+        if not artist or not title or (not fa and not per_track):
             return False, (
                 f"incomplete tags in {os.path.basename(f)} "
                 f"(artist={artist!r}, album={fa!r}, title={title!r})"
             )
         if album is None:
             album = fa.lower() if fa else ""
-        elif not singleton and fa and fa.lower() != album:
+        elif not per_track and fa and fa.lower() != album:
             return False, "inconsistent album tags across files"
     return True, ""
 

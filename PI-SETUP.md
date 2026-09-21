@@ -168,7 +168,8 @@ journalctl -u musik-bot -f                # Log live mitverfolgen
    `musik: bot_allowlist: [123456789]` → speichern.
 4. `sudo systemctl restart musik-bot`
 
-Danach: `/start` → Begrüßung, `/status` → „gerade läuft nichts". Fertig.
+Danach: `/start` → Begrüßung, `/status` → „gerade läuft nichts", `/asis` →
+wartende Import-Einheiten als Knöpfe. Fertig.
 
 ## Phase 5 — Plex Media Server (auf dem Pi) + Plexamp-Anbindung
 
@@ -292,16 +293,23 @@ Nach kurzer Zeit muss das Album in **Plexamp** auftauchen.
 | Toolchain aktualisieren (bei YouTube-Ausfällen) | `cd ~/musik && git pull && .venv/bin/python -m pip install -U spotdl somedl && sudo systemctl restart musik-bot` |
 | Komplett-Reinstall nach Repo-Update | `bash install.sh --library /mnt/music` (idempotent, hält config.yaml) |
 | Cookies neu (nach Logout/Passwortwechsel) | Phase 3 wiederholen (nur Schritt 4-5 + scp) |
+| Review-Einheiten auf eigene Tags importieren | Handy: Bot-`/asis` (Knöpfe antippen) · Terminal: `musik.py asis --pending` |
 | apt update: Plex-Key-Fehler („not bound", SHA1) | Workaround-Block in Phase 5.1 erneut ausführen (solange Plex den Key nicht neu signiert hat) |
 | Backup (DB + Config + Tokens) | `.venv/bin/python musik.py snapshot` |
 | Monats-Check | `.venv/bin/python musik.py doctor --quick` |
 | Download-Logs | `~/musik/reports/fetch/<job>.log` / `.errors` |
 
 **Playlist-Link (Best Of) landet im Review — das ist normal:** Eine Playlist
-ist kein Album für MusicBrainz; alle Tracks liegen in einer Einheit, der beste
-Album-Kandidat scheitert an `unmatched_tracks` → review. Auflösung:
-`.venv/bin/python musik.py review` → `W` (Import auf eigene Tags — die
-spotDL-Tags sind pro Track korrekt) → Tracks wandern in ihre echten Alben.
+ist kein Album für MusicBrainz. Die Auflösung braucht keine ID-Eingabe:
+
+- **Vom Handy:** dem Bot **`/asis`** schicken → wartende Einheiten erscheinen
+  als Knöpfe („Lebanon Hanover · 30 Tracks (review)") → **antippen** → Import
+  läuft, Ergebnis + Plex-Scan kommen als Nachricht zurück.
+- **Am Terminal:** `.venv/bin/python musik.py asis --pending` (alle
+  tag-vollständigen Einheiten auf eigene Tags; `--dry-run` zeigt vorher nur
+  die Liste) oder interaktiv `musik.py review` → `W`.
+
+Die Tracks wandern dabei Track-für-Track in ihre echten Spotify-Alben.
 Bei fehlendem Genre/Cover danach: `.venv/bin/python musik.py doctor --fix`.
 
 **Fehlersuche:** einzelne Track-Fehler → erstes Mittel ist immer ein Re-Fetch

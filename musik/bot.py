@@ -20,20 +20,26 @@ import os
 import time
 import traceback
 
-from telegram import Update
+from collections import Counter
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import (
     Application,
+    CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
     MessageHandler,
     filters,
 )
 
+from . import asis as asis_mod
 from . import fetch
 from . import jobs as jobs_mod
 from . import plex as plex_mod
+from . import state as state_mod
 from .paths import PROJECT_DIR, bootstrap, musik_config
+from .scan import artist_values
 
 MAX_MESSAGE_LEN = 400
 
@@ -73,6 +79,8 @@ HELP_TEXT = (
     "• oder Suchtext: „artist - title“\n\n"
     "Ich lade die Tracks herunter, tagge und importiere sie in die "
     "Musikbibliothek und melde mich, wenn sie fertig sind.\n\n"
+    "/asis — liegengeschlafene Einheiten (Review etc.) auflisten und "
+    "per Knopfdruck auf eigene Tags importieren\n"
     "/status — Warteschlange und letzte Ergebnisse"
 )
 
@@ -84,6 +92,9 @@ HELP_TEXT = (
 def _execute_job(job: dict, send) -> None:
     """Run one job end to end; `send` delivers progress messages."""
     jobs_mod.update_job(job["id"], status="running", started=time.time())
+    if job.get("kind") == "asis":
+        _execute_asis(job, send)
+        return
     query = job["text"].strip()
     print(f"bot: job {job['id']} running: {query[:120]}")
     send(f"⬇️ Download läuft:\n{query[:200]}")
@@ -117,6 +128,69 @@ def _execute_job(job: dict, send) -> None:
         jobs_mod.update_job(job["id"], status="error", finished=time.time(),
                             summary=msg)
         print(f"bot: job {job['id']} error")
+
+
+def _execute_asis(job: dict, send) -> None:
+    """Import the job's units as-is (own tags); report per-unit outcomes."""
+    paths = job.get("unit_paths") or []
+    lines = []
+    for p in paths:
+        label = os.path.basename(p) or p
+        send(f"📦 as-is-Import läuft:\n{label}")
+        try:
+            asis_mod.cmd_asis(only=p, include_pending=True)
+        except Exception as e:
+            traceback.print_exc()
+            lines.append(f"❌ {label}: {type(e).__name__}: {str(e)[:200]}")
+            continue
+        fresh = state_mod.get_unit(state_mod.load(), p)
+        status = (fresh or {}).get("status")
+        if status == "asis":
+            lines.append(f"✅ {os.path.basename(p) or p} — importiert")
+        else:
+            why = ((fresh or {}).get("reason") or "")[:120]
+            lines.append(f"⚠️ {os.path.basename(p) or p} — Status jetzt "
+                         f"„{status}“ {('('+why+')') if why else ''}")
+    ok, note = plex_mod.refresh_library()
+    if ok:
+        lines.append(f"🎧 {note}")
+    elif note:
+        lines.append(f"⚠️ {note}")
+    summary = "\n".join(lines)[:1500]
+    failed = any(l.startswith("❌") for l in lines)
+    jobs_mod.update_job(job["id"],
+                        status="error" if failed else "done",
+                        finished=time.time(), summary=summary)
+    send(summary or "fertig")
+
+
+def _asis_candidates() -> list[dict]:
+    """Units waiting in review/unmatched/network/pending whose files can
+    import on their own tags, annotated with a human label."""
+    out = []
+    st = state_mod.load()
+    for u in state_mod.units(st).values():
+        if u.get("status") not in ("review", "unmatched", "network", "pending"):
+            continue
+        present = [f for f in (u.get("files") or []) if os.path.isfile(f)]
+        if not present:
+            continue
+        u = dict(u)
+        u["files"] = present
+        u["n_files"] = len(present)
+        ok, _why = asis_mod.tags_complete(u)
+        if not ok:
+            continue
+        tags = [t for t in artist_values(present) if t]
+        if tags:
+            artist = Counter(tags).most_common(1)[0][0].title()
+        else:
+            artist = (u.get("guessed") or {}).get("artist") \
+                or os.path.basename(u.get("import_path") or "?")
+        u["label"] = f"{artist} · {u['n_files']} Tracks ({u['status']})"
+        out.append(u)
+    out.sort(key=lambda u: u["path"])
+    return out[:10]
 
 
 def _run_job(job: dict, app, loop) -> None:
@@ -207,6 +281,60 @@ async def _cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.effective_message.reply_text("\n".join(lines))
 
 
+async def _cmd_asis(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not _authorized(update):
+        await _deny(update)
+        return
+    cands = await asyncio.to_thread(_asis_candidates)
+    if not cands:
+        await update.effective_message.reply_text(
+            "Nichts angetan: keine Einheiten mit vollständigen Tags in "
+            "review/unmatched/pending. (/status zeigt, was zuletzt lief)")
+        return
+    mapping = context.bot_data.setdefault("asis_map", {})
+    mapping.clear()
+    rows = []
+    for i, u in enumerate(cands, 1):
+        mapping[str(i)] = u["path"]
+        rows.append([InlineKeyboardButton(
+            f"{i}. {u['label']}", callback_data=f"asis:{i}")])
+    if len(cands) > 1:
+        rows.append([InlineKeyboardButton(
+            "✅ ALLE importieren", callback_data="asis:all")])
+    await update.effective_message.reply_text(
+        "Diese Einheiten können auf eigene Tags importiert werden "
+        "(as-is) — antippen:\n"
+        "Playlists landen dabei Track-für-Track in ihren echten Alben.",
+        reply_markup=InlineKeyboardMarkup(rows))
+
+
+async def _on_asis_callback(update: Update,
+                            context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    if not _authorized(update):
+        await query.answer("🚫 nicht autorisiert", show_alert=True)
+        return
+    sel = (query.data or "").split(":", 1)[-1]
+    mapping = context.bot_data.get("asis_map") or {}
+    if sel == "all":
+        paths = list(mapping.values())
+    else:
+        one = mapping.get(sel)
+        paths = [one] if one else []
+    if not paths:
+        await query.answer("Veraltete Liste (Bot wurde neu gestartet) — "
+                           "schick /asis erneut", show_alert=True)
+        return
+    await query.answer()
+    job = jobs_mod.add_job(f"/asis {len(paths)} unit(s)", _chat_id(update))
+    job["kind"] = "asis"
+    job["unit_paths"] = paths
+    await context.bot_data["queue"].put(job)
+    await update.effective_message.reply_text(
+        f"✅ as-is-Import angenommen ({len(paths)} Einheit(en)) — "
+        "du bekommst das Ergebnis hier.")
+
+
 async def _on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _authorized(update):
         await _deny(update)
@@ -256,6 +384,8 @@ def cmd_bot() -> int:
     app.add_handler(CommandHandler("start", _cmd_start))
     app.add_handler(CommandHandler("help", _cmd_help))
     app.add_handler(CommandHandler("status", _cmd_status))
+    app.add_handler(CommandHandler("asis", _cmd_asis))
+    app.add_handler(CallbackQueryHandler(_on_asis_callback, pattern=r"^asis:"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, _on_message))
 
     print("bot: starte long polling …")
