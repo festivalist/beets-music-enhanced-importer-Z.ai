@@ -331,7 +331,7 @@ Nach kurzer Zeit muss das Album in **Plexamp** auftauchen.
 | Plex-Scan manuell anstoßen | `.venv/bin/python musik.py plex` (meldet die konkrete Ursache, falls es hakt) |
 | Plex-Playlist neu hochladen | `.venv/bin/python musik.py plex --playlist "Name"` (oder `all`) |
 | apt update: Plex-Key-Fehler („not bound", SHA1) | Workaround-Block in Phase 5.1 erneut ausführen (solange Plex den Key nicht neu signiert hat) |
-| YouTube schlägt komplett fehl („n challenge solving failed" → „Requested format is not available") | yt-dlp fehlt die JS-Runtime oder die EJS-Solver: `sudo cp ~/.spotdl/deno /usr/local/bin/deno` + `.venv/bin/python -m pip install -U "yt-dlp[default]"`; Test: `.venv/bin/python -m yt_dlp -F "<video-url>"` muss „audio only"-Formate zeigen |
+| YouTube schlägt komplett fehl („n challenge solving failed" → „Requested format is not available") | Fehlende JS-Runtime auf dem PATH (die yt-dlp-Warnung „No supported JavaScript runtime" ist das sichere Zeichen): `.venv/bin/python -m pip install -U "yt-dlp[default]"` + Deno installieren (`curl -fsSL https://deno.land/install.sh \| sh -s -- -y` — spotDLs eigener Deno-Download scheitert auf arm64!) + `sudo cp ~/.deno/bin/deno /usr/local/bin/deno`; Probe: `.venv/bin/python -m yt_dlp -F "<video-url>"` darf die Runtime-Warnung NICHT mehr zeigen |
 | Backup (DB + Config + Tokens) | `.venv/bin/python musik.py snapshot` |
 | Monats-Check | `.venv/bin/python musik.py doctor --quick` |
 | Download-Logs | `~/musik/reports/fetch/<job>.log` / `.errors` |

@@ -70,6 +70,14 @@ DENO_SRC=""
 for cand in "$HOME/.spotdl/deno" "$HOME/.deno/bin/deno"; do
     [[ -x "$cand" ]] && DENO_SRC="$cand" && break
 done
+if [[ -z "$DENO_SRC" ]] && ! command -v deno >/dev/null 2>&1; then
+    # spotdl's deno download fails on some platforms (aarch64!) — fall
+    # back to the official installer (supports linux arm64)
+    step "spotdl-Deno fehlt — offizieller Deno-Installer (aarch64-kompatibel)"
+    curl -fsSL https://deno.land/install.sh | sh -s -- -y \
+        || echo "    WARNING: Deno-Installer fehlgeschlagen — YouTube-Downloads werden scheitern."
+    [[ -x "$HOME/.deno/bin/deno" ]] && DENO_SRC="$HOME/.deno/bin/deno"
+fi
 if [[ -n "$DENO_SRC" ]] && ! command -v deno >/dev/null 2>&1; then
     if $SUDO cp "$DENO_SRC" /usr/local/bin/deno 2>/dev/null; then
         ok "deno -> /usr/local/bin/deno (systemweit sichtbar, auch für den systemd-Service)"
