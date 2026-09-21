@@ -18,6 +18,15 @@ import requests
 from .paths import bootstrap, musik_config
 
 TIMEOUT = 20
+_CLIENT_ID = "musik-bot-import"
+
+
+def _headers(cfg: dict) -> dict:
+    # newer PMS builds (1.4x) reject API writes without a client identifier
+    return {
+        "X-Plex-Token": cfg["token"],
+        "X-Plex-Client-Identifier": _CLIENT_ID,
+    }
 
 
 def plex_config() -> dict | None:
@@ -33,7 +42,7 @@ def plex_config() -> dict | None:
 def _sections(cfg: dict) -> list[dict]:
     r = requests.get(
         f"{cfg['url']}/library/sections",
-        headers={"X-Plex-Token": cfg["token"]},
+        headers=_headers(cfg),
         timeout=TIMEOUT,
     )
     r.raise_for_status()
@@ -69,11 +78,13 @@ def refresh_library() -> tuple[bool, str]:
             return False, f"Plex: keine Musik-Section gefunden (vorhanden: {names})"
         r = requests.post(
             f"{cfg['url']}/library/sections/{sec[0]}/refresh",
-            headers={"X-Plex-Token": cfg["token"]},
+            headers=_headers(cfg),
             timeout=TIMEOUT,
         )
         if r.status_code == 200:
             return True, f"Plex-Scan der Section „{sec[1]}“ angestoßen"
-        return False, f"Plex-Scan fehlgeschlagen (HTTP {r.status_code})"
+        body = (r.text or "").strip()[:150]
+        return False, (f"Plex-Scan fehlgeschlagen (HTTP {r.status_code}"
+                       + (f": {body}" if body else "") + ")")
     except requests.RequestException as e:
         return False, f"Plex nicht erreichbar: {str(e)[:120]}"

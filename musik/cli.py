@@ -136,6 +136,8 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("stats", help="library statistics (totals, formats, decades, top artists)")
 
+    sub.add_parser("plex", help="trigger a Plex library scan (needs musik: plex: config)")
+
     p_sim = sub.add_parser(
         "similar",
         help="similar-artist suggestions from ListenBrainz for artists you don't have yet",
@@ -292,6 +294,14 @@ def main(argv: list[str] | None = None) -> int:
         from . import stats
 
         return stats.cmd_stats()
+
+    if args.cmd == "plex":
+        from . import plex as plex_mod
+
+        ok, note = plex_mod.refresh_library()
+        print(note or "plex: nicht konfiguriert — musik: plex: url/token/section "
+                      "in config.yaml setzen (PI-SETUP Phase 5.5)")
+        return 0 if ok else 1
 
     if args.cmd == "similar":
         from . import similar
