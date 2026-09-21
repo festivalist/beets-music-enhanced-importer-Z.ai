@@ -11,7 +11,7 @@
 Die Kette, die hier aufgebaut wird:
 
 ```
-Handy (unterwegs) ──Link──> Telegram-Bot @trading_signals_on_bot (auf dem Pi)
+Handy (unterwegs) ──Link──> Telegram-Bot (auf dem Pi)
    └─ spotDL (Spotify-Links) / SomeDL (YouTube-Links, Suchtext)
         └─ Download als .m4a (mit Premium-Cookies: 256 kbps) → _incoming/
              └─ musik-Pipeline: scan → import (MusicBrainz) → Genre/Cover
@@ -161,7 +161,7 @@ journalctl -u musik-bot -f                # Log live mitverfolgen
 
 **Chat-ID freischalten (einmalig):**
 
-1. Dem Bot (**@trading_signals_on_bot**) vom Handy aus eine Nachricht schicken.
+1. Dem Bot vom Handy aus eine Nachricht schicken (welcher Bot es ist, steht im Log: `journalctl -u musik-bot | grep listening`).
 2. Antwort: „🚫 Nicht autorisiert. Deine Chat-ID ist **123456789** …"
    *(Die gleiche ID steht im Log: `journalctl -u musik-bot | grep unauthorized`)*
 3. Auf dem Pi: `nano ~/musik/config.yaml` →
@@ -278,7 +278,7 @@ cd ~/musik
 ffprobe -v quiet -show_entries format=bit_rate -of csv "/mnt/music/Singles/<Artist>/<file>.m4a"
 ```
 
-Dann der Bot-Live-Test vom Handy: Album-Link an @trading_signals_on_bot
+Dann der Bot-Live-Test vom Handy: Album-Link an @<dein-bot-name>
 schicken und die Meldungen verfolgen (`⬇️ → 📦 → importiert → 🎧 Plex-Scan`).
 Nach kurzer Zeit muss das Album in **Plexamp** auftauchen.
 
@@ -296,6 +296,13 @@ Nach kurzer Zeit muss das Album in **Plexamp** auftauchen.
 | Backup (DB + Config + Tokens) | `.venv/bin/python musik.py snapshot` |
 | Monats-Check | `.venv/bin/python musik.py doctor --quick` |
 | Download-Logs | `~/musik/reports/fetch/<job>.log` / `.errors` |
+
+**Playlist-Link (Best Of) landet im Review — das ist normal:** Eine Playlist
+ist kein Album für MusicBrainz; alle Tracks liegen in einer Einheit, der beste
+Album-Kandidat scheitert an `unmatched_tracks` → review. Auflösung:
+`.venv/bin/python musik.py review` → `W` (Import auf eigene Tags — die
+spotDL-Tags sind pro Track korrekt) → Tracks wandern in ihre echten Alben.
+Bei fehlendem Genre/Cover danach: `.venv/bin/python musik.py doctor --fix`.
 
 **Fehlersuche:** einzelne Track-Fehler → erstes Mittel ist immer ein Re-Fetch
 des Albums (Gap-Fill ergänzt nur fehlende Tracks); Massen-Ausfall → Tools
