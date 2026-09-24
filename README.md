@@ -61,7 +61,9 @@ python -m venv .venv
 **Linux / Raspberry Pi:** see [PI-SETUP.md](PI-SETUP.md) for the full from-scratch walkthrough (USB/NAS mount, YouTube-Premium cookies, Telegram, Plex/Plexamp). Short version: run `bash install.sh` — same steps
 (Python ≥ 3.10, `.venv`, all dependencies, self test, setup wizard) plus a
 `musik-bot.service` systemd unit for the Telegram bot. Native tools come
-from apt (`ffmpeg`, `libchromaprint-tools`, `flac`).
+from apt (`ffmpeg`, `libchromaprint-tools`, `flac`). Already have a tagged
+library on another machine? PI-SETUP.md **Phase 5b** migrates it
+(SMB over LAN → scan → asis re-import).
 
 ## Remote downloads: link in, album in the library
 

@@ -286,6 +286,98 @@ Phase 3 werden mitgenutzt, falls vorhanden). Gemischte
 (privat/gelöscht), greift die Download-Reihenfolge (Datei-Zeitstempel)
 als Näherung.
 
+## Phase 5b — Bestand vom Windows-PC übernehmen (Migration)
+
+Wer schon eine getaggte musik-Bibliothek auf dem Windows-PC hat
+(`C:\Users\olive\Music` samt Alben/Singles/Compilations-Baum), trägt sie
+einmalig rüber — danach ist das **Pi die alleinige Wahrheit** und der
+Windows-Ordner bleibt als Sicherungskopie eingefroren (keine Imports
+mehr auf Windows; unverarbeitete Quellordner wie `D:\Musik` bleiben
+zunächst dort und kommen später normal durch die Pipeline).
+
+**Warum Neu-Import statt DB-Kopieren:** Die Windows-`beets-library.db`
+speichert Pfade als Windows-Bytes — auf dem Pi nutzlos. Alles
+Wichtige (Genre, ReplayGain, Cover, Jahre) steckt in den **Tags** der
+Dateien, und der asis-Import rechnet die Pfade auf `/mnt/music` nach
+dem identischen Template um (Duplikate gegen bisherige Pi-Downloads
+klärt der eingebaute Qualitätsvergleich automatisch).
+
+**1. Auf Windows — Vorbereitung:**
+
+```bat
+cd /d C:\Users\olive\Documents\MusicBrainz-automated
+python musik.py report --verify        & rem 0 tote Pfade erwartet
+python musik.py snapshot               & rem DB-Archiv als Fallback
+ipconfig                               & rem IPv4-Adresse des PCs notieren
+```
+
+Dann `C:\Users\olive\Music` freigeben: Rechtsklick → Eigenschaften →
+Freigabe → „Freigeben …" → eigenen User mit **Lesen**. (Windows fragt
+beim ersten Freigeben nach der Freigabe-Firewall-Regel → zulassen.)
+
+**2. Auf dem Pi — Bot anhalten und Bibliothek ziehen:**
+
+```bash
+sudo systemctl stop musik-bot          # kein paralleler Import in dieselbe DB!
+sudo apt install -y cifs-utils rsync
+sudo mkdir -p /mnt/winmusic /mnt/music/_incoming/win-lib
+sudo mount -t cifs //<PC-IP>/Music /mnt/winmusic \
+    -o username=olive,uid=$(id -u),gid=$(id -g),ro
+rsync -a --info=progress2 \
+    --exclude '_trash/' --exclude '_backups/' --exclude '_incoming/' \
+    --exclude 'unsorted/' --exclude 'beets-library.db' --exclude '*.log' \
+    /mnt/winmusic/ /mnt/music/_incoming/win-lib/
+sudo umount /mnt/winmusic
+```
+
+(~20–40 GB; rsync ist fortsetzbar — einfach erneut ausführen.)
+
+**3. Trockenlauf:** Klassifizieren und auflisten, nichts wird bewegt:
+
+```bash
+cd ~/musik
+.venv/bin/python musik.py scan --root /mnt/music/_incoming/win-lib
+.venv/bin/python musik.py asis --pending --unit /mnt/music/_incoming/win-lib --dry-run
+```
+
+Erwartung: eine Einheit je Album (Windows-Library hat konsistente
+Album-Tags), Singles als Einzeldateien, fast alles „would-as-is".
+
+**4. Echtlauf:** verschiebt alles per Rename (gleiches Dateisystem,
+schnell) in die finale Struktur unter `/mnt/music`:
+
+```bash
+.venv/bin/python musik.py asis --pending --unit /mnt/music/_incoming/win-lib
+```
+
+**5. Aufräumen, Gesundcheck, verifizieren:**
+
+```bash
+.venv/bin/python musik.py cleanup --root /mnt/music/_incoming/win-lib --dry-run
+.venv/bin/python musik.py cleanup --root /mnt/music/_incoming/win-lib
+.venv/bin/python musik.py doctor --fix          # Art/Genre-Backfill
+.venv/bin/python musik.py stats                 # ~300+ Alben / ~3800 Items erwartet
+.venv/bin/python musik.py report --verify       # 0 tote Pfade
+.venv/bin/python musik.py plex                  # Plex-Scan: alles in Plexamp
+.venv/bin/python musik.py snapshot
+sudo systemctl start musik-bot
+```
+
+**Grenzen/Hinweise:**
+- Externe Cover-Dateien (cover.jpg in Albenordnern) kann cleanup ins
+  `_trash`-Archiv verschieben — `doctor --fix` holt sie via fetchart
+  zurück (eingebettete Cover sind ohnehin in den Dateien).
+- `%aunique{}`-Namenszusätze, die auf Windows durch damalige Duplikate
+  entstanden, können beim Import entfallen (Datei wird leicht
+  umbenannt — Layout bleibt äquivalent).
+- Plexamp startet danach die Sonic Analysis über den kompletten
+  Bestand (Hintergrund, dauert).
+- Download-Playlists (m3u), die auf Pi-Tracks zeigen, die hierbei als
+  Duplikat ersetzt wurden: einmal `.venv/bin/python musik.py plex
+  --playlist all` neu hochladen.
+- `doctor --quick` ohne Limit decode-testet beim ersten Lauf ALLES
+  (Stunden) — für den Anfang `--limit 200` als Spot-Check nutzen.
+
 ## Phase 6 — Erst-Test (Checkliste)
 
 **Tipp für SSH-Alltag** — einmalig den Alias setzen:
@@ -328,6 +420,7 @@ Nach kurzer Zeit muss das Album in **Plexamp** auftauchen.
 | Komplett-Reinstall nach Repo-Update | `bash install.sh --library /mnt/music` (idempotent, hält config.yaml) |
 | Cookies neu (nach Logout/Passwortwechsel) | Phase 3 wiederholen (nur Schritt 4-5 + scp) |
 | Review-Einheiten auf eigene Tags importieren | Handy: Bot-`/asis` (Knöpfe antippen) · Terminal: `musik.py asis --pending` |
+| Windows-Bestand nachträglich übernehmen | Phase 5b (SMB + scan + `asis --pending --unit …`) |
 | Plex-Scan manuell anstoßen | `.venv/bin/python musik.py plex` (meldet die konkrete Ursache, falls es hakt) |
 | Plex-Playlist neu hochladen | `.venv/bin/python musik.py plex --playlist "Name"` (oder `all`) |
 | apt update: Plex-Key-Fehler („not bound", SHA1) | Workaround-Block in Phase 5.1 erneut ausführen (solange Plex den Key nicht neu signiert hat) |
