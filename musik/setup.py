@@ -124,6 +124,15 @@ musik:
         # browser (Netscape format) to this file -> 256 kbps downloads,
         # fewer bot challenges, age-restricted videos. See README runbook.
         cookies_file: cookies.txt
+    # MusicGrabber (2. Beschaffungs-Engine, PI-SETUP Phase 9): der Bot
+    # schickt Freitext-Suchen zuerst hierher (Multi-Source inkl. Lossless,
+    # Qualitaets-Tiers, MusicBrainz-Dauerpruefung) und faellt bei Ausfall
+    # auf die spotDL/SomeDL-Kette zurueck. Links bleiben immer auf der
+    # alten Kette. Instanz ohne API-Key betreiben (No-Login, localhost).
+    musicgrabber:
+        url: http://127.0.0.1:38274
+        enabled: true
+        # job_timeout: 600
     # Plex (optional): refresh this library section after imports so new
     # albums show up in Plexamp without manual scans. Playlist links also
     # become Plex playlists (m3u under <library>/_playlists, uploaded via

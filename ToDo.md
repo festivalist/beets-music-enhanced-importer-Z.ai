@@ -66,8 +66,14 @@ Stories 4.1/4.3 weitergeführt.*
 - [ ] 2.3 Duplikat-/Qualitätsgrenzstelle absichern + dokumentieren: MG-Downloads
       vorhandener Alben laufen durch `_prepare_units` (Gap-Fill, _trash mit
       Manifest); MG-Library-Index zeigt NICHT auf die echte Bibliothek
-- [ ] 2.4 Bot-Routing Freitext → MG-API (search → download → Job-Poll) mit
-      Fallback auf spotDL/SomeDL; `/status` zeigt MG-Jobs (optional, nach 2.1–2.3)
+- [x] 2.4 Bot-Routing Freitext → MG-API mit Fallback — **2026-10-08**:
+      `musik/musicgrabber.py` (dünner Client: available/search/download/
+      wait_for_job; Fehlerklassen MGUnavailable/MGNoResults/MGJobFailed;
+      Auswahl-Regel: Artist-Token-Guard gegen Cover-Rang-1, dann MG-Ranking),
+      Bot routet Freitext zu MG mit sofortigem ingest nach Download,
+      Links unverändert auf spotDL/SomeDL; automatischer Fallback mit
+      Grund-Meldung; smoke_musicgrabber.py mit echten API-Fixtures;
+      setup.py-Template + PI-SETUP 9.8 (inkl. Crash-Loop-Troubleshooting)
 
 ## EPIC 3 — Beschaffung ohne Nutzerinteraktion
 

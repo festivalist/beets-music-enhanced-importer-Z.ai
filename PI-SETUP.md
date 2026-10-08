@@ -568,6 +568,27 @@ errors einer Seite, der nächste Timer-Lauf holt nach.
 | Staging manuell importieren | `.venv/bin/python musik.py ingest` (macht der Timer sonst alle 15 min) |
 | Ingest-Timer | `systemctl list-timers musik-ingest*` · Log: `journalctl -u musik-ingest.service -n 50` |
 
+**9.8 Bot-Integration (Freitext → MusicGrabber):** Der Telegram-Bot
+routet **Freitext-Suchen** („artist - title") zuerst an MusicGrabber —
+mehrere Quellen inkl. Lossless, Qualitäts-Tiers, MusicBrainz-Dauerprüfung.
+Die Auswahl-Regel im Bot bevorzugt Ergebnisse, deren Artist/Channel die
+Artist-Tokens der Anfrage tragen (Rang 1 ist nicht immer das echte Lied —
+beobachtet: ein „Party Mix" über dem offiziellen Video). **Links**
+(Spotify/YouTube) bleiben bewusst auf der spotDL/SomeDL-Kette mit
+Plex-Playlists. Liefert MG nichts (keine Ergebnisse, Dauer-Mismatch,
+Container down), fällt der Bot automatisch auf die YouTube-Kette zurück
+und meldet den Grund. Nach MG-Erfolg importiert der Bot sofort selbst
+(`musik ingest` — kein Warten auf den 15-Min-Timer); Plex wird von ingest
+aktualisiert. Config (Defaults reichen auf dem Pi): `musik: musicgrabber:
+{url: http://127.0.0.1:38274, enabled: true, job_timeout: 600}`.
+
+**Troubleshooting:** Container down → Bot meldet „nicht erreichbar" und
+nutzt den Fallback (Downloads laufen weiter, nur mit YouTube-Qualität).
+Crash-Loop mit `PermissionError: /music/Singles` → Staging-Root wurde
+gelöscht und von Docker als root neu angelegt:
+`sudo chown -R 1000:1000 /mnt/music/_incoming/musicgrabber && sudo docker
+restart musicgrabber` (seit keep_root-Fix 4bc89fb dauerhaft verhindert).
+
 **Noch offen (Stories 1.2–2.x, siehe ToDo.md):** Quellen-/Qualitäts-Fein-
 konfiguration, Testmatrix-Abnahme (Single/Album/Spotify-Playlist/YouTube-
 Playlist/0-day), `musik ingest`-Timer für das Staging, MG-Playlists-M3U in

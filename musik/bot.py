@@ -77,7 +77,8 @@ HELP_TEXT = (
     "Schick mir einfach:\n"
     "• einen Spotify-Link (Album, Playlist, Track, Artist)\n"
     "• einen YouTube/YT-Music-Link\n"
-    "• oder Suchtext: „artist - title“\n\n"
+    "• oder Suchtext: „artist - title“ (läuft zuerst über MusicGrabber — "
+    "mehrere Quellen inkl. Lossless, Qualitäts-Auswahl; Fallback: YouTube)\n\n"
     "Ich lade die Tracks herunter, tagge und importiere sie in die "
     "Musikbibliothek und melde mich, wenn sie fertig sind.\n\n"
     "/asis — liegengeschlafene Einheiten (Review etc.) auflisten und "
@@ -90,6 +91,64 @@ HELP_TEXT = (
 # worker (runs in a thread; one job at a time)
 # --------------------------------------------------------------------------
 
+def _is_free_text(query: str) -> bool:
+    """True for plain search text (no Spotify/YouTube link) — those go to
+    MusicGrabber first; links keep the spotDL/SomeDL chain."""
+    try:
+        pairs = fetch.classify(query)
+    except Exception:
+        return False
+    return bool(pairs) and all(kind == "search" for kind, _value in pairs)
+
+
+def _try_musicgrabber(job: dict, query: str, send) -> bool:
+    """Route a free-text search through MusicGrabber (multi-source, quality
+    tiers, MusicBrainz duration check) and import the result immediately.
+    Returns False (with a notice) when MG cannot deliver — the caller then
+    runs the usual spotDL/SomeDL fallback."""
+    from . import musicgrabber as mg
+
+    if not mg.mg_config().get("enabled", True):
+        return False
+    try:
+        if not mg.available():
+            send("ℹ️ MusicGrabber nicht erreichbar — Fallback über YouTube-Kette")
+            return False
+        send(f"🔍 MusicGrabber-Suche: {query[:120]}")
+        token, results = mg.search(query, limit=10)
+        pick = mg.pick_result(query, results)
+        if pick is None:
+            send("ℹ️ MusicGrabber: keine Ergebnisse — Fallback über YouTube-Kette")
+            return False
+        quality = f" | {pick['quality']}" if pick["quality"] else ""
+        send(f"⬇️ via MusicGrabber [{pick['source']}{quality}]:\n"
+             f"{pick['artist'][:60]} - {pick['title'][:80]}")
+        job_id = mg.download(pick, token)
+        mg.wait_for_job(job_id)
+        # file is in the MG staging area -> import now, no 15-min-timer wait
+        # (the ingest timer's flock skips while this run holds the same
+        # library; ingest itself refreshes Plex at the end)
+        from . import ingest as ingest_mod
+
+        send("📦 geladen — Import & Tagging laufen…")
+        ingest_mod.cmd_ingest()
+        summary = (f"✅ via MusicGrabber [{pick['source']}{quality}] "
+                   f"importiert: {pick['artist'][:50]} - {pick['title'][:70]}")
+        send(summary)
+        jobs_mod.update_job(job["id"], status="done", finished=time.time(),
+                            summary=summary)
+        print(f"bot: job {job['id']} done (musicgrabber)")
+        return True
+    except mg.MGJobFailed as e:
+        send(f"⚠️ MusicGrabber fehlgeschlagen ({str(e)[:150]}) — "
+             "Fallback über YouTube-Kette")
+        return False
+    except mg.MGUnavailable as e:
+        send(f"⚠️ MusicGrabber nicht erreichbar ({str(e)[:100]}) — "
+             "Fallback über YouTube-Kette")
+        return False
+
+
 def _execute_job(job: dict, send) -> None:
     """Run one job end to end; `send` delivers progress messages."""
     jobs_mod.update_job(job["id"], status="running", started=time.time())
@@ -98,6 +157,8 @@ def _execute_job(job: dict, send) -> None:
         return
     query = job["text"].strip()
     print(f"bot: job {job['id']} running: {query[:120]}")
+    if _is_free_text(query) and _try_musicgrabber(job, query, send):
+        return
     send(f"⬇️ Download läuft:\n{query[:200]}")
     try:
         fetch_jobs = fetch.run_fetch([query])

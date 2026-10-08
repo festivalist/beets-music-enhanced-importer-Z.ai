@@ -98,7 +98,12 @@ the real library. Deployment and configuration live on the Pi:
 **PI-SETUP.md Phase 9** (`musicgrabber/docker-compose.yml` in this repo).
 `musik ingest` (systemd timer, every 15 min) runs the staged output through
 the normal chain: scan → MusicBrainz import → asis → art/genre → Plex
-refresh. The spotDL/SomeDL chain remains the default until routing is
+refresh. The Telegram bot routes **free-text searches** through
+MusicGrabber first (config `musik: musicgrabber:`; multi-source quality
+pick with an artist-token guard against cover/namesake rank-1 results) and
+falls back to the spotDL/SomeDL chain when MG cannot deliver; Spotify/
+YouTube links keep the old chain including Plex playlists. The
+spotDL/SomeDL chain remains the default for links until routing is
 switched (ToDo EPIC 5).
 
 ### The Telegram bot (`musik bot`)
