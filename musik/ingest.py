@@ -63,6 +63,28 @@ def cmd_ingest(root: str | None = None) -> int:
     print(f"ingest: processing {root}")
     scan_mod.cmd_scan(root)
 
+    # The staging root persists (keep_root) and MusicGrabber reuses
+    # Singles/<Artist>/ — so a decided unit can RECEIVE NEW FILES later.
+    # In staging, present files are by definition unprocessed: reopen
+    # decided units that carry files so the chain re-decides them
+    # (gap-fill discards re-downloads of known tracks).
+    from . import state as state_mod
+    rk = os.path.normcase(os.path.normpath(root))
+    st = state_mod.load()
+    reopened = 0
+    for key, u in state_mod.units(st).items():
+        k = os.path.normcase(os.path.normpath(key))
+        if k != rk and not k.startswith(rk + os.sep):
+            continue
+        if u.get("status") in ("asis", "auto", "duplicate", "review-apply") \
+                and u.get("files"):
+            state_mod.set_status(u, "pending",
+                                 "reopened: new files arrived in staging folder")
+            reopened += 1
+    if reopened:
+        state_mod.save(st)
+        print(f"ingest: reopened {reopened} decided unit(s) with new files")
+
     # Gap-aware pre-pass: album already in the library -> only missing
     # tracks stay; one-track units become singletons (Singles\ path).
     for note in fetch_mod._prepare_units(root):

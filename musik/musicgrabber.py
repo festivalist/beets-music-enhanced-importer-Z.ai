@@ -86,10 +86,16 @@ def search(query: str, limit: int = 10) -> tuple[str, list[dict]]:
              timeout=(5, 60))
     out = []
     for r in d.get("results") or []:
+        artist = r.get("artist") or r.get("channel") or ""
+        title = r.get("title") or ""
+        # YouTube titles often repeat the channel ("The Fratellis - The
+        # Fratellis - Chelsea Dagger") — strip a matching artist prefix.
+        if artist and title.lower().startswith(artist.lower() + " - "):
+            title = title[len(artist) + 3:].strip() or title
         out.append({
             "video_id": r.get("video_id"),
-            "title": r.get("title") or "",
-            "artist": r.get("artist") or r.get("channel") or "",
+            "title": title,
+            "artist": artist,
             "source": r.get("source") or "",
             # jiosaavn downloads REQUIRE the direct source_url (live-probed
             # 2026-10-08: POST /api/download answers 400 without it)
