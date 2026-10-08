@@ -132,6 +132,11 @@ drin sein.*
 
 - [ ] 5.1 Routing umstellen (MG primär, spotDL/SomeDL Fallback) + README-
       YouTube-Breakage-Runbook straffen — erst nach abgeschlossenem EPIC 3
+- [ ] Phase 5b Windows-Bestand übernehmen — **offen, aber erst jetzt
+      sinnvoll**: die Pi-config hatte bis 2026-10-08 Windows-Backslash-
+      Templates (jeder Pi-Import landete FLACH im Root; behoben + 221 Items
+      re-gehomed, Playlists regeneriert). Runbook steht (PI-SETUP 5b),
+      Ausführung durch den Nutzer per SMB+rsync+asis.
 - [ ] Offene Testfälle aus PI-SETUP Phase 8 (mobiler Netz-Test, 256-kbps-
       ffprobe-Check)
 - [ ] SCOPE §8 unverändert: retag --apply, Deezer-Plugin, slskd/Soulseek,

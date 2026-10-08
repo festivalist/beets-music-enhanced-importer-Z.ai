@@ -92,9 +92,9 @@ match:
     track_length_max: 30
 
 paths:
-    default: $albumartist\\$original_year - $album%aunique{{}}\\%if{{$multidisc,$disc-}}$track $title
-    singleton: Singles\\$artist\\$year - $title%aunique{{}}
-    comp: Compilations\\$original_year - $album%aunique{{}}\\%if{{$multidisc,$disc-}}$track $title
+    default: $albumartist@@SEP@@$original_year - $album%aunique{{}}@@SEP@@%if{{$multidisc,$disc-}}$track $title
+    singleton: Singles@@SEP@@$artist@@SEP@@$year - $title%aunique{{}}
+    comp: Compilations@@SEP@@$original_year - $album%aunique{{}}@@SEP@@%if{{$multidisc,$disc-}}$track $title
 
 # ---------------------------------------------------------------------------
 # musik application settings (ignored by beets)
@@ -143,6 +143,14 @@ musik:
         # token: YOUR-X-PLEX-TOKEN
         # section: Musik
 """
+
+# Path templates MUST use the platform separator: on Linux a backslash is
+# not a separator, beets flattens it into the filename and the whole
+# library ends up as `Artist_2006 - Album_01 Song.mp3` directly in the
+# root (incident 2026-10-08: every Pi import since September was flat).
+CONFIG_TEMPLATE = CONFIG_TEMPLATE.replace(
+    "@@SEP@@", "\\\\" if os.name == "nt" else "/"
+)
 
 
 def _ask(prompt: str, default: str = "") -> str:

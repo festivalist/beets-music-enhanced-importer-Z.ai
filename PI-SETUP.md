@@ -288,6 +288,21 @@ Phase 3 werden mitgenutzt, falls vorhanden). Gemischte
 (privat/gelöscht), greift die Download-Reihenfolge (Datei-Zeitstempel)
 als Näherung.
 
+**5.7b Wichtig — Pfad-Trenner (Vorfall 2026-10-08):** Die `paths:`-
+Templates in config.yaml müssen **Forward-Slashes** haben. Das Setup-
+Wizard erzeugt sie seit dem Fix plattformkorrekt; die vor dem Fix
+erzeugten Pi-Configs hatten Windows-Backslashes — beets flacht die auf
+Linux zu `_` im Dateinamen ab, und die **gesamte Bibliothek lag flach im
+Root** (`Grauzone_1981 - Grauzone_01 ….m4a`). Behoben durch: Templates in
+config.yaml auf `/`, dann alle Items per `Item.move()` re-gehomed (DB-
+Pfade wandern mit), Playlist-m3us aus den item_ids regeneriert und
+`plex --playlist all` neu hochgeladen. Phase 5b (Windows-Bestand) darf
+erst mit korrekten Templates laufen — vorherige Imports wären flach
+gelanden.
+
+**5.7c Watched Playlists / Automatik:** nicht Teil dieser Anleitung —
+siehe Phase 9 (MusicGrabber) und dessen „Watched"-Tab.
+
 ## Phase 5b — Bestand vom Windows-PC übernehmen (Migration)
 
 Wer schon eine getaggte musik-Bibliothek auf dem Windows-PC hat
