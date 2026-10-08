@@ -65,10 +65,12 @@ def cmd_ingest(root: str | None = None) -> int:
 
     # The staging root persists (keep_root) and MusicGrabber reuses
     # Singles/<Artist>/ — so a decided unit can RECEIVE NEW FILES later.
-    # In staging, present files are by definition unprocessed: reopen
-    # decided units that carry files so the chain re-decides them
-    # (gap-fill discards re-downloads of known tracks).
+    # Reopen decided units only when files are actually ON DISK (stale
+    # state rows keep their historical, long-moved file lists — those
+    # must stay decided). In staging, present files are by definition
+    # unprocessed; gap-fill discards re-downloads of known tracks.
     from . import state as state_mod
+    from .scan import openable
     rk = os.path.normcase(os.path.normpath(root))
     st = state_mod.load()
     reopened = 0
@@ -76,8 +78,13 @@ def cmd_ingest(root: str | None = None) -> int:
         k = os.path.normcase(os.path.normpath(key))
         if k != rk and not k.startswith(rk + os.sep):
             continue
-        if u.get("status") in ("asis", "auto", "duplicate", "review-apply") \
-                and u.get("files"):
+        if u.get("status") not in ("asis", "auto", "duplicate", "review-apply"):
+            continue
+        present = [f for f in (u.get("files") or [])
+                   if os.path.isfile(openable(f))]
+        if present:
+            u["files"] = present
+            u["n_files"] = len(present)
             state_mod.set_status(u, "pending",
                                  "reopened: new files arrived in staging folder")
             reopened += 1
