@@ -300,9 +300,6 @@ Pfade wandern mit), Playlist-m3us aus den item_ids regeneriert und
 erst mit korrekten Templates laufen — vorherige Imports wären flach
 gelanden.
 
-**5.7c Watched Playlists / Automatik:** nicht Teil dieser Anleitung —
-siehe Phase 9 (MusicGrabber) und dessen „Watched"-Tab.
-
 ## Phase 5b — Bestand vom Windows-PC übernehmen (Migration)
 
 Wer schon eine getaggte musik-Bibliothek auf dem Windows-PC hat
