@@ -29,7 +29,8 @@ def _guard(root: str) -> str | None:
 
 
 def cmd_cleanup(root: str, dry_run: bool = False,
-                trash_base: str | None = None) -> int:
+                trash_base: str | None = None,
+                keep_root: bool = False) -> int:
     from . import trash as trash_mod
     from .paths import musik_config
 
@@ -91,8 +92,14 @@ def cmd_cleanup(root: str, dry_run: bool = False,
         if dry_run or not changed:
             break
 
-    # Root deletion: only when nothing at all is left inside.
-    if os.path.isdir(root) and not os.listdir(root):
+    # Root deletion: only when nothing at all is left inside. Downloader
+    # staging roots (keep_root=True — e.g. the MusicGrabber bind mount)
+    # must NEVER be deleted: docker recreates a missing bind source as
+    # root, and the container user (PUID) then dies in a crash loop with
+    # PermissionError (incident 2026-10-08 19:26).
+    if keep_root:
+        pass
+    elif os.path.isdir(root) and not os.listdir(root):
         if os.path.normcase(os.path.dirname(root)) == os.path.normcase(root):
             pass
         elif dry_run:

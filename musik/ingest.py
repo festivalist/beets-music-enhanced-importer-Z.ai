@@ -77,7 +77,11 @@ def cmd_ingest(root: str | None = None) -> int:
     asis_mod.cmd_asis(only=root, include_pending=True)
 
     if os.path.isdir(root):
-        cleanup_mod.cmd_cleanup(root=root)
+        # keep_root: the staging root is a docker bind-mount source —
+        # deleting it makes docker recreate it as root and crash the
+        # MusicGrabber container (PermissionError for the PUID user).
+        cleanup_mod.cmd_cleanup(root=root, keep_root=True)
+    os.makedirs(root, exist_ok=True)
 
     counts, albums = _outcome(root)
     if albums:
