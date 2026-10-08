@@ -39,17 +39,30 @@ def route(method, url, json=None, timeout=None):
     if url.endswith("/api/search"):
         return Resp(200, {
             "results": [
+                # live case 2: karaoke-label cover, names the original
+                # artist IN THE TITLE, 320 kbps, outranks everything
+                {"video_id": "paris1", "title": "Chelsea Dagger "
+                 "(Originally Performed By The Fratellis) [Full Vocal "
+                 "Version]", "artist": None, "channel": "Paris Music",
+                 "duration": "3:48", "is_playlist": False,
+                 "source": "jiosaavn", "quality": "AAC 320kbps",
+                 "relevance_score": 300, "quality_tier": 4,
+                 "source_url": "https://aac.saavncdn.com/x.mp4"},
+                # live case 1: party-mix namesake, high quality tier
                 {"video_id": "js_hwoEqKC6", "title": "Chelsea Dagger",
                  "artist": None, "channel": "The Professional DJ",
-                 "duration": "5:15", "is_playlist": False, "video_count": None,
+                 "duration": "5:15", "is_playlist": False,
                  "source": "jiosaavn", "quality": "AAC 320kbps",
-                 "relevance_score": 220, "quality_tier": 4},
+                 "relevance_score": 220, "quality_tier": 4,
+                 "source_url": "https://aac.saavncdn.com/y.mp4"},
+                # the real recording (rank 3!)
                 {"video_id": "sEXHeTcxQy4",
                  "title": "The Fratellis - Chelsea Dagger",
                  "artist": None, "channel": "The Fratellis",
                  "duration": "3:50", "is_playlist": False, "video_count": 30,
                  "source": "youtube", "quality": None,
-                 "relevance_score": 150, "quality_tier": 0},
+                 "relevance_score": 150, "quality_tier": 0,
+                 "source_url": "https://www.youtube.com/watch?v=sEXHeTcxQy4"},
             ],
             "search_token": "tok-123",
         })
@@ -72,34 +85,39 @@ assert MG.available() is False
 MG.requests.request = route
 print("1) available() ok/boom OK")
 
-# 2) search normalization (duration parsed, artist falls back to channel)
+# 2) search normalization (duration parsed, artist falls back to channel,
+#    source_url kept for jiosaavn downloads)
 token, results = MG.search("The Fratellis - Chelsea Dagger")
-assert token == "tok-123" and len(results) == 2
-r0, r1 = results
-assert r0["artist"] == "The Professional DJ" and r0["duration_secs"] == 315
-assert r1["artist"] == "The Fratellis" and r1["duration_secs"] == 230
-assert r1["relevance"] == 150 and r0["quality_tier"] == 4
+assert token == "tok-123" and len(results) == 3
+r0, r2 = results[0], results[2]
+assert r0["artist"] == "Paris Music" and r0["duration_secs"] == 228
+assert r0["source_url"].startswith("https://aac.saavncdn.com/")
+assert r2["artist"] == "The Fratellis" and r2["duration_secs"] == 230
+assert r2["relevance"] == 150 and r0["quality_tier"] == 4
 print("2) search normalization OK")
 
-# 3) pick_result: the cover/party mix must NOT win when the query names
-#    the artist (real-world case observed 2026-10-08)
+# 3) pick_result: artist query must NEVER pick the karaoke cover (names
+#    the original artist in its title) nor the party-mix namesake — the
+#    official video on rank 3 wins (both live cases from 2026-10-08)
 pick = MG.pick_result("The Fratellis - Chelsea Dagger", results)
 assert pick["video_id"] == "sEXHeTcxQy4", pick
-# bare title (no artist info): MG's own ranking decides
+# bare title (no artist tokens): MG's ranking decides among non-covers —
+# documented limitation: a namesake can win here
 pick = MG.pick_result("Chelsea Dagger", results)
 assert pick["video_id"] == "js_hwoEqKC6"
 # playlists are never picked
 pl = dict(results[1], is_playlist=True)
 assert MG.pick_result("x", [pl]) is None
-print("3) pick_result (cover vs original, bare title, playlists) OK")
+print("3) pick_result (karaoke cover + namesake + bare title) OK")
 
-# 4) download body carries the completeness-check pair
-MG.download(pick if pick["video_id"] == "sEXHeTcxQy4" else results[1], token)
+# 4) download body carries source_url + the completeness-check pair
+MG.download(results[2], token)
 body = CALLS[-1]["json"]
 assert body["download_type"] == "single" and body["source"] == "youtube"
+assert body["source_url"].endswith("sEXHeTcxQy4")
 assert body["search_token"] == "tok-123"
 assert body["selected_duration_secs"] == 230
-print("4) download body (token + duration) OK")
+print("4) download body (source_url + token + duration) OK")
 
 # 5) wait_for_job: completed / failed / timeout
 job = MG.wait_for_job(77, timeout=10)

@@ -91,6 +91,9 @@ def search(query: str, limit: int = 10) -> tuple[str, list[dict]]:
             "title": r.get("title") or "",
             "artist": r.get("artist") or r.get("channel") or "",
             "source": r.get("source") or "",
+            # jiosaavn downloads REQUIRE the direct source_url (live-probed
+            # 2026-10-08: POST /api/download answers 400 without it)
+            "source_url": r.get("source_url") or "",
             "quality": r.get("quality") or "",
             "quality_tier": r.get("quality_tier") or 0,
             "relevance": r.get("relevance_score") or 0,
@@ -100,25 +103,37 @@ def search(query: str, limit: int = 10) -> tuple[str, list[dict]]:
     return d.get("search_token") or "", out
 
 
+# Titles of karaoke/tribute releases name the ORIGINAL artist — a
+# title-based guard cannot tell them apart (live case: "Paris Music -
+# Chelsea Dagger (Originally Performed By The Fratellis) [Full Vocal
+# Version]", 320 kbps AAC, ranked above the official video).
+_COVER_TITLE_RE = re.compile(
+    r"originally performed|performed by|tribute|karaoke|in the style of|"
+    r"made famous|cover version|\bcover\b|instrumental version|full vocal version",
+    re.I,
+)
+
+
 def pick_result(query: str, results: list[dict]) -> dict | None:
     """Pick the result to download. Rank 1 alone is not trustworthy: MG
-    sometimes puts a high-quality cover/namesake above the real recording
-    (observed live: 'The Professional DJ' party mix above the official
-    Fratellis video). Prefer results whose artist/title carry the query's
-    artist tokens — 'artist - title' is the documented search format —
-    then keep MG's own ranking (relevance, quality tier). Global rule, no
-    per-artist special cases; users searching a bare title get rank 1.
+    sometimes puts a high-quality cover/namesake above the real recording.
+    Prefer results whose ARTIST/CHANNEL carries the query's artist tokens
+    (never the title — covers name the original artist there) and drop
+    cover-style titles outright; among those, keep MG's own ranking
+    (relevance, quality tier). Global rule, no per-artist special cases;
+    users searching a bare title get rank 1 among non-cover results.
     """
-    results = [r for r in results if r["video_id"] and not r["is_playlist"]]
+    results = [
+        r for r in results
+        if r["video_id"] and not r["is_playlist"]
+        and not _COVER_TITLE_RE.search(r["title"])
+    ]
     if not results:
         return None
     artist_part = query.split(" - ")[0] if " - " in query else query
     want = _tokens(artist_part)
     if want:
-        matching = [
-            r for r in results
-            if want <= (_tokens(r["artist"]) | _tokens(r["title"]))
-        ]
+        matching = [r for r in results if want <= _tokens(r["artist"])]
         if matching:
             results = matching
     return max(results, key=lambda r: (r["relevance"], r["quality_tier"]))
@@ -132,6 +147,8 @@ def download(result: dict, search_token: str = "") -> int:
         "source": result["source"],
         "download_type": "single",
     }
+    if result.get("source_url"):
+        body["source_url"] = result["source_url"]
     if search_token:
         body["search_token"] = search_token
     if result.get("duration_secs"):
