@@ -19,7 +19,12 @@ services:
       - PGID=${PGID:-1000}
       - TZ=${TZ:-Europe/Berlin}
       - MUSIC_DIR=/music
-      - API_KEY=${MUSICGRABBER_API_KEY:?set in musicgrabber/.env (see .env.example)}
+      # KEIN API_KEY setzen: ein gesetzter Key erzwingt Authentifizierung auf
+      # ALLEN API-Wegen, während die UI defaultmäßig ohne Login arbeitet —
+      # der Browser könnte den Key nie mitschicken (dauerhaft 401 auf
+      # Settings/Suche, passiert 2026-10-08). LAN-only ohne Port-Forwarding
+      # ist der No-Login-Default die richtige Betriebsart; für Bot-Routing
+      # (Story 2.4) später MGs User-System sauber aktivieren.
       # Quellen-/Qualitäts-Einstellungen lieber im Settings-Tab der UI
       # pflegen — ENV-Variaben überschreiben und locken die UI-Werte.
     volumes:
