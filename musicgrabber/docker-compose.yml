@@ -19,7 +19,7 @@ services:
       - PGID=${PGID:-1000}
       - TZ=${TZ:-Europe/Berlin}
       - MUSIC_DIR=/music
-      - API_KEY=${MUSICGRABBER_API_KEY:?Bitte in musicgrabber/.env setzen (Vorlage: .env.example)}
+      - API_KEY=${MUSICGRABBER_API_KEY:?set in musicgrabber/.env (see .env.example)}
       # Quellen-/Qualitäts-Einstellungen lieber im Settings-Tab der UI
       # pflegen — ENV-Variaben überschreiben und locken die UI-Werte.
     volumes:
