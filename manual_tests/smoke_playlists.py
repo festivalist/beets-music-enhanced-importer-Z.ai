@@ -145,11 +145,14 @@ info = {
         {"title": "Unavailable Song", "channel": "Anthrax"},   # no file
     ],
 }
+# platform-neutral fixture paths: os.path.basename must split them on
+# BOTH Windows and Linux (hardcoded backslashes broke the test on the Pi)
+dl_dir = os.path.join(tmp, "dl")
 files = [
-    "D:\\dl\\The Long Goodbye (Official Audio).m4a",   # loose name match
-    "D:\\dl\\Persistence of Memory.m4a",               # exact name match
-    "D:\\dl\\03 It's For The Kids.m4a",                # leftover
-    "D:\\dl\\track4.m4a",                              # matched via tag
+    os.path.join(dl_dir, "The Long Goodbye (Official Audio).m4a"),  # loose
+    os.path.join(dl_dir, "Persistence of Memory.m4a"),               # exact
+    os.path.join(dl_dir, "03 It's For The Kids.m4a"),                # leftover
+    os.path.join(dl_dir, "track4.m4a"),                              # via tag
 ]
 tags = {
     "track4.m4a": {"file": "track4.m4a", "artist": "Anthrax", "title": "Gone"},
