@@ -431,8 +431,13 @@ Nach kurzer Zeit muss das Album in **Plexamp** auftauchen.
 | Monats-Check | `.venv/bin/python musik.py doctor --quick` |
 | Download-Logs | `~/musik/reports/fetch/<job>.log` / `.errors` |
 
-**Playlist-Link (Best Of) landet im Review — das ist normal:** Eine Playlist
-ist kein Album für MusicBrainz. Die Auflösung braucht keine ID-Eingabe:
+**Playlist-Links importieren auf eigene Tags (asis):** Eine Playlist ist
+kein Album für MusicBrainz — die Kette entscheidet Fetch-Einheiten deshalb
+direkt auf den Download-Tags (Streaming-Katalog-Tags sind pro Track
+autoritativ, der Job-Ordner ist kein Release-Ordner). Ein Playlist-Link
+läuft damit **ohne Interaktion** durch: Download → asis-Import →
+Plex-Playlist (5.7). Nur Tracks mit unvollständigen Tags (grobe
+YouTube-Metadaten) parken im Review — die holst du so nach:
 
 - **Vom Handy:** dem Bot **`/asis`** schicken → wartende Einheiten erscheinen
   als Knöpfe („Lebanon Hanover · 30 Tracks (review)") → **antippen** → Import

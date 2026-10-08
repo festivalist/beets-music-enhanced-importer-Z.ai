@@ -7,20 +7,31 @@ Stories 4.1/4.3 weitergeführt.*
 
 ## EPIC 4 — Review-Friktion senken (parallel, unabhängig von MusicGrabber)
 
-- [ ] 4.1 Mittleres Band (0.25–0.35) entschärfen: auto-asis, wenn kein
-      Top-Kandidat die Identitäts-Gates besteht und tags_complete + Ordner-/Tag-
-      Übereinstimmung vorliegt — generalisierte Regel in `musik/session.py`,
-      kein Einzelfall-Tuning; vorher/nachher-Zähler per dry-run (ehem. ToDo #1)
-- [ ] 4.2 `from_fetch`-Units mit complete tags direkt asis führen — Playlist-
-      Links sollen nicht mehr systematisch im Review landen; PI-SETUP-
-      Formulierung „das ist normal" entfernen
-- [ ] 4.3 Review-Sichtbarkeit: betroffener Track/Album prominent (erste
-      Spalte/Kopfzeile) in review.csv, `musik review`, session-report (ehem.
-      ToDo #3)
-- [ ] 4.4 Bestandsabbau: offene Units (Stand Windows-Kopie 2026-10-08: 88 =
-      53 review + 32 pending + 2 review-apply + 1 unmatched; auf dem Pi
-      nachzählen) einmalig decided — nach 4.1 per dry-run, Rest `/asis ALLE`
-      bzw. review.csv-apply; Baseline dokumentieren, Ziel dauerhaft ≈ 0
+- [x] 4.1 Mittleres Band — **abgeschlossen als Analyse 2026-10-08 mit klarem
+      Befund**: Die contradiction rule (seit 2026-09-17) deckt den Fall schon
+      ab. Offline-Replay der 53 Review-Units mit Kandidaten: **51/53 → asis**,
+      2 bleiben korrekt in Review (SCOPE-§5.3-Schutz greift: Dexy's
+      different-recording-Veto d=0.055, Style Council Titel-Mismatch d=0.18).
+      Zielcheck: eine zusätzliche Mittelband-Regel wäre redundant geworden —
+      nicht gebaut. Offen: Re-Decide des Pi-Bestands, sobald erreichbar
+      (`musik.py import --status review` + `asis --pending`)
+- [x] 4.2 Fetch-Units direkt asis — Tier-3 prüft für `fetch-…`-Units keine
+      Ordner-Korroboration mehr (Job-Ordner ist Metadaten, Playlist-Tags pro
+      Track autoritativ) → Playlist-Links laufen zur Import-Zeit als asis
+      durch, kein Review-Umweg (session.py + smoke_tier3.py + Doku).
+      **Offener Live-Test auf dem Pi** (git pull + Bot-Restart, dann Spotify-
+      UND YouTube-Playlist-Link schicken): beide müssen ohne Interaktion
+      durchlaufen und als Plex-Playlist landen (Testmatrix-Fälle)
+- [x] 4.3 Review-Sichtbarkeit — review.csv führt jetzt mit `unit`-
+      Identitätsspalte („Artist - Album (N Tracks)") + Kurz-`blocker`,
+      `unit_path` bleibt als Apply-Schlüssel hinten (ToDo-Alt-Item #3).
+      Nutzer-Check beim nächsten Review offen
+- [x] 4.4 Bestandsabbau Windows **erledigt 2026-10-08**: scan retired jetzt
+      Review/Unmatched/Network-Units, deren Dateien vollständig weg sind
+      (→ `ignored`, reversibel) — Lauf über alle Stale-Roots: 52 Units
+      retired, 32 tote Pending-Zeilen gelöscht, 2 echte Review-Fälle
+      bleiben bewusst (s. 4.1). **Offen: Pi-Stock gleich prüfen**
+      (`musik.py scan --root /mnt/music/_incoming` + `import --status review`)
 
 ## EPIC 1 — MusicGrabber auf dem Pi (Beschaffungs-Engine Nr. 2)
 

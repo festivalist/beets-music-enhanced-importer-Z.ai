@@ -468,6 +468,24 @@ def cmd_scan(root: str) -> int:
             del existing[k]
             removed += 1
 
+    # Units waiting for a decision (review/unmatched/network) keep their
+    # files by design — but once EVERY file is gone from disk they can
+    # never be decided and only pollute queues, CSVs and reports. Retire
+    # them to `ignored` (visible + reversible; the pending/ignored cleanup
+    # above drops the row on a later scan once nothing is left to learn).
+    retired = 0
+    for k in list(existing.keys()):
+        u = existing[k]
+        if not (k.startswith(root_key + os.sep) or k == root_key):
+            continue
+        if u.get("status") not in ("review", "unmatched", "network"):
+            continue
+        files = u.get("files") or []
+        if files and not any(os.path.isfile(f) for f in files):
+            u["status"] = "ignored"
+            u["reason"] = "retired: source files no longer exist"
+            retired += 1
+
     kept, added = 0, 0
     for u in new_units:
         key = os.path.normcase(os.path.normpath(u["path"]))
@@ -500,7 +518,9 @@ def cmd_scan(root: str) -> int:
 
     report_mod.write_scan_report(st, notes)
     c = state_mod.counts(st)
-    print(f"scan: {added} new units, {kept} known, {removed} stale removed (root: {root})")
+    print(f"scan: {added} new units, {kept} known, {removed} stale removed"
+          + (f", {retired} gone-file unit(s) retired to ignored" if retired else "")
+          + f" (root: {root})")
     print("unit status counts:", ", ".join(f"{k}={v}" for k, v in sorted(c.items())))
     for n in notes:
         print("note:", n)

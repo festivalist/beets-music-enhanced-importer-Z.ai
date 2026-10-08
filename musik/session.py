@@ -386,7 +386,7 @@ class Decider:
         tags are complete and consistent, and (for album units) the
         folder-name parse agrees with the tags. Never fires after a
         network failure — "MB answered: nothing" must be real."""
-        from .asis import tags_complete
+        from .asis import from_fetch, tags_complete
 
         mb_errors = NetworkErrorRecorder.errors_from(
             self.netrec.snapshot(), "musicbrainz"
@@ -402,6 +402,22 @@ class Decider:
             from .scan import tag_of
             from beets.autotag import string_dist
 
+            if from_fetch(self.unit):
+                # Downloader staging (fetch-…): the folder name carries job
+                # metadata, not release identity, and a playlist's tracks
+                # span many releases by design — the streaming-catalog tags
+                # are authoritative per file (asis.from_fetch). The
+                # folder-agreement corroboration does not apply here.
+                reason = (
+                    "own metadata: downloader tags authoritative (fetch staging); "
+                    "sources don't know these tracks"
+                )
+                return {
+                    "status": "asis",
+                    "reason": reason,
+                    "candidates": [],
+                    "guessed": g,
+                }
             first = next(
                 (f for f in self.unit.get("files", []) if os.path.isfile(f)),
                 None,

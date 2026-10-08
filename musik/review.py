@@ -12,15 +12,17 @@ import os
 from . import state as state_mod
 
 REVIEW_COLUMNS = [
-    "unit_path",
+    "unit",               # "Artist - Album (N Tracks)" — identity up front
     "status",
+    "blocker",            # why it didn't auto-accept (short form of reason)
     "guessed_artist",
     "guessed_album",
     "n_files",
     "cand1_source", "cand1_artist", "cand1_album", "cand1_year", "cand1_distance", "cand1_id",
     "cand2_artist", "cand2_album", "cand2_distance", "cand2_id",
     "cand3_artist", "cand3_album", "cand3_distance", "cand3_id",
-    "decision",          # accept | accept2 | override | unmatched | ignore
+    "unit_path",          # exact key for apply — fill decisions, don't edit
+    "decision",           # accept | accept2 | override | unmatched | ignore
     "override_artist",
     "override_album",
     "override_mbid",
@@ -32,20 +34,41 @@ UNMATCHED_COLUMNS = [
 ]
 
 
+def _unit_label(unit: dict) -> str:
+    """"Artist - Album (N Tracks)" — the identity a review reader looks
+    for, without having to parse a path first."""
+    guessed = unit.get("guessed") or {}
+    name = " - ".join(x for x in (guessed.get("artist"), guessed.get("album")) if x)
+    n = unit.get("n_files", "?")
+    return f"{name or os.path.basename(unit.get('path') or '?')} ({n} Track{'s' if n != 1 else ''})"
+
+
+def _blocker(reason: str) -> str:
+    """Short form of the decision reason — drop the boilerplate prefix so
+    the actual blocker (artist mismatch, distance, penalties) leads."""
+    reason = (reason or "").strip()
+    prefix = "below auto-accept confidence: "
+    if reason.lower().startswith(prefix):
+        reason = reason[len(prefix):]
+    return reason[:160]
+
+
 def _review_row(unit: dict) -> dict:
     cands = unit.get("candidates") or []
     guessed = unit.get("guessed") or {}
     row = {
-        "unit_path": unit["path"],
+        "unit": _unit_label(unit),
         "status": unit.get("status", ""),
+        "blocker": _blocker(unit.get("reason", "")),
         "guessed_artist": guessed.get("artist", ""),
         "guessed_album": guessed.get("album", ""),
         "n_files": unit.get("n_files", ""),
+        "unit_path": unit["path"],
         "decision": "",
         "override_artist": "",
         "override_album": "",
         "override_mbid": "",
-        "notes": unit.get("reason", "")[:200],
+        "notes": "",
     }
     for idx, c in enumerate(cands[:3], 1):
         row[f"cand{idx}_source"] = c.get("source", "")

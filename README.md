@@ -349,7 +349,12 @@ unit wins:
    (no candidates at all, or every candidate is unrelated beyond distance
    0.35), the files' own tags become the source: they must be complete and
    consistent, and for albums the folder-name parse must agree with the
-   tags (two independent presentations corroborating each other). Typical
+   tags (two independent presentations corroborating each other).
+   Downloader staging units (`fetch-…` from `musik fetch`/the bot) skip
+   that corroboration: their folder name is job metadata, and a playlist's
+   tracks span releases by design — the streaming-catalog tags are
+   authoritative per track, so playlist imports resolve to `asis` right at
+   import time instead of parking in review. Typical
    beneficiaries: 0-day/scene WEB releases MusicBrainz hasn't indexed yet,
    and DJ mixes/live sets that never will be. Units imported this way are
    marked `asis` and can be re-tagged once MusicBrainz catches up;
@@ -365,7 +370,11 @@ demo-style tokens) or drop part of the album title.
 
 Review units can be resolved three ways: the interactive `review` command,
 the `review.csv` batch flow, or the explicit `asis` command — plus the
-automatic tier 3 above for the self-evident cases.
+automatic tier 3 above for the self-evident cases. A `scan` retires
+review/unmatched/network units whose source files have vanished entirely
+(→ `ignored`), so dead rows never clog the queues; `review.csv` leads with
+a `unit` identity column ("Artist - Album (N Tracks)") and the short
+`blocker` reason right behind it.
 
 ### 0-day material and the asis command
 
