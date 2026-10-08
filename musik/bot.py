@@ -269,6 +269,45 @@ async def _cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_text(HELP_TEXT)
 
 
+def _running_progress() -> str:
+    """Live progress for the running fetch job: files landed so far in the
+    staging dir plus the downloader's own `N/M` count from the newest log
+    (SomeDL prints `7/12`, spotDL similar). Best-effort — newest dir/log
+    is the active job because only one job runs at a time."""
+    import glob
+    import re as _re
+
+    from .paths import incoming_dir, reports_dir
+    from .scan import collect_audio_tree
+
+    out = []
+    try:
+        dirs = sorted(
+            (d for d in glob.glob(os.path.join(incoming_dir(), "fetch-*"))
+             if os.path.isdir(d)),
+            key=os.path.getmtime,
+        )
+        if dirs:
+            out.append(f"   📥 {len(collect_audio_tree(dirs[-1]))} Datei(en) geladen")
+    except OSError:
+        pass
+    try:
+        logs = sorted(
+            glob.glob(os.path.join(reports_dir(), "fetch", "*.log")),
+            key=os.path.getmtime,
+        )
+        if logs:
+            with open(logs[-1], "rb") as fh:
+                fh.seek(max(0, os.path.getsize(logs[-1]) - 4096))
+                tail = fh.read().decode("utf-8", "replace")
+            m = _re.findall(r"(\d+)\s*/\s*(\d+)", tail)
+            if m:
+                out.append(f"   ⏱ Fortschritt: {m[-1][0]}/{m[-1][1]}")
+    except OSError:
+        pass
+    return "\n".join(out)
+
+
 async def _cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _authorized(update):
         await _deny(update)
@@ -278,13 +317,23 @@ async def _cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if stats["running_job"]:
         r = stats["running_job"]
         lines.append(f"🔄 läuft: {r['text'][:80]}")
+        prog = _running_progress()
+        if prog:
+            lines.append(prog)
     else:
         lines.append("💤 gerade läuft nichts")
     lines.append(f"⏳ in Warteschlange: {stats['queued']}")
     for j in stats["recent"]:
         icon = "✅" if j["status"] == "done" else "❌"
-        head = (j.get("summary") or "").splitlines()[0][:80] if j.get("summary") else j["text"][:60]
+        summary = j.get("summary") or ""
+        head = summary.splitlines()[0][:80] if summary else j["text"][:60]
         lines.append(f"{icon} {head}")
+        # the playlist result (🎵 … N/N zugeordnet) lives on a later line —
+        # surface it so /status answers "10/30 importiert?" directly
+        for extra in summary.splitlines():
+            if "🎵" in extra or "Plex-Playlist" in extra:
+                lines.append(f"     {extra.strip()[:90]}")
+                break
     await update.effective_message.reply_text("\n".join(lines))
 
 

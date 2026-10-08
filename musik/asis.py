@@ -28,14 +28,21 @@ def _tag(f: str, field: str) -> str:
 
 
 def from_fetch(unit: dict) -> bool:
-    """Downloader staging unit (Spotify/YouTube fetch job).
+    """Downloader staging unit (bot fetch jobs, MusicGrabber output).
 
-    Per-track tags come from the streaming catalog and are authoritative
-    per file; the album tag intentionally differs between tracks (a
-    best-of playlist spans many releases). Beets groups these by album
-    tag on import, landing every track in its own release's folder.
+    Per-track tags come from the streaming catalog (fetch jobs) or
+    MusicGrabber's own AcoustID/MusicBrainz tagging and are authoritative
+    per file; the album tag intentionally differs between tracks (a best-of
+    playlist spans many releases; MG's Singles/ tree holds one release per
+    track). Beets groups these by album tag on import, landing every track
+    in its own release's folder. The staging folder name is job metadata,
+    never release identity.
     """
-    return os.path.basename(unit.get("path") or "").startswith("fetch-")
+    p = os.path.basename(unit.get("path") or "")
+    if p.startswith("fetch-"):
+        return True
+    parts = os.path.normpath(unit.get("path") or "").split(os.sep)
+    return "musicgrabber" in parts
 
 
 def tags_complete(unit: dict) -> tuple[bool, str]:

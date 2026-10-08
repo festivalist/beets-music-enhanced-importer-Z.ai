@@ -54,10 +54,12 @@ Stories 4.1/4.3 weitergeführt.*
 
 ## EPIC 2 — Ingest-Kette MG-Staging → beets → Plexamp
 
-- [ ] 2.1 `musik ingest --root <staging>` (Kette aus `fetch --import` ohne
+- [x] 2.1 `musik ingest --root` (Kette aus `fetch --import` ohne
       Download-Teil: scan → prepare → import → asis → cleanup → enrich →
-      Plex-Refresh) + systemd-Timer auf dem Pi + Telegram-Abschlussbericht;
-      scan-Klassifizierung des MG-Layouts (Singles/Artist/Title) verifizieren
+      Plex-Refresh) + systemd-Timer auf dem Pi (15 min, flock) + Telegram-Abschlussbericht —
+      **code-fertig 2026-10-08, Deploy/Erstlauf läuft**; MG-Staging gilt
+      jetzt als Downloader-Staging (from_fetch erkennt musicgrabber-Pfade,
+      per-Track-Albumtags autoritativ); smoke_tier3 Fall 6 deckt das ab
 - [ ] 2.2 MG-Playlists-M3U (`Playlists/…` im Staging) in die playlists-Kette
       einspeisen (prepare/build/matching/Plex-Upload, Nachzügler rebuild);
       smoke_playlists um MG-M3U-Fall erweitern

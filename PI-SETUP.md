@@ -547,7 +547,17 @@ unterwegs läuft alles über Telegram-Bot und Plexamp, nicht über MG).
       zeigt nur `./data` und das Staging als Mounts
 - [ ] `ffprobe` zeigt FLAC (Monochrome-Quelle) bzw. ≥256 kbps
 
-**9.6 Betrieb:**
+**9.6 Automatischer Import (musik ingest):** Der Staging-Ordner ist
+transient — `musik-ingest.timer` (mit `install.sh` installiert, alle 15 min,
+`flock`-gesichert) läuft die Kette scan → import (MusicBrainz) → asis →
+cleanup → Genre/Cover → Plex-Scan über `_incoming/musicgrabber`. Manuell:
+`.venv/bin/python musik.py ingest`. Damit landet MusicGrabber-Ausgabe
+zuverlässig getagggt und nach config.yaml einsortiert in der Bibliothek
+(MG-`Playlists/*.m3u` folgen mit Story 2.2). Hinweis: Der Timer kollidiert
+selten mit einem laufenden Bot-Import (beide schreiben die beets-DB) — dann
+errors einer Seite, der nächste Timer-Lauf holt nach.
+
+**9.7 Betrieb:**
 
 | Aufgabe | Befehl |
 |---|---|
@@ -555,6 +565,8 @@ unterwegs läuft alles über Telegram-Bot und Plexamp, nicht über MG).
 | Update | `cd ~/musik/musicgrabber && docker compose pull && docker compose up -d` |
 | Stop / Start | `docker compose down` / `docker compose up -d` |
 | Backup | `musicgrabber/data/` mitsichern (sqlite-Index + Einstellungen) |
+| Staging manuell importieren | `.venv/bin/python musik.py ingest` (macht der Timer sonst alle 15 min) |
+| Ingest-Timer | `systemctl list-timers musik-ingest*` · Log: `journalctl -u musik-ingest.service -n 50` |
 
 **Noch offen (Stories 1.2–2.x, siehe ToDo.md):** Quellen-/Qualitäts-Fein-
 konfiguration, Testmatrix-Abnahme (Single/Album/Spotify-Playlist/YouTube-

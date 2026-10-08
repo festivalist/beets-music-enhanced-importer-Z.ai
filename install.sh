@@ -138,6 +138,36 @@ EOF
     ok "  2. journal: journalctl -u musik-bot -f"
     [[ -f "$PROJECT_DIR/telegram_token.json" ]] || \
         echo "    note: no telegram_token.json yet — service will idle-error until created."
+
+    step "Installing ingest timer (musik-ingest: MusicGrabber staging -> beets -> Plex)"
+    # flock -n: skip if a previous run still holds the lock (long imports);
+    # the bot does not take this lock — a rare collision errors one side,
+    # the timer simply retries 15 minutes later.
+    $SUDO tee /etc/systemd/system/musik-ingest.service >/dev/null <<EOF
+[Unit]
+Description=musik ingest (MusicGrabber staging -> beets -> Plex)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=$RUN_USER
+WorkingDirectory=$PROJECT_DIR
+ExecStart=/usr/bin/flock -n $PROJECT_DIR/state/ingest.lock $PROJECT_DIR/.venv/bin/python -u musik.py ingest
+EOF
+    $SUDO tee /etc/systemd/system/musik-ingest.timer >/dev/null <<EOF
+[Unit]
+Description=run musik ingest every 15 minutes
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+    $SUDO systemctl daemon-reload
+    $SUDO systemctl enable --now musik-ingest.timer
+    ok "musik-ingest.timer enabled (every 15 min; manual: musik.py ingest)"
 else
     step "Skipping systemd service (--no-systemd or no systemctl)"
 fi

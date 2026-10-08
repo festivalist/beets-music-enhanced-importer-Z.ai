@@ -179,6 +179,13 @@ def main(argv: list[str] | None = None) -> int:
                          help="after downloading: scan + import + asis fallback + "
                               "cleanup (full unattended chain)")
 
+    p_ingest = sub.add_parser(
+        "ingest",
+        help="import staged MusicGrabber output (scan -> import -> asis -> "
+             "cleanup -> art/genre -> Plex refresh; used by musik-ingest.timer)",
+    )
+    p_ingest.add_argument("--root",
+                          help="staging root (default: <library>/_incoming/musicgrabber)")
     sub.add_parser(
         "bot",
         help="run the Telegram bot service (link in -> music in the library)",
@@ -350,6 +357,11 @@ def main(argv: list[str] | None = None) -> int:
             inputs=args.inputs, self_test=args.self_test,
             do_import=args.do_import,
         )
+
+    if args.cmd == "ingest":
+        from . import ingest
+
+        return ingest.cmd_ingest(root=getattr(args, "root", None))
 
     if args.cmd == "bot":
         from . import bot

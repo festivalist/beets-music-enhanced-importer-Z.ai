@@ -105,4 +105,17 @@ r = decide(u)
 assert r is not None and r["status"] == "asis", r
 print("5) singleton unit, tags complete -> asis OK")
 
+# 6) MusicGrabber staging paths count as downloader staging too (EPIC 2.1):
+#    per-track album variance is by design there as well
+u = make_unit("musicgrabber", [
+    ("a.flac", {"artist": "The Fratellis", "album": "Eyes Wide, Tongue Tied",
+                "title": "Baby Don't You Lie to Me!"}),
+    ("b.flac", {"artist": "The Fratellis", "album": "Here We Stand",
+                "title": "Mistress Mabel"}),
+], {"artist": "", "album": ""})
+r = decide(u)
+assert r is not None and r["status"] == "asis", r
+assert "fetch staging" in r["reason"] or "downloader" in r["reason"], r
+print("6) MusicGrabber staging unit -> asis OK (EPIC 2.1)")
+
 print("smoke_tier3: all assertions passed")

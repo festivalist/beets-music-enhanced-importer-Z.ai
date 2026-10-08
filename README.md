@@ -96,8 +96,10 @@ follow). It writes **only** into the staging area
 `<library>/_incoming/musicgrabber` — beets/musik stays the only writer of
 the real library. Deployment and configuration live on the Pi:
 **PI-SETUP.md Phase 9** (`musicgrabber/docker-compose.yml` in this repo).
-The spotDL/SomeDL chain remains the default until routing is switched
-(ToDo EPIC 5).
+`musik ingest` (systemd timer, every 15 min) runs the staged output through
+the normal chain: scan → MusicBrainz import → asis → art/genre → Plex
+refresh. The spotDL/SomeDL chain remains the default until routing is
+switched (ToDo EPIC 5).
 
 ### The Telegram bot (`musik bot`)
 
