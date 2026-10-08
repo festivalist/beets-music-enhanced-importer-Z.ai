@@ -35,10 +35,14 @@ Stories 4.1/4.3 weitergeführt.*
 
 ## EPIC 1 — MusicGrabber auf dem Pi (Beschaffungs-Engine Nr. 2)
 
-- [ ] 1.1 Deployment Pi/Docker — arm64 bestätigt (Docker-Hub-Tags multi-arch),
-      `musicgrabber/docker-compose.yml` + PI-SETUP Phase 9 stehen bereit;
-      ausstehend: Ausführung auf dem Pi (Docker installieren, `.env`, Start,
-      Staging-Verzeichnis, Berechtigungen)
+- [x] 1.1 Deployment Pi/Docker — **ausgeführt 2026-10-08 per SSH**:
+      docker.io (Debian) + Compose-v2-Plugin-Binary (trixie hat kein
+      docker-compose-v2-Paket → PI-SETUP 9.1 entsprechend korrigiert),
+      Compose-YAML-Fix (Doppelpunkt im Interpolationsfehlertext),
+      Staging `/mnt/music/_incoming/musicgrabber` angelegt, `.env` mit
+      generiertem API-Key (PUID 1000), Container Up + HTTP 200, Mounts
+      verifiziert (nur Staging + /data). Offen aus 9.5: erster UI-Download
+      + ffprobe-Check (Nutzer), Settings-Tab-Feinkonfiguration (= 1.2)
 - [ ] 1.2 Quellen & Qualität konfigurieren: Monochrome (FLAC) + YouTube +
       SoundCloud + FreeMp3Cloud aktiv, MIN_AUDIO_BITRATE an lossless-first
       anpassen, YouTube-Cookies hinterlegen; Telegram-Notify nur mit separatem

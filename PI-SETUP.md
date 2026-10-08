@@ -483,9 +483,23 @@ aktualisieren (Zeile oben); Bot antwortet nicht → `journalctl -u musik-bot -n 
 
 **9.1 Docker installieren (einmalig, aus den Debian-Quellen — kein fremdes apt-Repo):**
 
+> **trixie-Realität (Stand 2026-10-08, so deployed):** `docker-compose-v2` liegt
+> nicht in den Debian-Quellen; das dortige `docker-compose` ist das EOL-v1-
+> Python-Paket. Daher `docker.io` aus Debian + das Compose-v2-Plugin als
+> Standalone-Binary von GitHub (offizielles Release-Artefakt, kein Zusatz-Repo,
+> kein apt-Key-Thema). Nebenbeobachtung: `sudo` strippt
+> `SEQUOIA_CRYPTO_POLICY` — `apt update` zeigt in Nicht-Login-Shells die
+> Plex-SHA1-Warnung; für alle anderen Repos ist das harmlos (Warnung, kein
+> Abbruch; dePLOYt wurde trotzdem problemlos).
+
 ```bash
-sudo apt update && sudo apt install -y docker.io docker-compose-v2
+sudo apt update && sudo apt install -y docker.io
 sudo usermod -aG docker $USER     # danach neu anmelden oder `newgrp docker`
+sudo mkdir -p /usr/local/lib/docker/cli-plugins
+sudo curl -fsSL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64 \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+sudo docker compose version       # muss eine v2-Version zeigen
 ```
 
 **9.2 Compose + .env aus dem Repo:**
@@ -501,8 +515,11 @@ nano .env                        # MUSICGRABBER_API_KEY=… ; PUID/PGID = `id -u
 
 **9.3 Starten:**
 
+> **Deployed 2026-10-08 per SSH** (Image 2,6 GB arm64, Health-Check Up,
+> Mounts verifiziert: nur `./data` + Staging; Web-UI antwortet mit 200).
+
 ```bash
-docker compose up -d
+docker compose up -d              # als pi nach newgrp/Neuanmeldung, sonst sudo
 docker compose logs -f           # Start beobachten (erste Init kann dauern)
 ```
 
