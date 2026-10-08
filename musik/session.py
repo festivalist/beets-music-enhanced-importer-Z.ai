@@ -261,10 +261,10 @@ class Decider:
         hints = u.get("hints") or []
         if "multi-artist-dir" in hints or "va-album" in hints:
             return True
-        from .scan import tag_of
+        from .scan import openable, tag_of
 
         first = next(
-            (f for f in u.get("files", []) if os.path.isfile(f)), None
+            (f for f in u.get("files", []) if os.path.isfile(openable(f))), None
         )
         aa = tag_of(first, "albumartist") if first else ""
         if aa and aa.strip().lower() in (
@@ -399,7 +399,7 @@ class Decider:
 
         g = self.unit.get("guessed") or {}
         if not self.unit.get("singleton"):
-            from .scan import tag_of
+            from .scan import openable, tag_of
             from beets.autotag import string_dist
 
             if from_fetch(self.unit):
@@ -419,7 +419,7 @@ class Decider:
                     "guessed": g,
                 }
             first = next(
-                (f for f in self.unit.get("files", []) if os.path.isfile(f)),
+                (f for f in self.unit.get("files", []) if os.path.isfile(openable(f))),
                 None,
             )
             if first is None:
@@ -485,6 +485,10 @@ class Decider:
                 search_name=self.override_album or None,
             )
             if prop.candidates:
+                # Attach the override result so _match_for() can resolve the
+                # record's chosen id — without this, the fallback silently
+                # applied the original (rejected) top candidate instead.
+                task.candidates = list(prop.candidates) + list(candidates)
                 return "apply", self._apply_record(
                     prop.candidates[0], "review-apply",
                     f"override search '{self.override_artist}' - '{self.override_album}'",
@@ -689,7 +693,8 @@ class MusikSession(ImportSession):
             out.append({
                 "file": cls._file_basename(item),
                 "title": getattr(ti, "title", "") or "",
-                "kind": cls._pair_kind(tracks_dist.get(item)),
+                # beets keys Distance.tracks by TrackInfo, not by Item
+                "kind": cls._pair_kind(tracks_dist.get(ti)),
             })
         for item in getattr(match, "extra_items", []) or []:
             out.append({

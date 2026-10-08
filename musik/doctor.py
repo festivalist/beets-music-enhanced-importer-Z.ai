@@ -57,7 +57,7 @@ def _decode_test(exe: str, args: list[str], path: str) -> str | None:
 
 def _cache_key(path: str) -> str:
     try:
-        st = os.stat(path)
+        st = os.stat(openable(path))
         return f"{int(st.st_mtime)}:{st.st_size}"
     except OSError:
         return ""
@@ -74,7 +74,7 @@ def check_audio(items, ok_cache: dict, quick: bool) -> tuple[list[str], list[str
     checked = skipped = 0
     for item in items:
         path = os.fsdecode(item.path)
-        if not os.path.isfile(path):
+        if not os.path.isfile(openable(path)):
             continue
         key = _cache_key(path)
         cached = ok_cache.get(os.path.normcase(path))
@@ -181,7 +181,10 @@ def cmd_doctor(fix: bool = False, quick: bool = False, limit: int | None = None)
         path = os.fsdecode(item.path)
         if len(path) > LONG_PATH_LIMIT:
             long_paths.append(path)
-        if os.path.isfile(path):
+        # openable(): >260-char paths exist (beets syspaths them); without
+        # the prefix a healthy file would read as dead and --fix would
+        # remove its DB row.
+        if os.path.isfile(openable(path)):
             db_paths.add(os.path.normcase(os.path.abspath(path)))
         else:
             dead.append((item.id, f"{path}  ({item.artist} - {item.title})"))
@@ -189,7 +192,7 @@ def cmd_doctor(fix: bool = False, quick: bool = False, limit: int | None = None)
     orphans, incoming = find_orphans(os.fsdecode(lib.directory), db_paths)
 
     missing_art = [a for a in albums
-                   if not a.artpath or not os.path.isfile(os.fsdecode(a.artpath))]
+                   if not a.artpath or not os.path.isfile(openable(os.fsdecode(a.artpath)))]
     missing_genre = [a for a in albums if not getattr(a, "genres", None)]
 
     ok_cache = (state_mod.load().get("meta") or {}).get("doctor_ok") or {}

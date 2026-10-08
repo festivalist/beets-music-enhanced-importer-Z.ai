@@ -10,6 +10,7 @@ an import run. Mirrors beets' usual options per unit:
 import os
 
 from . import state as state_mod
+from .scan import openable
 
 
 def _show(unit: dict) -> None:
@@ -61,13 +62,18 @@ def _cand_id(unit: dict, n: int) -> str:
 
 
 def _run_forced(lib, unit: dict, forced: dict) -> str:
-    """Run the unit with forced decisions; returns the new status."""
+    """Run the unit with forced decisions; returns the new status.
+    A per-unit guard: one failing unit must not abort the whole review
+    session (state of earlier decisions is already saved)."""
     from . import engine
     from . import state as state_mod
 
     engine.netrec.clear()
     decider = engine.build_decider(unit, forced=forced)
-    outcome = engine.run_unit_real(lib, unit, decider)
+    try:
+        outcome = engine.run_unit_real(lib, unit, decider)
+    except Exception as exc:
+        outcome = {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
     engine._merge_result(unit, outcome)
     state_mod.set_status(unit, outcome["status"], outcome.get("reason", ""))
     return outcome["status"]
@@ -120,7 +126,8 @@ def cmd_review(only: str | None = None) -> int:
         while True:
             # If the unit's audio is already gone, it was imported earlier
             # in this session (or left behind) — don't re-run lookups on it.
-            if unit.get("files") and not any(os.path.isfile(f) for f in unit["files"]):
+            if unit.get("files") and not any(
+                    os.path.isfile(openable(f)) for f in unit["files"]):
                 chosen = unit.get("chosen") or {}
                 print(f"  already imported: {chosen.get('artist', '?')} - "
                       f"{chosen.get('album') or chosen.get('track_title', '?')}")

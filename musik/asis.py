@@ -80,13 +80,15 @@ def enrich_from_meta_files(unit: dict) -> int:
     matched by track number (tag, else leading filename number).
     Returns the number of files touched.
     """
-    metas = [m for m in (unit.get("meta_files") or []) if os.path.isfile(m)]
+    metas = [m for m in (unit.get("meta_files") or [])
+             if os.path.isfile(openable(m))]
     if not metas:
         return 0
     entries: dict[int, dict] = {}
     for mf in metas:
         try:
-            raw = open(mf, "rb").read()
+            with open(mf, "rb") as fh:
+                raw = fh.read()
         except OSError:
             continue
         text = None

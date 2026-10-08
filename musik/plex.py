@@ -36,6 +36,15 @@ def _headers(cfg: dict) -> dict:
     }
 
 
+def _num(cfg: dict, key: str, default, cast):
+    """Config knob with a numeric fallback — a malformed value disables
+    the knob, not the whole integration."""
+    try:
+        return cast(cfg.get(key, default))
+    except (TypeError, ValueError):
+        return default
+
+
 def plex_config() -> dict | None:
     """Configured plex section or None (integration disabled)."""
     cfg = (musik_config().get("plex") or {})
@@ -48,8 +57,8 @@ def plex_config() -> dict | None:
         "token": token,
         "section": (cfg.get("section") or "").strip(),
         "playlists": cfg.get("playlists", True),
-        "playlist_attempts": int(cfg.get("playlist_attempts", 5)),
-        "playlist_wait": float(cfg.get("playlist_wait", 10)),
+        "playlist_attempts": _num(cfg, "playlist_attempts", 5, int),
+        "playlist_wait": _num(cfg, "playlist_wait", 10.0, float),
     }
 
 
@@ -121,8 +130,8 @@ def refresh_library() -> tuple[bool, str]:
         body = (r.text or "").strip()[:150]
         return False, (f"Plex-Scan fehlgeschlagen (Section „{sec[1]}“ id={sec[0]}, "
                        f"HTTP {r.status_code}" + (f": {body}" if body else "") + ")")
-    except requests.RequestException as e:
-        return False, f"Plex nicht erreichbar: {str(e)[:120]}"
+    except (requests.RequestException, ET.ParseError, ValueError) as e:
+        return False, f"Plex nicht erreichbar / unerwartete Antwort: {str(e)[:120]}"
 
 
 # --------------------------------------------------------------------------

@@ -63,9 +63,14 @@ def cmd_retag(limit: int | None = None, max_distance: float = 0.10) -> int:
         own_artist = items[0].albumartist or items[0].artist or "?"
         own_album = items[0].album or "?"
         own_year = items[0].year or 0
-        dirname = os.path.dirname(os.fsdecode(items[0].path))
         try:
-            _artist, _album, proposal = tag_album(items, dirname)
+            # Search from the album's own tags. (Never pass the folder path —
+            # tag_album's second positional parameter is search_artist.)
+            _artist, _album, proposal = tag_album(
+                items,
+                search_artist=own_artist if own_artist != "?" else None,
+                search_name=own_album if own_album != "?" else None,
+            )
         except Exception as e:
             none.append(f"`{own_artist} - {own_album}` — lookup failed: {e}")
             continue

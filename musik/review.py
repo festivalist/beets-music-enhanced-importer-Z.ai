@@ -194,6 +194,15 @@ def apply_decisions(csv_path: str | None = None) -> int:
             print(f"  unknown decision '{d['decision']}' (skipped): {d['unit_path']}")
             continue
 
+        # Singleton units have no album-level search: an artist/album-only
+        # override would silently re-run the normal (failing) path while
+        # reporting "applied".
+        if (unit.get("singleton") or unit.get("split_into_singletons")) \
+                and not (forced.get("album_id") or forced.get("track_id")):
+            print(f"  override on a singleton needs an MBID "
+                  f"(artist/album search is album-only): {d['unit_path']}")
+            continue
+
         engine.setup_beets()
         from beets import config as beets_config
         from beets.library import Library

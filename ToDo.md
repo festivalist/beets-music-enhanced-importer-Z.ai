@@ -73,6 +73,49 @@ Stories 4.1/4.3 weitergeführt.*
 - [ ] 3.3 Track-Upgrades lossy→lossless report-first (optional; Apply bleibt
       manuelle Ausnahme, SCOPE §8)
 
+## EPIC 6 — Code-Health (Audit 2026-10-08: Totcode/Datentypen/Struktur/Konventionen)
+
+*Audit-Grundlage: 3 Parallel-Recherchen über alle 27 musik/-Module; P1-Befunde
+im Code verifiziert. Deploy-Gate: 6.1 + 6.2 + 7.1 müssen vor dem Pi-Deploy
+drin sein.*
+
+- [x] 7.1 Story-Workflow-Skill `musik-story-workflow` (Anforderung→Stories→
+      fester Ablauf mit Zielcheck+Redundanzcheck; AGENTS.md-Skilliste; dieses
+      Backlog) — **Deploy-Gate**
+- [x] 6.1 P1-Fixes — **erledigt 2026-10-08**: (a) Override-Apply hängt
+      Suchergebnis an `task.candidates` (falscher Kandidat/SKIP-Crash),
+      (b) retag `tag_album`-Signatur (Suche aus eigenen Tags statt Pfad),
+      (c) `_run_logged` Reader-Thread + Prozessgruppen-/taskkill-T + EIN
+      globales Job-Budget über alle Retry-Runden; smoke_decider.py deckt
+      Override-Pfad + stummen Timeout-Kill ab
+- [x] 6.2 P2-Fixes — **erledigt 2026-10-08**: openable()-Routing (doctor
+      dead-rows/Cache/art, report --verify, quality.score, scan stale+
+      retirement, session tier3/va_like, asis meta-files, interactive),
+      `_album_file_map` TrackInfo-Key („enhanced" wird jetzt gemeldet),
+      `_release_kind` chosen.albumtype, gap-fill TimeoutExpired-Handler,
+      Singleton-Override-Guard in apply, per-unit-Guard in interactive
+      `_run_forced`, plex `_num`-Fallbacks + weitere Exception-Typen;
+      smoke_quality.py (Long-Path-Routing)
+- [ ] 6.3 Redundanz-Dedup: engine.open_library() (13→1), asis._tag→
+      scan.tag_of, state.norm_key/path_under, _cand_id, engine.apply_forced,
+      original_year-Fill + MBID-Extraktion entdoubleln, Totcode raus
+      (engine._item_paths, jobs.get_job, fetch._OPEN_STATUSES, state.STATUSES→
+      wahr+Guard), Privat-Zugriffe public, fetch._unit_label-Rename,
+      scan.junk_files privat
+- [ ] 6.4 Zyklus session↔asis auflösen (from_fetch/tags_complete → scan,
+      enrich_from_meta_files → scan); smoke_tier3 anpassen
+- [ ] 6.5 Config/Doku/Installer-Drift: auto_accept_distance-Fallback 0.25,
+      scripts/ tracken (pretag_from_folder, va_asis_prepare; beatport_refresh-
+      Verweis auf Automatik umstellen), PNGs löschen, --get-playlist-Wortlaut,
+      install.ps1 Self-Test + install.sh fpcalc-Label, SCOPE §4.5-Zeile,
+      mutagen-Pin
+- [ ] 6.6 Tests/CI: manual_tests in CI wiren; smoke_scan.py (Klassifizierung)
+      + smoke_decider.py erweitern (Entscheidungsmatrix)
+- [ ] 6.7/6.8 später: smoke_gapfill (Temp-Beets-DB für _prepare_units),
+      engine↔review/report + fetch↔playlists entflechten, gapfill-Modul,
+      beatport-Rename, Decider-Konstanten nach oben, systemd-Template,
+      install.ps1 --library, Sprachregel CLI/Bot
+
 ## EPIC 5 + Späteres
 
 - [ ] 5.1 Routing umstellen (MG primär, spotDL/SomeDL Fallback) + README-

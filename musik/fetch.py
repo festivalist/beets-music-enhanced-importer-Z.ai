@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 import sysconfig
+import threading
 import time
 from dataclasses import dataclass, field
 
@@ -321,9 +322,44 @@ def _retry_argv(job: FetchJob, errors_file: str, rcfg: dict,
             0)
 
 
+def _kill_tree(proc: subprocess.Popen) -> None:
+    """Kill the child AND its grandchildren (spotdl spawns ffmpeg): plain
+    proc.kill() only hits the direct child, leaving orphans that keep
+    holding file locks in the job dir."""
+    try:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                capture_output=True, timeout=15,
+            )
+        else:
+            import signal
+
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+    try:
+        proc.kill()
+    except OSError:
+        pass
+
+
+def _drain(proc: subprocess.Popen, log, tool: str) -> None:
+    """Reader thread: keeps stdout moving even when the child goes silent
+    (a full pipe would otherwise stall the child's own progress lines)."""
+    for line in proc.stdout or []:
+        log.write(line)
+        log.flush()
+        print(f"  [{tool}] {line.rstrip()}")
+
+
 def _run_logged(argv: list[str], log_path: str, job: FetchJob,
                 deadline_s: float | None) -> int:
-    """Run a subprocess, streaming output to the log file and console."""
+    """Run a subprocess, streaming output to the log file and console.
+
+    The deadline is enforced from the MAIN thread via wait(timeout=...) —
+    a silent child emits no lines, so a line-driven deadline check would
+    never fire exactly in the stall case the budget exists for."""
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     timed_out = False
     with open(log_path, "a", encoding="utf-8", errors="replace") as log:
@@ -333,22 +369,28 @@ def _run_logged(argv: list[str], log_path: str, job: FetchJob,
             argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, encoding="utf-8", errors="replace", env=env,
             cwd=os.path.dirname(log_path),
+            start_new_session=(os.name != "nt"),  # own group -> killpg-able
         )
+        reader = threading.Thread(
+            target=_drain, args=(proc, log, job.tool), daemon=True)
+        reader.start()
         try:
-            for line in proc.stdout or []:
-                log.write(line)
-                log.flush()
-                print(f"  [{job.tool}] {line.rstrip()}")
-                if deadline_s and time.monotonic() > deadline_s:
-                    timed_out = True
-                    proc.kill()
-                    break
-        finally:
-            try:
-                proc.wait(timeout=30)
-            except subprocess.TimeoutExpired:
-                proc.kill()
+            if deadline_s is None:
                 proc.wait()
+            else:
+                try:
+                    proc.wait(timeout=max(0.0, deadline_s - time.monotonic()))
+                except subprocess.TimeoutExpired:
+                    timed_out = True
+        finally:
+            if proc.poll() is None:
+                _kill_tree(proc)
+                try:
+                    proc.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    _kill_tree(proc)
+                    proc.wait()
+        reader.join(timeout=5)
     job.timed_out = timed_out
     if timed_out:
         job.errors.append("job exceeded its time budget and was killed")
@@ -474,7 +516,7 @@ def run_fetch(inputs: list[str], timeout_s: float | None = DOWNLOAD_TIMEOUT,
                 log.write(f"\n===== retry round {rcfg['retry_rounds'] - rounds_left + 1} =====\n")
             job.returncode = _run_logged(
                 argv, job.log_path, job,
-                deadline_s=(time.monotonic() + timeout_s if timeout_s else None),
+                deadline_s=deadline,  # ONE job-wide budget, not per round
             )
             _collect(job, errors_file)
             rounds_left -= 1
@@ -614,11 +656,17 @@ def _insert_gap_tracks(files: list[str], target, lib) -> tuple[list[str], list[s
         env = dict(os.environ)
         for tn in inserted_tracks:
             for args in (("replaygain",), ("embedart",)):
-                subprocess.run(
-                    [sys.executable, "-m", "beets", *args,
-                     f"album_id:{target.id}", f"track:{tn}"],
-                    env=env, capture_output=True, timeout=300,
-                )
+                try:
+                    subprocess.run(
+                        [sys.executable, "-m", "beets", *args,
+                         f"album_id:{target.id}", f"track:{tn}"],
+                        env=env, capture_output=True, timeout=300,
+                    )
+                except subprocess.TimeoutExpired:
+                    # tracks are imported and stored; only the analysis
+                    # backfill is skipped (same contract as _enrich_albums)
+                    print(f"import: gap backfill {args[0]} timed out for "
+                          f"track {tn} (album_id:{target.id})")
     return inserted, failed
 
 

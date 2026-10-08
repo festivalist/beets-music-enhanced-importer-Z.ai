@@ -463,7 +463,9 @@ def cmd_scan(root: str) -> int:
         superseded = any(
             os.path.normcase(f) in covered for f in u.get("files", [])
         )
-        gone = u.get("files") and not all(os.path.isfile(f) for f in u["files"])
+        gone = u.get("files") and not all(
+            os.path.isfile(openable(f)) for f in u["files"]
+        )
         if superseded or gone:
             del existing[k]
             removed += 1
@@ -481,7 +483,7 @@ def cmd_scan(root: str) -> int:
         if u.get("status") not in ("review", "unmatched", "network"):
             continue
         files = u.get("files") or []
-        if files and not any(os.path.isfile(f) for f in files):
+        if files and not any(os.path.isfile(openable(f)) for f in files):
             u["status"] = "ignored"
             u["reason"] = "retired: source files no longer exist"
             retired += 1

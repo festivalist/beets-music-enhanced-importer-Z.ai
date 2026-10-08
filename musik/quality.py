@@ -4,6 +4,8 @@ import os
 
 import mutagen
 
+from .scan import openable
+
 # Rough fidelity tiers: lossless > modern lossy > mp3-era lossy.
 FORMAT_TIER = {
     ".flac": 6, ".ape": 6, ".wv": 6, ".alac": 6,
@@ -20,7 +22,10 @@ def score(path: str) -> tuple:
     tier = FORMAT_TIER.get(ext, 0)
     bitrate = sample_rate = bits = 0
     try:
-        m = mutagen.File(path)
+        # openable(): >260-char Windows paths must still score — a swallowed
+        # read error here would silently rank a lossless file tier 0 and
+        # trash the wrong duplicate.
+        m = mutagen.File(openable(path))
         if m is not None:
             info = m.info
             bitrate = int(getattr(info, "bitrate", 0) or 0)

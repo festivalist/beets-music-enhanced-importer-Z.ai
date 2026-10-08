@@ -6,6 +6,7 @@ from collections import Counter
 
 from . import state as state_mod
 from .paths import reports_dir
+from .scan import openable
 
 
 def _status_counts(state: dict) -> Counter:
@@ -307,12 +308,12 @@ def verify(state: dict, fix: bool = False) -> dict:
     out["albums"] = len(albums)
     out["items"] = len(list(lib.items()))
     for a in albums:
-        if not a.artpath or not os.path.isfile(os.fsdecode(a.artpath)):
+        if not a.artpath or not os.path.isfile(openable(os.fsdecode(a.artpath))):
             out["albums_missing_art"] += 1
         if not getattr(a, "genres", None):
             out["albums_missing_genre"] += 1
     for item in lib.items():
-        if not os.path.isfile(os.fsdecode(item.path)):
+        if not os.path.isfile(openable(os.fsdecode(item.path))):
             out["items_missing_path"] += 1
             if fix:
                 print(f"verify --fix: removing dead item #{item.id} "

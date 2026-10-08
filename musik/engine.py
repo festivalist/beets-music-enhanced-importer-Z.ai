@@ -263,7 +263,8 @@ def _release_kind(unit: dict, outcome: dict | None = None) -> str:
         return "mix"
     at = None
     for r in (outcome or {}).get("results", []):
-        at = r.get("albumtype") or at
+        # albumtype lives inside the chosen-candidate record (chosen_info)
+        at = (r.get("chosen") or {}).get("albumtype") or at
     if at in ("album", "ep", "single", "compilation"):
         return at
     n = unit.get("n_files", 0)
