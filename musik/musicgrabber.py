@@ -139,8 +139,9 @@ def pick_result(query: str, results: list[dict]) -> dict | None:
     return max(results, key=lambda r: (r["relevance"], r["quality_tier"]))
 
 
-def download(result: dict, search_token: str = "") -> int:
-    """Queue a single-track download; returns the MusicGrabber job id."""
+def download(result: dict, search_token: str = ""):
+    """Queue a single-track download; returns the MusicGrabber job id
+    (a string in current MG builds — live-probed 2026-10-08)."""
     body = {
         "video_id": result["video_id"],
         "title": result["title"],
@@ -155,12 +156,13 @@ def download(result: dict, search_token: str = "") -> int:
         body["selected_duration_secs"] = result["duration_secs"]
     d = _api("POST", "/api/download", body, timeout=(5, 60))
     for key in ("id", "job_id"):
-        if d.get(key):
-            return int(d[key])
+        v = d.get(key)
+        if v:
+            return v
     raise MGJobFailed(f"download response without job id: {str(d)[:120]}")
 
 
-def wait_for_job(job_id: int, timeout: float | None = None,
+def wait_for_job(job_id, timeout: float | None = None,
                  progress=None) -> dict:
     """Poll the job until it completes; returns the final job dict.
     `progress(stage, job)` fires on stage changes (rate-limited by the

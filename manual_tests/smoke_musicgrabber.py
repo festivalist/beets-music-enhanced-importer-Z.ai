@@ -67,9 +67,9 @@ def route(method, url, json=None, timeout=None):
             "search_token": "tok-123",
         })
     if url.endswith("/api/download"):
-        return Resp(200, {"id": 77})
-    if "/api/jobs/77" in url:
-        return Resp(200, {"id": 77, "status": "completed",
+        return Resp(200, {"id": "816f3ba5"})  # string id (live-probed)
+    if "/api/jobs/" in url:
+        return Resp(200, {"id": "816f3ba5", "status": "completed",
                           "title": "The Fratellis - Chelsea Dagger",
                           "progress_stage": None})
     return Resp(404, None, "nope")
@@ -119,20 +119,20 @@ assert body["search_token"] == "tok-123"
 assert body["selected_duration_secs"] == 230
 print("4) download body (source_url + token + duration) OK")
 
-# 5) wait_for_job: completed / failed / timeout
-job = MG.wait_for_job(77, timeout=10)
+# 5) wait_for_job: completed / failed / timeout (string job ids are real)
+job = MG.wait_for_job("816f3ba5", timeout=10)
 assert job["status"] == "completed"
 print("5a) wait_for_job completed OK")
 
 
 def fail_route(method, url, json=None, timeout=None):
-    return Resp(200, {"id": 78, "status": "failed",
+    return Resp(200, {"id": "78ab", "status": "failed",
                       "error": "Duration mismatch: got 99s"})
 
 
 MG.requests.request = fail_route
 try:
-    MG.wait_for_job(78, timeout=5)
+    MG.wait_for_job("78ab", timeout=5)
     raise AssertionError("should have raised")
 except MG.MGJobFailed as e:
     assert "Duration mismatch" in str(e)
@@ -152,9 +152,9 @@ class FakeTime(types.SimpleNamespace):
 
 
 MG.time = FakeTime()
-MG.requests.request = lambda *a, **kw: Resp(200, {"id": 79, "status": "running"})
+MG.requests.request = lambda *a, **kw: Resp(200, {"id": "79c", "status": "running"})
 try:
-    MG.wait_for_job(79, timeout=10)
+    MG.wait_for_job("79c", timeout=10)
     raise AssertionError("should have raised")
 except MG.MGJobFailed as e:
     assert "not finished" in str(e)
