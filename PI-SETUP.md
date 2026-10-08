@@ -12,8 +12,10 @@ Die Kette, die hier aufgebaut wird:
 
 ```
 Handy (unterwegs) ──Link──> Telegram-Bot (auf dem Pi)
-   └─ spotDL (Spotify-Links) / SomeDL (YouTube-Links, Suchtext)
-        └─ Download als .m4a (mit Premium-Cookies: 256 kbps) → _incoming/
+   ├─ spotDL (Spotify-Links) / SomeDL (YouTube-Links, Suchtext)
+   │    └─ Download als .m4a (mit Premium-Cookies: 256 kbps) → _incoming/
+   └─ MusicGrabber (Phase 9 — zweite Beschaffungs-Engine: Suche, Watched
+        Playlists/Artists, auch lossless) → _incoming/musicgrabber/
              └─ musik-Pipeline: scan → import (MusicBrainz) → Genre/Cover
                   └─ Plex-Scan (lokaler PMS) → Album erscheint in Plexamp
 ```
@@ -459,6 +461,83 @@ aktualisieren (Zeile oben); Bot antwortet nicht → `journalctl -u musik-bot -n 
       fehlende Tracks ergänzt"
 - [ ] `ffprobe` zeigt 256 kbps (Cookies wirksam)
 - [ ] Windows-Test-Bot ist aus; einziges aktives System ist der Pi
+
+## Phase 9 — MusicGrabber (Beschaffungs-Engine Nr. 2, Docker)
+
+> **Rolle (Nordstern, SCOPE-Change 2026-10-08):** MusicGrabber (GitLab
+> `g33kphr33k/musicgrabber`, Unlicense) ist die zweite Beschaffungs-Engine
+> neben spotDL/SomeDL: Multi-Source-Suche (u. a. Monochrome-FLAC = lossless),
+> Watched Playlists (Spotify/YouTube/…), MusicBrainz-Artist-Follow,
+> Track-Upgrades. Sie schreibt **ausschließlich** nach
+> `/mnt/music/_incoming/musicgrabber` (Staging) — beets/musik bleibt die
+> einzige Instanz, die die echte Bibliothek schreibt. Der MG-eigene
+> Library-Index zeigt deshalb **nicht** auf `/mnt/music`; Duplikat- und
+> Qualitätshoheit liegen bei der musik-Pipeline (`_prepare_units`,
+> Qualitäts-Tiers). Das Docker-Image ist multi-arch (amd64+arm64, Docker-Hub
+> geprüft 2026-10-08) und läuft unverändert auf dem Pi 5.
+
+**9.1 Docker installieren (einmalig, aus den Debian-Quellen — kein fremdes apt-Repo):**
+
+```bash
+sudo apt update && sudo apt install -y docker.io docker-compose-v2
+sudo usermod -aG docker $USER     # danach neu anmelden oder `newgrp docker`
+```
+
+**9.2 Compose + .env aus dem Repo:**
+
+```bash
+cd ~/musik && git pull
+mkdir -p /mnt/music/_incoming/musicgrabber
+cd musicgrabber
+cp .env.example .env
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"   # API-Key erzeugen
+nano .env                        # MUSICGRABBER_API_KEY=… ; PUID/PGID = `id -u` / `id -g`
+```
+
+**9.3 Starten:**
+
+```bash
+docker compose up -d
+docker compose logs -f           # Start beobachten (erste Init kann dauern)
+```
+
+Web-UI: `http://192.168.50.47:38274` — nur LAN, kein Port-Forwarding (von
+unterwegs läuft alles über Telegram-Bot und Plexamp, nicht über MG).
+
+**9.4 Grundeinstellungen (Settings-Tab):**
+
+- Quellen: Monochrome, YouTube, SoundCloud, FreeMp3Cloud aktiv; JioSaavn
+  optional. **slskd/Soulseek: aus** (SCOPE §8, später).
+- Qualität lossless-first: Provider-Format behalten (kein Re-Encoding),
+  untere Bitrate-Schwelle z. B. 192 kbps.
+- YouTube-Cookies: dieselbe Export-Datei wie Phase 3 (liegt unter
+  `~/musik/cookies.txt`), sofern MG sie verlangt.
+- **Telegram-Notifications: NICHT den Token des musik-bots eintragen** —
+  Telegram erlaubt pro Token nur einen Betriebstyp (Polling XOR Webhook), der
+  musik-bot pollt bereits. Entweder eigenen BotFather-Bot für MG anlegen oder
+  verzichten (der Import-Bericht kommt über den musik-bot).
+
+**9.5 Erster Test (Akzeptanz Story 1.1):**
+
+- [ ] Im UI einen Track suchen und laden → Dateien erscheinen unter
+      `/mnt/music/_incoming/musicgrabber/Singles/…`
+- [ ] Container schreibt nirgendwo sonst: `docker inspect musicgrabber`
+      zeigt nur `./data` und das Staging als Mounts
+- [ ] `ffprobe` zeigt FLAC (Monochrome-Quelle) bzw. ≥256 kbps
+
+**9.6 Betrieb:**
+
+| Aufgabe | Befehl |
+|---|---|
+| Status / Logs | `docker compose ps` / `docker compose logs -f` |
+| Update | `cd ~/musik/musicgrabber && docker compose pull && docker compose up -d` |
+| Stop / Start | `docker compose down` / `docker compose up -d` |
+| Backup | `musicgrabber/data/` mitsichern (sqlite-Index + Einstellungen) |
+
+**Noch offen (Stories 1.2–2.x, siehe ToDo.md):** Quellen-/Qualitäts-Fein-
+konfiguration, Testmatrix-Abnahme (Single/Album/Spotify-Playlist/YouTube-
+Playlist/0-day), `musik ingest`-Timer für das Staging, MG-Playlists-M3U in
+die Plex-Playlist-Kette, Bot-Routing auf die MG-API.
 
 ## Anmerkungen & Grenzen
 

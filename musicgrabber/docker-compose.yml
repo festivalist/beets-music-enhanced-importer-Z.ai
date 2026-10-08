@@ -1,0 +1,27 @@
+# MusicGrabber — Beschaffungs-Engine Nr. 2 (neben spotDL/SomeDL).
+# Rollenverteilung (Nordstern / SCOPE-Change 2026-10-08): MusicGrabber
+# beschafft ausschließlich bis ins Staging; beets/musik bleibt die einzige
+# Instanz, die die echte Bibliothek schreibt. Deshalb mounten wir NUR das
+# Staging-Unterverzeichnis — die Bibliothek selbst bleibt für den Container
+# unsichtbar (Duplikat-/Qualitätshoheit liegt bei der musik-Pipeline).
+# Image ist multi-arch (amd64+arm64, Docker-Hub-Tags geprüft 2026-10-08)
+# und läuft unverändert auf dem Pi 5.
+services:
+  musicgrabber:
+    image: g33kphr33k/musicgrabber:latest   # latest = 4.3.0 (2026-10-02); bei Bedarf auf 4.3.0 pinnen
+    container_name: musicgrabber
+    restart: unless-stopped
+    ports:
+      - "38274:8080"          # Web-UI/API, nur LAN — kein Port-Forwarding/Remote Access
+    shm_size: 2gb             # Pi 5 (>=4 GB RAM); bei Knappheit auf 1gb reduzieren und beobachten
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-Europe/Berlin}
+      - MUSIC_DIR=/music
+      - API_KEY=${MUSICGRABBER_API_KEY:?Bitte in musicgrabber/.env setzen (Vorlage: .env.example)}
+      # Quellen-/Qualitäts-Einstellungen lieber im Settings-Tab der UI
+      # pflegen — ENV-Variaben überschreiben und locken die UI-Werte.
+    volumes:
+      - ./data:/data                                  # sqlite-Index + App-Daten (persistent!)
+      - /mnt/music/_incoming/musicgrabber:/music      # Staging = MGs einziger Schreibbereich

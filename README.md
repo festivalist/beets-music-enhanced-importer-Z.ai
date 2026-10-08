@@ -87,6 +87,18 @@ one folder per link; albums import as MusicBrainz-matched albums,
 playlists split into `Singles\`, one-track links become singletons.
 Failed tracks are retried automatically; whatever remains is reported.
 
+### MusicGrabber — second acquisition engine (Pi, Docker)
+
+Since 2026-10-08 a second acquisition engine runs alongside the pinned
+spotDL/SomeDL chain: self-hosted [MusicGrabber](https://gitlab.com/g33kphr33k/musicgrabber)
+(multi-source search incl. lossless, watched playlists, MusicBrainz artist
+follow). It writes **only** into the staging area
+`<library>/_incoming/musicgrabber` — beets/musik stays the only writer of
+the real library. Deployment and configuration live on the Pi:
+**PI-SETUP.md Phase 9** (`musicgrabber/docker-compose.yml` in this repo).
+The spotDL/SomeDL chain remains the default until routing is switched
+(ToDo EPIC 5).
+
 ### The Telegram bot (`musik bot`)
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) (`/newbot`), put

@@ -34,3 +34,7 @@ Thumbs.db
 AGENTS.md
 telegram_token.json
 cookies*.txt
+
+# --- musicgrabber deployment (secrets + container data) ------------------
+musicgrabber/.env
+musicgrabber/data/
