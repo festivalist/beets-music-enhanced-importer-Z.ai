@@ -140,6 +140,51 @@ def should_split(files: list[str], kind: str) -> bool:
     return distinct >= 3 and top_share < 0.5
 
 
+def singleton_root() -> str:
+    """First literal component of the configured singleton path template.
+
+    '' when the template starts with a variable (no fixed root name).
+    """
+    try:
+        from beets import config as beets_config
+
+        template = str(beets_config["paths"]["singleton"].get() or "")
+    except Exception:
+        return ""
+    first = re.split(r"[\\/]", template.strip(), maxsplit=1)[0].strip()
+    if not first or "$" in first or "%" in first:
+        return ""
+    return first
+
+
+def apply_singles_tree_rule(unit: dict) -> None:
+    """Force-split units inside the library's own singles tree.
+
+    The singleton layout (Singles/<Artist>/<file>) puts several distinct
+    releases in ONE directory by construction — should_split's multi-
+    artist heuristics can never fire there (single artist), yet the unit
+    is not an album. A consistent shared album tag still marks a real
+    album that merely sits under that name; it stays whole.
+    """
+    root = singleton_root()
+    if not root:
+        return
+    parts = os.path.normpath(unit.get("path") or "").split(os.sep)
+    if root not in parts:
+        return
+    albums = {
+        (tag_of(f, "album") or "").strip().lower()
+        for f in unit.get("files") or []
+        if os.path.isfile(f)
+    }
+    albums.discard("")
+    if len(albums) == 1:
+        return
+    if not unit.get("split_into_singletons"):
+        unit["split_into_singletons"] = True
+        unit["hints"] = list(unit.get("hints") or []) + ["singles-tree"]
+
+
 YEAR_RE = re.compile(r"\((\d{4})\)")
 BARE_YEAR_RE = re.compile(r"(?<![0-9])((?:19|20)\d{2})(?![0-9])")
 
@@ -327,7 +372,9 @@ def classify(root: str) -> tuple[list[dict], list[str]]:
         note_side_files(d, units, notes)
 
         if files:
-            units.append(make_unit(d, d, files, "album"))
+            unit = make_unit(d, d, files, "album")
+            apply_singles_tree_rule(unit)
+            units.append(unit)
             # Nested audio dirs (bonus discs inside an album dir) get
             # their own units.
             for s in subdirs:

@@ -313,8 +313,11 @@ gelanden.
 > Tag) — 438 zu Singletons konvertiert und ins Singles/-Layout verschoben,
 > 34 echte Ein-Track-Alben per Windows-DB-Abgleich geschützt. Endstand:
 > 322 Alben / 4.005 Items / 720 Künstler / 38,8 GB, 0 tote Pfade. Die 29
-> Units mit unvollständigen Tags (77 Dateien) liegen unangetastet im
-> Staging für späteres review/retry.
+> verbliebenen Units (77 Dateien unter `Singles/<Artist>/`, je Datei ihr
+> wahres Ursprungsalbum im Tag) wurden am Abend per neuer Singles-Tree-
+> Regel als Singletons importiert (Scan splittet unter dem konfigurierten
+> Singleton-Root, siehe README) — Staging `win-lib` damit vollständig
+> aufgelöst, Endstand 323 Alben / 4.087 Items.
 > Beim manuellen Nachvollziehen bleibt die folgende rsync-Variante gültig:
 
 Wer schon eine getaggte musik-Bibliothek auf dem Windows-PC hat

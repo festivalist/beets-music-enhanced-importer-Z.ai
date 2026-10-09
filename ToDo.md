@@ -147,6 +147,17 @@ drin sein.*
       Plex-Scan, Snapshot, Bot aktiv; doctor --fix (48 Art / 63 Genre)
       nachgelaufen. Pi ist damit die vollständige alleinige Wahrheit;
       Windows-Kopie bleibt eingefrorene Sicherung.
+- [x] 5b-Nachlauf Singles-Tree-Regel — **AUSGEFÜHRT 2026-10-09 Abend**:
+      Scan erzwingt split_into_singletons für Units unter dem
+      konfigurierten Singleton-Root (Root-Name aus dem paths.singleton-
+      Template; konsistenter Album-Tag bleibt Album-Einheit) — die 29
+      gestrandeten Multi-Single-Ordner (77 Dateien: je Datei Artist/
+      Title + wahres Ursprungsalbum, als Album-Unit aber "inkonsistente
+      Album-Tags"; should_split feuert bei einem Artist nie) liefen
+      29/29 als Singletons, Genres/12 original_years inline gefüllt;
+      Staging win-lib leer und entfernt; Endstand **323 Alben /
+      4.087 Items / 0 tote Pfade**; smoke_singles_split.py (5 Fälle),
+      README-Regel, PI-SETUP 5b nachgezogen.
 - [ ] Offene Testfälle aus PI-SETUP Phase 8 (mobiler Netz-Test, 256-kbps-
       ffprobe-Check)
 - [ ] SCOPE §8 unverändert: retag --apply, Deezer-Plugin, slskd/Soulseek,

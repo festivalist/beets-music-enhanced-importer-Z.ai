@@ -418,6 +418,14 @@ Rules baked in (no manual work needed):
   only when their album tags are missing or inconsistent. A folder with
   one consistent album tag across many artists is a real compilation and
   imports as an album.
+- **Singles-tree rule** (scan): units below the configured singleton root
+  (`paths.singleton`, e.g. `Singles/<Artist>/`) split into singletons —
+  the library's own layout puts one release per FILE there and each file
+  carries its true album tag, so album consistency must not be required.
+  A consistent shared album tag still keeps the unit whole (a real album
+  that merely sits under that name). Found in the Phase-5b migration: a
+  re-scanned library otherwise strands every multi-single artist folder
+  as "inconsistent album tags".
 - **`--sources` flag** (`import`/`retry`): limits metadata plugins per run,
   e.g. `--sources musicbrainz,beatport4`. Discogs is excluded from
   singleton passes automatically when you pass sources without it — its
