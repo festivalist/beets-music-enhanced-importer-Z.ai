@@ -145,6 +145,29 @@ _COVER_TITLE_RE = re.compile(
 )
 
 
+def ranked_results(query: str, results: list[dict]) -> list[dict]:
+    """Filtered and ranked candidate list, best first — the ordering
+    behind pick_result. The bot walks it when the top candidate dies at
+    MusicGrabber's quality/duration gate (live 2026-10-10: jiosaavn's
+    "Do Wrong Right" copy was 97 kbps — MG rightly rejected it, but the
+    next source would have delivered)."""
+    out = [
+        r for r in results
+        if r["video_id"] and not r["is_playlist"]
+        and not _COVER_TITLE_RE.search(r["title"])
+    ]
+    if not out:
+        return []
+    artist_part = query.split(" - ")[0] if " - " in query else query
+    want = _tokens(artist_part)
+    if want:
+        matching = [r for r in out if want <= _tokens(r["artist"])]
+        if matching:
+            out = matching
+    return sorted(out, key=lambda r: (r["relevance"], r["quality_tier"]),
+                  reverse=True)
+
+
 def pick_result(query: str, results: list[dict]) -> dict | None:
     """Pick the result to download. Rank 1 alone is not trustworthy: MG
     sometimes puts a high-quality cover/namesake above the real recording.
@@ -154,20 +177,8 @@ def pick_result(query: str, results: list[dict]) -> dict | None:
     (relevance, quality tier). Global rule, no per-artist special cases;
     users searching a bare title get rank 1 among non-cover results.
     """
-    results = [
-        r for r in results
-        if r["video_id"] and not r["is_playlist"]
-        and not _COVER_TITLE_RE.search(r["title"])
-    ]
-    if not results:
-        return None
-    artist_part = query.split(" - ")[0] if " - " in query else query
-    want = _tokens(artist_part)
-    if want:
-        matching = [r for r in results if want <= _tokens(r["artist"])]
-        if matching:
-            results = matching
-    return max(results, key=lambda r: (r["relevance"], r["quality_tier"]))
+    ranked = ranked_results(query, results)
+    return ranked[0] if ranked else None
 
 
 def download(result: dict, search_token: str = ""):

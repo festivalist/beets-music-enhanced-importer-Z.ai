@@ -123,15 +123,31 @@ def _try_musicgrabber(job: dict, query: str, send) -> bool:
         mg.ensure_staging_layout()
         send(f"🔍 MusicGrabber-Suche: {query[:120]}")
         token, results = mg.search(query, limit=10)
-        pick = mg.pick_result(query, results)
-        if pick is None:
+        ranked = mg.ranked_results(query, results)
+        if not ranked:
             send("ℹ️ MusicGrabber: keine Ergebnisse — Fallback über YouTube-Kette")
+            return False
+        # walk the ranked candidates: MG's quality/duration gate can reject
+        # rank 1 (live case: a 97-kbps jiosaavn copy) — the next source
+        # often delivers instead of falling back to lossy YouTube
+        pick = None
+        last_err = ""
+        for cand in ranked[:3]:
+            job_id = mg.download(cand, token)
+            try:
+                mg.wait_for_job(job_id)
+                pick = cand
+                break
+            except mg.MGJobFailed as e:
+                last_err = str(e)[:150]
+                print(f"bot: musicgrabber candidate rejected: {last_err}")
+        if pick is None:
+            send(f"⚠️ MusicGrabber fehlgeschlagen ({last_err}) — "
+                 "Fallback über YouTube-Kette")
             return False
         quality = f" | {pick['quality']}" if pick["quality"] else ""
         send(f"⬇️ via MusicGrabber [{pick['source']}{quality}]:\n"
              f"{pick['artist'][:60]} - {pick['title'][:80]}")
-        job_id = mg.download(pick, token)
-        mg.wait_for_job(job_id)
         # file is in the MG staging area -> import now, no 15-min-timer wait
         # (the ingest timer's flock skips while this run holds the same
         # library; ingest itself refreshes Plex at the end)

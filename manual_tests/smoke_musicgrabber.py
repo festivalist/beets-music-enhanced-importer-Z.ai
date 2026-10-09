@@ -130,7 +130,15 @@ assert pick["video_id"] == "js_hwoEqKC6"
 # playlists are never picked
 pl = dict(results[1], is_playlist=True)
 assert MG.pick_result("x", [pl]) is None
-print("3) pick_result (karaoke cover + namesake + bare title) OK")
+# ranked_results: full list, best first — the bot walks it when rank 1
+# dies at the quality/duration gate. Artist query: guard keeps only the
+# official video; bare title: MG's ranking over the non-covers
+ranked = MG.ranked_results("The Fratellis - Chelsea Dagger", results)
+assert [r["video_id"] for r in ranked] == ["sEXHeTcxQy4"]
+ranked = MG.ranked_results("Chelsea Dagger", results)
+assert [r["video_id"] for r in ranked] == ["js_hwoEqKC6", "sEXHeTcxQy4"]
+assert MG.pick_result("Chelsea Dagger", results) is ranked[0]
+print("3) pick_result + ranked_results (cover + namesake + bare title) OK")
 
 # 4) download body carries source_url + the completeness-check pair
 MG.download(results[2], token)
