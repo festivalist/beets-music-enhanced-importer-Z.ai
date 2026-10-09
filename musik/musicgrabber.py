@@ -10,12 +10,13 @@ old chain. No auth headers: the instance deliberately runs no-login
 to it on localhost.
 """
 
+import os
 import re
 import time
 
 import requests
 
-from .paths import musik_config
+from .paths import incoming_dir, musik_config
 
 DEFAULTS = {
     "url": "http://127.0.0.1:38274",
@@ -71,6 +72,25 @@ def available() -> bool:
         return True
     except MGUnavailable:
         return False
+
+
+def ensure_staging_layout() -> None:
+    """(Re)create MusicGrabber's staging layout anchors (Singles/, Albums/,
+    Playlists/) from the host side before queueing downloads. MG writes
+    into these without mkdir -p (live 2026-10-09: after our cleanup emptied
+    the staging, EVERY track job died with ENOENT '/music/Singles'), and
+    container-side recreation comes back root-owned (2026-10-08
+    crash-loop) — host-side, owned by the service user, is the safe
+    direction. Empty dirs are invisible to scan/cleanup-with-keep_root.
+    No-op where the MG staging root does not exist (Windows dev box)."""
+    root = os.path.join(incoming_dir(), "musicgrabber")
+    if not os.path.isdir(root):
+        return
+    for sub in ("Singles", "Albums", "Playlists"):
+        try:
+            os.makedirs(os.path.join(root, sub), exist_ok=True)
+        except OSError as e:
+            print(f"musicgrabber: cannot ensure staging layout ({e})")
 
 
 def _dur_secs(text) -> int | None:

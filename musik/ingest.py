@@ -111,6 +111,11 @@ def cmd_ingest(root: str | None = None) -> int:
         # MusicGrabber container (PermissionError for the PUID user).
         cleanup_mod.cmd_cleanup(root=root, keep_root=True)
     os.makedirs(root, exist_ok=True)
+    # MG's downloader expects Singles//Albums//Playlists/ to exist (no
+    # mkdir on its side); cleanup keeps them, this recreates them should
+    # they be missing for any other reason (ENOENT incident 2026-10-09)
+    from .musicgrabber import ensure_staging_layout
+    ensure_staging_layout()
 
     counts, albums = _outcome(root)
     if albums:

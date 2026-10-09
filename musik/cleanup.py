@@ -80,6 +80,13 @@ def cmd_cleanup(root: str, dry_run: bool = False,
                     moved += len(files)
                     changed = True
             if not os.listdir(dirpath):
+                # downloader staging (keep_root): empty TOP-LEVEL dirs are
+                # the engine's layout anchors — MusicGrabber writes into
+                # Singles/ without mkdir and fails ENOENT when cleanup has
+                # emptied the staging (live 2026-10-09: every track job
+                # '/music/Singles' No such file or directory)
+                if keep_root and os.path.dirname(dirpath) == root:
+                    continue
                 if dry_run:
                     print(f"  would delete empty folder: {dirpath}")
                 else:

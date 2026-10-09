@@ -118,6 +118,9 @@ def _try_musicgrabber(job: dict, query: str, send) -> bool:
         if not mg.available():
             send("ℹ️ MusicGrabber nicht erreichbar — Fallback über YouTube-Kette")
             return False
+        # MG writes into Singles//Albums/ without mkdir — self-heal the
+        # staging skeleton before queueing anything (ENOENT incident)
+        mg.ensure_staging_layout()
         send(f"🔍 MusicGrabber-Suche: {query[:120]}")
         token, results = mg.search(query, limit=10)
         pick = mg.pick_result(query, results)
@@ -196,6 +199,12 @@ def _execute_job(job: dict, send) -> None:
         jobs_mod.update_job(job["id"], status="done", finished=time.time(),
                             summary="\n—\n".join(summaries)[:1500])
         print(f"bot: job {job['id']} done")
+        # free text fell back to the spotDL/SomeDL chain (MG could not
+        # deliver) — the album offer belongs to the REQUEST, not to the
+        # engine, so it fires here too (live case 2026-10-09: MG staging
+        # ENOENT → fallback import → user wondered about the missing offer)
+        if _is_free_text(query):
+            _maybe_album_offer(job, query, {}, send)
     except Exception as e:
         traceback.print_exc()
         msg = f"❌ Job fehlgeschlagen: {type(e).__name__}: {str(e)[:300]}"
@@ -405,6 +414,7 @@ def _execute_album(job: dict, send) -> None:
                             summary=msg)
         return
     try:
+        mg.ensure_staging_layout()  # ENOENT guard: Albums/ must exist
         send(f"🔍 löse das Release auf: {label[:120]}")
         summary = mg.resolve_release_group(rg_mbid)
         artist = summary.get("artist") or a.get("artist") or "?"

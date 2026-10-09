@@ -618,6 +618,16 @@ Crash-Loop mit `PermissionError: /music/Singles` → Staging-Root wurde
 gelöscht und von Docker als root neu angelegt:
 `sudo chown -R 1000:1000 /mnt/music/_incoming/musicgrabber && sudo docker
 restart musicgrabber` (seit keep_root-Fix 4bc89fb dauerhaft verhindert).
+MG-Job fehlschlägt mit `No such file or directory: '/music/Singles'` →
+die Layout-Anker (`Singles/`, `Albums/`, `Playlists/`) fehlen im Staging;
+MG legt sie NICHT selbst an. Ursache 2026-10-09: cleanup hatte das
+geleerte Staging bis auf die Wurzel geräumt (keep_root schützte nur die
+Wurzel). Doppelt gefixt: cleanup verschont seither leere Top-Level-
+Ordner unter dem Staging-Root, und Bot/ingest rufen vor jedem MG-Download
+bzw. nach jedem Cleanup `ensure_staging_layout()` auf (legt fehlende
+Anker host-seitig als User pi neu an — NIEMALS im Container, sonst
+root-owned → Crash-Loop). Manuelle Behebung:
+`mkdir -p /mnt/music/_incoming/musicgrabber/{Singles,Albums,Playlists}`.
 
 **9.9 Bot-Integration Track → Album (Story 2.5, 2026-10-09):** Nach jedem
 erfolgreichen Freitext-Track-Import bietet der Bot das zugehörige Album /

@@ -98,7 +98,13 @@ Stories 4.1/4.3 weitergeführt.*
       1977er Album), Jahre per gebündeltem rgid-Lookup nachgereicht
       (Recording-Suche liefert first-release-date kaum) + autoritatives
       Re-Filtern, Ranking Score→Reissue-Gewicht→Jahr aufsteigend
-      (Original zuerst; MB-Scores großer Kataloge sind 100-Gleichstände)
+      (Original zuerst; MB-Scores großer Kataloge sind 100-Gleichstände).
+      **Zwischenfall 2026-10-10 („/music/Singles" ENOENT):** cleanup
+      räumte geleerte MG-Staging-Anker weg → alle MG-Track-Jobs
+      scheiterten, Fallback-Imports bekamen kein Album-Angebot; gefixt:
+      keep_root schont Top-Level-Ordner, `ensure_staging_layout()` heilt
+      vor jedem Download/nach jedem Ingest, Angebot jetzt engine-
+      unabhängig (auch im Fallback-Pfad); smoke_cleanup_staging.py neu
 - [ ] 2.6 (optional) Album-Angebot auch für Spotify/YouTube-TRACK-Links
       (Kandidatensuche dann aus den importierten Tags) und Freitext-
       Album-Intent („artist - albumname" direkt als Album-Anfrage)
