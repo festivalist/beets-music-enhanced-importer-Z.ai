@@ -302,6 +302,21 @@ gelanden.
 
 ## Phase 5b — Bestand vom Windows-PC übernehmen (Migration)
 
+> **AUSGEFÜHRT 2026-10-09 (per Agent/SSH, Protokoll im ToDo):** SMB+rsync
+> wurde durch **tar-over-ssh** ersetzt (SMB-Freigabe ist ohne Admin-Rechte
+> nicht skriptbar; tar-Streams laufen über plink, pro Ordner chunked und
+> damit abbruchfest). Ablauf: Windows verify+snapshot → tar-Transfer
+> (269 Ordner / 4.137 Dateien / 39 GB, 0 Fehler) → Vollständigkeits-Diff
+> → Trockenlauf (780 Units, 751 would-as-is) → Echtlauf asis →
+> **Nachkorrektur Singles**: Windows-Singletons kamen als Ein-Track-
+> Alben herein (Singles-Ordner = eine Unit, beets gruppiert per Album-
+> Tag) — 438 zu Singletons konvertiert und ins Singles/-Layout verschoben,
+> 34 echte Ein-Track-Alben per Windows-DB-Abgleich geschützt. Endstand:
+> 322 Alben / 4.005 Items / 720 Künstler / 38,8 GB, 0 tote Pfade. Die 29
+> Units mit unvollständigen Tags (77 Dateien) liegen unangetastet im
+> Staging für späteres review/retry.
+> Beim manuellen Nachvollziehen bleibt die folgende rsync-Variante gültig:
+
 Wer schon eine getaggte musik-Bibliothek auf dem Windows-PC hat
 (`C:\Users\olive\Music` samt Alben/Singles/Compilations-Baum), trägt sie
 einmalig rüber — danach ist das **Pi die alleinige Wahrheit** und der

@@ -132,11 +132,21 @@ drin sein.*
 
 - [ ] 5.1 Routing umstellen (MG primär, spotDL/SomeDL Fallback) + README-
       YouTube-Breakage-Runbook straffen — erst nach abgeschlossenem EPIC 3
-- [ ] Phase 5b Windows-Bestand übernehmen — **offen, aber erst jetzt
-      sinnvoll**: die Pi-config hatte bis 2026-10-08 Windows-Backslash-
-      Templates (jeder Pi-Import landete FLACH im Root; behoben + 221 Items
-      re-gehomed, Playlists regeneriert). Runbook steht (PI-SETUP 5b),
-      Ausführung durch den Nutzer per SMB+rsync+asis.
+- [x] Phase 5b Windows-Bestand übernehmen — **AUSGEFÜHRT 2026-10-09**:
+      Windows verify/snapshot (306 Alben/3.864 Items, 0 tote Pfade) →
+      tar-over-ssh-Transfer (269 Ordner/4.137 Dateien/39 GB, 0 Fehler;
+      SMB-Freigabe wäre ohne Admin nicht skriptbar) → Vollständigkeit exakt
+      (nur die 12 bewusst ausgeschlossenen DB-Dateien fehlen) → Trockenlauf
+      780 Units/751 would-as-is → Echtlauf 751 importiert, 0 Fehler, 97
+      original_years gefüllt → **438 fälschlich als Ein-Track-Alben
+      importierte Windows-Singletons zu Singletons konvertiert** und ins
+      Singles/-Layout verschoben (34 echte Ein-Track-Alben per Windows-DB-
+      Abgleich geschützt) → 29 Units mit unvollständigen Tags bleiben
+      unangetastet im Staging (77 Dateien, später review/retry). Endstand:
+      **322 Alben / 4.005 Items / 720 Künstler / 38,8 GB, 0 tote Pfade**,
+      Plex-Scan, Snapshot, Bot aktiv; doctor --fix (48 Art / 63 Genre)
+      nachgelaufen. Pi ist damit die vollständige alleinige Wahrheit;
+      Windows-Kopie bleibt eingefrorene Sicherung.
 - [ ] Offene Testfälle aus PI-SETUP Phase 8 (mobiler Netz-Test, 256-kbps-
       ffprobe-Check)
 - [ ] SCOPE §8 unverändert: retag --apply, Deezer-Plugin, slskd/Soulseek,
