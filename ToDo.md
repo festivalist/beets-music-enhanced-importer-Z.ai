@@ -83,7 +83,7 @@ Stories 4.1/4.3 weitergeführt.*
       **2026-10-09**: nach Freitext-Track-Import Inline-Buttons mit den
       MB-Kandidaten (releases.track_album_candidates: Recording-Suche →
       Album/EP-RGs, Kompilationen/Live/Singles gefiltert, Cover-Guard,
-      neueste RG garantiert in Top-3, ASCII→Umlaut-Fallback „Eisbaer");
+      neueste RG garantiert, ASCII→Umlaut-Fallback „Eisbaer");
       Tap → MG-Albumpipeline (resolve-release-group → albums/download →
       bulk-import-Status, alles live gegen 4.3.0 verifiziert) → sofortiger
       ingest → Singleton der Track-Anfrage wird entfernt; Teilerfolge
@@ -92,7 +92,13 @@ Stories 4.1/4.3 weitergeführt.*
       album_job_timeout; smokes: track_album_candidates + album_offer +
       musicgrabber-Albumbfälle; README + PI-SETUP 9.9; Live-Probe: Here
       We Stand 13→18er-Release (Gap-Fill + 3× FLAC-Ersatz), 2 minder-
-      qualitative Duplikate als Known-Edge an EPIC 2.3 gemeldet
+      qualitative Duplikate als Known-Edge an EPIC 2.3 gemeldet.
+      **Nachbesserung (Nutzer-Feedback Bowie „Heroes"):** 5 statt 3
+      Vorschläge, Soundtracks gefiltert (2009er OST rangierte über dem
+      1977er Album), Jahre per gebündeltem rgid-Lookup nachgereicht
+      (Recording-Suche liefert first-release-date kaum) + autoritatives
+      Re-Filtern, Ranking Score→Reissue-Gewicht→Jahr aufsteigend
+      (Original zuerst; MB-Scores großer Kataloge sind 100-Gleichstände)
 - [ ] 2.6 (optional) Album-Angebot auch für Spotify/YouTube-TRACK-Links
       (Kandidatensuche dann aus den importierten Tags) und Freitext-
       Album-Intent („artist - albumname" direkt als Album-Anfrage)

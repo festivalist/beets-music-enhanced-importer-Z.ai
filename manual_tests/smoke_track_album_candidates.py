@@ -55,20 +55,23 @@ cands = R._recording_release_groups(
 assert sorted(c["rg_mbid"] for c in cands) == ["rg-album", "rg-ep"], cands
 print("2) single filtered, EP+album offered OK")
 
-# 3) compilations and live albums dropped; bootlegs/promos dropped
+# 3) compilations, live albums and soundtracks dropped; bootlegs/promos
+#    dropped (live case: Bowie "Heroes" offered a 2009 movie soundtrack)
 cands = R._recording_release_groups(
     [rec(100, "Example Band", "Song", [
         rel("rg-comp", "Now 43", "Album", secondary=["Compilation"],
             rg_date="2002-01-01"),
         rel("rg-live", "Live Somewhere", "Album", secondary=["Live"],
             rg_date="2003-01-01"),
+        rel("rg-ost", "Film OST", "Album", secondary=["Soundtrack"],
+            rg_date="2009-05-05"),
         rel("rg-boot", "Bootleg", "Album", status="Bootleg",
             rg_date="2004-01-01"),
         rel("rg-album", "Great Album", "Album", rg_date="2001-05-01"),
     ])],
-    WANT, 3)
+    WANT, 5)
 assert [c["rg_mbid"] for c in cands] == ["rg-album"]
-print("3) compilation/live/bootleg filtered OK")
+print("3) compilation/live/soundtrack/bootleg filtered OK")
 
 # 4) artist-token guard: covers credit the ORIGINAL artist in the title,
 #    never in their own credit — their releases must not become candidates
@@ -101,7 +104,9 @@ assert [c["rg_mbid"] for c in cands_all] == ["rg-a", "rg-b", "rg-c", "rg-new"]
 print("5) newest-always-included OK")
 
 
-# 6) track_album_candidates wiring: MB search + in_library flag from beets
+# 6) track_album_candidates wiring: MB search + year backfill (batched
+#    release-group lookup — the recording search barely returns dates) +
+#    in_library flag from beets
 class Resp:
     def __init__(self, status=200, payload=None):
         self.status_code = status
@@ -115,11 +120,20 @@ QUERIES: list[dict] = []
 
 
 def fake_get(url, params=None, headers=None, timeout=None):
-    QUERIES.append(params)
+    QUERIES.append({"url": url, "params": params})
+    if "/release-group" in url:  # the backfill batch lookup
+        return Resp(200, {"release-groups": [
+            {"id": "rg-album", "title": "Great Album",
+             "first-release-date": "2001-05-01", "primary-type": "Album",
+             "secondary-types": None},
+            {"id": "rg-new", "title": "Reissue Era",
+             "first-release-date": "2024-06-01", "primary-type": "Album",
+             "secondary-types": None},
+        ]})
     payload = {"recordings": [
         rec(100, "Example Band", "Song", [
-            rel("rg-album", "Great Album", "Album", rg_date="2001-05-01"),
-            rel("rg-new", "Reissue Era", "Album", rg_date="2024-06-01"),
+            rel("rg-album", "Great Album", "Album"),
+            rel("rg-new", "Reissue Era", "Album"),
         ]),
     ]}
     return Resp(200, payload)
@@ -146,8 +160,41 @@ assert len(cands) == 2
 by_id = {c["rg_mbid"]: c for c in cands}
 assert by_id["rg-album"]["in_library"] is True
 assert by_id["rg-new"]["in_library"] is False
-assert QUERIES[0]["query"] == 'artist:"Example Band" AND recording:"Song"'
-print("6) track_album_candidates + in_library flag OK")
+assert QUERIES[0]["params"]["query"] == 'artist:"Example Band" AND recording:"Song"'
+# years came from the backfill (search fixtures carry none), original first
+assert cands[0]["rg_mbid"] == "rg-album" and cands[0]["year"] == "2001"
+assert cands[1]["rg_mbid"] == "rg-new" and cands[1]["year"] == "2024"
+assert any("rgid:rg-album OR rgid:rg-new" == q["params"]["query"]
+           for q in QUERIES)
+print("6) wiring + year backfill + in_library flag OK")
+
+# 6b) backfill veto: authoritative data marks a candidate a soundtrack
+#     (MB search missed it) — it must NOT survive the offer
+QUERIES.clear()
+
+
+def veto_get(url, params=None, headers=None, timeout=None):
+    if "/release-group" in url:
+        return Resp(200, {"release-groups": [
+            {"id": "rg-ost", "title": "Film OST",
+             "first-release-date": "2009-05-05", "primary-type": "Album",
+             "secondary-types": ["Soundtrack"]},
+            {"id": "rg-album", "title": "Great Album",
+             "first-release-date": "2001-05-01", "primary-type": "Album",
+             "secondary-types": None},
+        ]})
+    return Resp(200, {"recordings": [
+        rec(100, "Example Band", "Song", [
+            rel("rg-ost", "Film OST", "Album"),
+            rel("rg-album", "Great Album", "Album"),
+        ]),
+    ]})
+
+
+R.requests.get = veto_get
+cands = R.track_album_candidates("Example Band", "Song")
+assert [c["rg_mbid"] for c in cands] == ["rg-album"], cands
+print("6b) backfill veto (authoritative soundtrack) OK")
 
 # 7) de-transliteration fallback: ASCII spelling finds nothing on the
 #    strict pass, the ae/oe/ue/ss variant is queried next (live case:
@@ -157,6 +204,12 @@ QUERIES.clear()
 
 def umlaut_get(url, params=None, headers=None, timeout=None):
     QUERIES.append(params)
+    if "/release-group" in url:  # backfill for the found RG
+        return Resp(200, {"release-groups": [
+            {"id": "rg-grau", "title": "Grauzone",
+             "first-release-date": "1981-01-01", "primary-type": "Album",
+             "secondary-types": None},
+        ]})
     if "Eisbaer" in params["query"]:
         return Resp(200, {"recordings": []})
     assert "Eisbär" in params["query"]
@@ -169,7 +222,10 @@ def umlaut_get(url, params=None, headers=None, timeout=None):
 R.requests.get = umlaut_get
 cands = R.track_album_candidates("Grauzone", "Eisbaer")
 assert len(cands) == 1 and cands[0]["rg_mbid"] == "rg-grau"
-assert len(QUERIES) == 2 and QUERIES[1]["query"].count("ä") == 1
+assert cands[0]["year"] == "1981"  # backfilled via the batched rgid lookup
+# recording search (ASCII) → recording search (umlaut) → rgid backfill
+assert len(QUERIES) == 3 and QUERIES[1]["query"].count("ä") == 1
+assert QUERIES[2]["query"] == "rgid:rg-grau"
 print("7) de-transliteration fallback OK")
 
 # 8) MB unreachable → [] (the offer is optional, the track job must live)

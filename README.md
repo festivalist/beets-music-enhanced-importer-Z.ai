@@ -108,10 +108,12 @@ switched (ToDo EPIC 5).
 
 **Albums via free text (Story 2.5, 2026-10-09):** after a free-text track
 import the bot offers the containing albums/EPs as buttons — MusicBrainz
-candidates (album/EP release groups only; compilations, live albums and
-singles filtered), top 3 by relevance with the **newest** release always
-included, ✓ marking albums already in the library (that tap gap-fills
-missing tracks). One tap queues the whole release through MG's album
+candidates (album/EP release groups only; compilations, live albums,
+soundtracks and singles filtered), up to **5**, canonical first (relevance,
+reissue weight, year ascending — the original album before later one-offs)
+with the **newest** release always included; missing years are backfilled
+through one batched release-group lookup. ✓ marks albums already in the
+library (that tap gap-fills missing tracks). One tap queues the whole release through MG's album
 pipeline (per-track bulk import, preferentially lossless via Monochrome,
 into staging `Albums/<Artist>/<Album>/`) and imports it through `musik
 ingest`; the track-request singleton is removed once the album verifiably

@@ -83,8 +83,8 @@ HELP_TEXT = (
     "Ich lade die Tracks herunter, tagge und importiere sie in die "
     "Musikbibliothek und melde mich, wenn sie fertig sind.\n\n"
     "Nach einer Track-Suche biete ich per Knopfdruck das passende Album / "
-    "die EP an (Top-3-Kandidaten inkl. der neuesten Veröffentlichung, "
-    "bevorzugt Lossless) — ein Tipp genügt.\n\n"
+    "die EP an (bis zu 5 Kandidaten, Original zuerst, die neueste "
+    "Veröffentlichung immer dabei, bevorzugt Lossless) — ein Tipp genügt.\n\n"
     "/asis — liegengeschlafene Einheiten (Review etc.) auflisten und "
     "per Knopfdruck auf eigene Tags importieren\n"
     "/status — Warteschlange und letzte Ergebnisse"
@@ -330,8 +330,9 @@ def _remove_singleton(item_id) -> str:
 
 def _maybe_album_offer(job: dict, query: str, pick: dict, send) -> None:
     """After a successful free-text track import: offer the containing
-    albums/EPs as buttons (MusicBrainz candidates; top 3 by relevance with
-    the NEWEST always included — user rule 2026-10-09). The offer is pure
+    albums/EPs as buttons (MusicBrainz candidates; up to 5, canonical
+    first — score, reissue weight, year ascending — with the NEWEST always
+    included; user rules 2026-10-09). The offer is pure
     best-effort: any problem means no offer, never a failed track job."""
     from . import musicgrabber as mg
     from .releases import track_album_candidates
@@ -348,7 +349,7 @@ def _maybe_album_offer(job: dict, query: str, pick: dict, send) -> None:
         if not artist or not title:
             return
         lib = _open_library()
-        cands = track_album_candidates(artist, title, library=lib, limit=3)
+        cands = track_album_candidates(artist, title, library=lib)
         if not cands:
             return
         singleton_id = _find_singleton(lib, artist, title)

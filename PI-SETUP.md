@@ -623,12 +623,18 @@ restart musicgrabber` (seit keep_root-Fix 4bc89fb dauerhaft verhindert).
 erfolgreichen Freitext-Track-Import bietet der Bot das zugehörige Album /
 die EP als Inline-Buttons an. Kandidaten liefert eine MusicBrainz-
 Recording-Suche im musik-Tool (`musik/releases.py`): nur Album/EP-Release-
-Groups, Kompilationen/Live-Alben/Singles gefiltert, Cover-Artists über
-Artist-Token-Guard ausgeschlossen, Top 3 nach Relevanz — die **neueste**
-Veröffentlichung ist garantiert dabei (Nutzerregel 2026-10-09). ASCII-
-Schreibweisen werden automatisch zurück-übersetzt („Eisbaer" → „Eisbär";
-MBs Lucene-Suche faltet Umlaute nicht — Live-Befund). ✓ markiert Alben,
-die schon in der Bibliothek sind (Tap = Gap-Fill fehlender Tracks).
+Groups, Kompilationen/Live-Alben/Soundtracks/Singles gefiltert, Cover-
+Artists über Artist-Token-Guard ausgeschlossen, bis zu **5** Kandidaten —
+Reihenfolge Score → Reissue-Gewicht → Jahr aufsteigend (Original-Album
+zuerst; MB-Scores großer Kataloge sind reine 100-Gleichstände, daher
+entscheidet das Jahr), die **neueste** Veröffentlichung ist garantiert
+dabei (Nutzerregeln 2026-10-09; Bowie-„Heroes"-Befund: Soundtrack über
+dem 1977er Album). Fehlende Jahre werden per EINEM gebündelten RG-Lookup
+(`rgid:a OR rgid:b …`) nachgereicht — die Recording-Suche liefert
+first-release-date kaum. ASCII-Schreibweisen werden automatisch zurück-
+übersetzt („Eisbaer" → „Eisbär"; MBs Lucene-Suche faltet Umlaute nicht).
+✓ markiert Alben, die schon in der Bibliothek sind (Tap = Gap-Fill
+fehlender Tracks).
 
 Der Button-Tap läuft über MGs native Album-Pipeline (Endpoints gegen
 `127.0.0.1:38274`, alle live gegen 4.3.0 verifiziert):

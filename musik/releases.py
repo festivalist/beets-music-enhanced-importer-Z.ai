@@ -161,9 +161,11 @@ def _tokens(text: str) -> set[str]:
     return {t for t in re.split(r"[^a-z0-9]+", (text or "").lower()) if t}
 
 
-# dropped from the "whole album instead?" offer: VA compilations and live
-# albums are never the canonical home of a studio track
-_UNWANTED_SECONDARY = {"compilation", "live"}
+# dropped from the "whole album instead?" offer: VA compilations, live
+# albums and soundtracks are never the canonical home of a studio track
+# (live case 2026-10-09: Bowie "Heroes" offered a 2009 movie soundtrack
+# ABOVE the 1977 album — user: "nicht wirklich brauchbar")
+_UNWANTED_SECONDARY = {"compilation", "live", "soundtrack"}
 
 
 def _recording_release_groups(recordings: list[dict], want: set[str],
@@ -171,9 +173,13 @@ def _recording_release_groups(recordings: list[dict], want: set[str],
     """Pure ranking: MB recording-search results → album/EP release-group
     candidates. Artist-token guard (covers name the original artist in the
     TITLE, never in their own credit), official releases only, dedup by
-    release-group, earliest date per group. Top `limit` by search score with
-    the NEWEST group always included — user rule 2026-10-09: with more
-    candidates than buttons, the newest release must still be offered."""
+    release-group, earliest date per group, `weight` counts qualifying
+    release entries (reissues accumulate under one RG — a weak but free
+    canonical-ness signal). Top `limit` by (score, weight) with YEAR
+    ASCENDING on ties (the original album outranks later one-offs — MB
+    search scores are all ~100 ties for big-catalog tracks) and the NEWEST
+    group always included (user rule 2026-10-09: with more candidates than
+    buttons, the newest release must still be offered)."""
     best: dict[str, dict] = {}
     for rec in recordings:
         credit = rec.get("artist-credit") or []
@@ -204,17 +210,84 @@ def _recording_release_groups(recordings: list[dict], want: set[str],
                     "type": (rg.get("primary-type") or "?").lower(),
                     "year": year,
                     "score": score,
+                    "weight": 1,
                 }
             else:
                 cand["score"] = max(cand["score"], score)
+                cand["weight"] += 1
                 if year and (not cand["year"] or year < cand["year"]):
                     cand["year"] = year
-    ranked = sorted(best.values(), key=lambda c: c["score"], reverse=True)[:limit]
+    def _order(c: dict):
+        # missing years sort last (unknown, not "oldest")
+        return (-c["score"], -c["weight"], c["year"] or "9999")
+    ranked = sorted(best.values(), key=_order)[:limit]
     if len(best) > limit:
         newest = max(best.values(), key=lambda c: c["year"] or "0000")
         if not any(c["rg_mbid"] == newest["rg_mbid"] for c in ranked):
             ranked[-1] = newest
     return ranked
+
+
+def _backfill_years(cands: list[dict]) -> list[dict]:
+    """One batched release-group lookup (rgid:a OR rgid:b …) replaces the
+    sparse search-result dates with authoritative first-release-date/type
+    data — the recording search barely returns first-release-date (live
+    2026-10-09: Bowie's “Heroes” RG came back dateless). Also re-filters
+    with the better data. Best-effort: on error the candidates pass
+    through unchanged."""
+    if not cands:
+        return cands
+    query = " OR ".join(f"rgid:{c['rg_mbid']}" for c in cands)
+    try:
+        r = requests.get(BROWSE_URL, params={"query": query, "limit": 25,
+                                             "fmt": "json"},
+                         headers=HEADERS, timeout=30)
+        if r.status_code != 200:
+            return cands
+        groups = {g.get("id"): g
+                  for g in r.json().get("release-groups") or []}
+    except requests.RequestException:
+        return cands
+    out = []
+    for c in cands:
+        g = groups.get(c["rg_mbid"])
+        if not g:
+            out.append(c)  # lookup miss: keep the search-result version
+            continue
+        secondary = {s.lower() for s in g.get("secondary-types") or []}
+        if secondary & _UNWANTED_SECONDARY \
+                or (g.get("primary-type") or "").lower() not in WANTED_TYPES:
+            continue  # authoritative data vetoes the candidate
+        date = g.get("first-release-date") or ""
+        if date[:4].isdigit():
+            c["year"] = date[:4]
+        c["type"] = (g.get("primary-type") or c.get("type") or "?").lower()
+        out.append(c)
+    return out
+
+
+def track_album_candidates(artist: str, title: str, library=None,
+                           limit: int = 5) -> list[dict]:
+    """Album/EP release groups containing the requested track — the bot's
+    "whole album instead?" offer after a free-text track request. Returns
+    [{rg_mbid, artist, title, type, year, score, in_library?}] or [] (MB
+    unreachable/unmatched — the offer is optional and must never break the
+    track job). in_library marks groups already in beets via
+    mb_releasegroupid; those buttons mean gap-fill, not a fresh copy."""
+    recordings = _mb_recording_search(artist, title)
+    cands = _recording_release_groups(recordings, _tokens(artist), limit)
+    cands = _backfill_years(cands)
+    cands.sort(key=lambda c: (-(c["score"]), -(c.get("weight", 0)),
+                              c["year"] or "9999"))
+    if library is not None:
+        for c in cands:
+            try:
+                c["in_library"] = next(
+                    library.albums(f"mb_releasegroupid:{c['rg_mbid']}"),
+                    None) is not None
+            except Exception:
+                c["in_library"] = False
+    return cands
 
 
 def _detransliterate(text: str) -> str:
@@ -238,12 +311,12 @@ def _mb_recording_search(artist: str, title: str) -> list[dict]:
         if v_artist.strip():
             parts.append(f'artist:"{v_artist.strip()}"')
         parts.append(f'recording:"{v_title.strip()}"')
-        for attempt in range(2):  # MB 503 hiccups are transient
+        for attempt in range(3):  # MB 503 hiccups are transient
             try:
                 r = requests.get(SEARCH_URL,
                                  params={"query": " AND ".join(parts),
                                          "limit": 25, "fmt": "json"},
-                                 headers=HEADERS, timeout=30)
+                         headers=HEADERS, timeout=30)
             except requests.RequestException as e:
                 print(f"releases: recording search failed "
                       f"({e.__class__.__name__}) — no album offer")
@@ -257,27 +330,6 @@ def _mb_recording_search(artist: str, title: str) -> list[dict]:
                 print(f"releases: recording search HTTP {r.status_code} — "
                       "no album offer")
                 return []
-            time.sleep(3)
+            time.sleep(3 * (attempt + 1))
         time.sleep(1.05)  # musicbrainz ratelimit: 1/s
     return []
-
-
-def track_album_candidates(artist: str, title: str, library=None,
-                           limit: int = 3) -> list[dict]:
-    """Album/EP release groups containing the requested track — the bot's
-    "whole album instead?" offer after a free-text track request. Returns
-    [{rg_mbid, artist, title, type, year, score, in_library?}] or [] (MB
-    unreachable/unmatched — the offer is optional and must never break the
-    track job). in_library marks groups already in beets via
-    mb_releasegroupid; those buttons mean gap-fill, not a fresh copy."""
-    recordings = _mb_recording_search(artist, title)
-    cands = _recording_release_groups(recordings, _tokens(artist), limit)
-    if library is not None:
-        for c in cands:
-            try:
-                c["in_library"] = next(
-                    library.albums(f"mb_releasegroupid:{c['rg_mbid']}"),
-                    None) is not None
-            except Exception:
-                c["in_library"] = False
-    return cands
