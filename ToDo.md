@@ -163,6 +163,75 @@ drin sein.*
 - [ ] SCOPE §8 unverändert: retag --apply, Deezer-Plugin, slskd/Soulseek,
       aktive Bestands-Upgrades
 
+## EPIC 7 — Plex-Konsolidierung: eine Instanz, Musik auf die OMV-HDDs des Ziel-Pis
+
+> **⚠️ VOR START Pflicht-Check (Nutzeranweisung 2026-10-09):** Jüngste
+> Entwicklungen aus parallel laufenden Feature-Implementierungen (anderer
+> Chat, u. a. bot.py/musicgrabber.py/setup.py/README — Stichwort
+> Album-Angebot/Freitext-Alben) einarbeiten und den aktuellen Code-Stand
+> prüfen, bevor eine dieser Stories begonnen wird.
+> **Start ausschließlich nach explizitem Go des Nutzers.**
+
+Entscheidungen (2026-10-09): Ziel-Pi **192.168.50.43** (SSH wie Pi 5,
+Zugang siehe Chat/Memory — nichts Sensibles ins Repo). Darauf laufen der
+bestehende TV/Film-Plex sowie **zwei HDDs im Gehäuse, verwaltet über
+OpenMediaVault** (SMB nur für andere Geräte; Tool+Plex nutzen lokale
+Pfade). Pi 5 wird danach anderweitig genutzt (kein Backup nötig), ABER
+vor jedem Eingriff in den Ziel-Plex: **Backup der Plex-Metadatenbank**
+(Story 7.0). Beets-DB bleibt lokal auf SD (SQLite niemals auf Netz-
+Shares); Musik/_incoming/_playlists/_trash/_backups auf die HDD. Der
+TV/Film-Erkennungsfehler verschwindet durch die Konsolidierung selbst
+(nach Löschung der Musik-Server-Instanz gibt es genau einen Home-Server).
+
+Vorwissen aus Exploration (Stand a61b489): install.sh ist im Wesentlichen
+idempotent (config.yaml bleibt, venv bleibt, Units werden sauber neu
+geschrieben, Plex wird nie angefasst, Tokens/State unberührt); Lücken =
+Stories 7.1. Hardcodiert: MG-Staging-Mount in docker-compose.yml:32 und
+kein first-class Re-Home → Story 7.2.
+
+- [ ] 7.0 Sicherungsnetz + Ist-Aufnahme (Live, ~15 min): Ziel-PMS-Backup
+      (Plug-in Databases + Preferences.xml als tar auf die HDD), Ist-
+      Aufnahme per SSH (OS/OMV/Platten/Mountpoints/Plex-DB/Docker).
+- [ ] 7.1 Installer-Härtung (Code): (a) aktiven Bot nach Update neu
+      starten, (b) `--library` bei existierender config.yaml → laute
+      Warnung statt stiller Ignoranz, (c) Self-Test-Fehler nicht mehr
+      fatal vor systemd, (d) setup.py schreibt zeitgestempeltes config-
+      Backup vor Überschreiben. Tests: Re-Run-Simulation + Smokes + CI.
+      Doku: README, PI-SETUP Phase 2/7.
+- [ ] 7.2 Root-Flexibilisierung + `musik rehome <old> <new>` (Code):
+      docker-compose Staging-Mount via .env-Variable; Re-Home-Befehl
+      (Item.move aller Items auf neue Root, stale dests in
+      state/playlists invalidieren, m3us aus item_ids regenerieren,
+      Verify-Ausgabe; 5.7b-Präzedenz als first-class Befehl). Smoke mit
+      Temp-Beets-DB. Doku: README + PI-SETUP.
+- [ ] 7.3 Ziel-Pi vorbereiten (Live per SSH): OMV-Musik-Root auf HDD
+      neben TV/Filmen festlegen, Rechte (pi schreiben, plex lesen, PUID
+      für MG), Docker installieren (Phase-9.1-Weg, OMV-Koexistenz
+      prüfen), Repo klonen, `install.sh --library <HDD-Musik-Root>`,
+      Plex-Block (url 127.0.0.1 + Ziel-PMS-Token + Section), DB-Pfad
+      lokal; kopieren: cookies.txt, beatport-/discogs-Token,
+      musicgrabber/data (telegram_token.json BEWUSST noch nicht —
+      Token darf nur von einem Bot gepollt werden).
+- [ ] 7.4 Bibliothek transferieren + Re-Home (Live, Downtime-Fenster):
+      Pi-5-Dienste stoppen (bot/timer/MG), rsync /mnt/music → HDD-Root
+      (39 GB), `musik rehome`, doctor --quick, report --verify → 0 tote
+      Pfade, Musik-Section im Ziel-Plex (API oder 1 UI-Klick Nutzer),
+      `musik plex --playlist all` (neuer Server = frische Uploads).
+- [ ] 7.5 Bot + MusicGrabber umziehen (Live): MG-Docker auf Ziel-Pi
+      (Staging-Bind auf HDD-Root via 7.2, .env, data/, Settings:
+      min_bitrate 192, lossless-first), Pi-5-Bot STOPPEN →
+      telegram_token.json kopieren → Ziel-Bot starten, ingest.timer
+      aktivieren; Live-Smoke /status + Freitext-Track bis Plexamp.
+- [ ] 7.6 Abkoppeln + Abnahme: Nutzer löscht Musik-Server-Instanz im
+      Plex-Konto (ein Home-Server → TV/Film-Erkennung normal), Pi 5
+      freigegeben; Abnahme-Kette: Spotify-Album-Link, YT-Playlist-Link
+      (Plexamp-Playlist), Freitext-Track (MG, lossless via ffprobe),
+      doctor --quick; Doku-Abschluss (PI-SETUP-Sektion „Migration auf
+      bestehenden OMV/Plex-Pi", SCOPE-Datumseintrag, ToDo-Ticks).
+
+Reihenfolge: 7.1+7.2 sofort baubar (deploy in 7.3/7.4); 7.0+7.3 live,
+dann 7.4→7.5→7.6 an einem Abend. Rollback bis 7.6: Pi 5 unangetastet.
+
 ## Beim Nutzer anfragen (bei nächster Gelegenheit)
 
 - Pi: SSH-Zugang/Host bekannt geben für Ferndeployment von Phase 9 — oder
