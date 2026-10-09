@@ -106,6 +106,20 @@ YouTube links keep the old chain including Plex playlists. The
 spotDL/SomeDL chain remains the default for links until routing is
 switched (ToDo EPIC 5).
 
+**Albums via free text (Story 2.5, 2026-10-09):** after a free-text track
+import the bot offers the containing albums/EPs as buttons — MusicBrainz
+candidates (album/EP release groups only; compilations, live albums and
+singles filtered), top 3 by relevance with the **newest** release always
+included, ✓ marking albums already in the library (that tap gap-fills
+missing tracks). One tap queues the whole release through MG's album
+pipeline (per-track bulk import, preferentially lossless via Monochrome,
+into staging `Albums/<Artist>/<Album>/`) and imports it through `musik
+ingest`; the track-request singleton is removed once the album verifiably
+holds the same song. Unavailable tracks are reported per name (partial
+success), a failed album download never silently downgrades to the lossy
+chain — send a Spotify album link for that instead. Offers expire silently
+when ignored; taps on stale offers (bot restart) get an alert.
+
 ### The Telegram bot (`musik bot`)
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) (`/newbot`), put
@@ -117,7 +131,9 @@ switched (ToDo EPIC 5).
    id into `config.yaml` under `musik: bot_allowlist: [123...]` and
    restart the bot.
 4. Now send links: you get progress updates (`⬇️ download`, `📦 N tracks`,
-   import) and a summary per album. `/status` shows queue and history.
+   import) and a summary per album. Free-text track requests additionally
+   get the **album offer** described above. `/status` shows queue and
+   history, including live `N/M tracks` counters for running album jobs.
 
 This bot is **independent** of the ZCode desktop Telegram relay — it runs
 as its own service with its own token.

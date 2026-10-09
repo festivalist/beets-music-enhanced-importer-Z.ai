@@ -619,10 +619,45 @@ gelöscht und von Docker als root neu angelegt:
 `sudo chown -R 1000:1000 /mnt/music/_incoming/musicgrabber && sudo docker
 restart musicgrabber` (seit keep_root-Fix 4bc89fb dauerhaft verhindert).
 
+**9.9 Bot-Integration Track → Album (Story 2.5, 2026-10-09):** Nach jedem
+erfolgreichen Freitext-Track-Import bietet der Bot das zugehörige Album /
+die EP als Inline-Buttons an. Kandidaten liefert eine MusicBrainz-
+Recording-Suche im musik-Tool (`musik/releases.py`): nur Album/EP-Release-
+Groups, Kompilationen/Live-Alben/Singles gefiltert, Cover-Artists über
+Artist-Token-Guard ausgeschlossen, Top 3 nach Relevanz — die **neueste**
+Veröffentlichung ist garantiert dabei (Nutzerregel 2026-10-09). ASCII-
+Schreibweisen werden automatisch zurück-übersetzt („Eisbaer" → „Eisbär";
+MBs Lucene-Suche faltet Umlaute nicht — Live-Befund). ✓ markiert Alben,
+die schon in der Bibliothek sind (Tap = Gap-Fill fehlender Tracks).
+
+Der Button-Tap läuft über MGs native Album-Pipeline (Endpoints gegen
+`127.0.0.1:38274`, alle live gegen 4.3.0 verifiziert):
+
+| Schritt | Endpoint | Ergebnis |
+|---|---|---|
+| Release-Group → Release | `POST /api/albums/resolve-release-group` `{release_group_mbid}` | `{artist, album_title, release_mbid, year, track_count}` |
+| Album queue | `POST /api/albums/download` `{artist, album_title, release_mbid}` | `{import_id, track_count, queued_count, album_dir}` |
+| Fortschritt | `GET /api/bulk-import/{import_id}/status` bis `complete:true` | `{completed, failed, dupe_skipped, tracks[]}` |
+
+MG lädt Per-Track-Bulk-Import (ISRC-first, bevorzugt Monochrome-FLAC =
+16-bit/44.1-kHz-Lossless, Fallbacks m4a/mp3) ins Staging
+`Albums/<Artist>/<Album>/` (`.albuminfo`-Sidecar mit release_mbid,
+`.lrc`-Lyrics — cleanup räumt beides ab). Danach importiert der Bot sofort
+via `musik ingest` (Gap-Fill/Qualitätsersetzung in vorhandene Alben
+inklusive) und entfernt den Singleton der ursprünglichen Track-Anfrage,
+sobald das Album denselben Song verifiziert enthält. Teilerfolge sind
+normal: nicht lieferbare Tracks (Dauer-Mismatch, strenge Artist-Prüfung)
+werden namentlich gemeldet — nochmal tippen holt Nachzügler per Gap-Fill
+nach. Scheitert das Album komplett, gibt es KEINEN stillen Abstieg auf die
+lossy spotDL-Kette (Nordstern lossless-first); stattdessen Hinweis auf
+einen Spotify-Album-Link. `/status` zeigt bei laufenden Album-Jobs die
+live N/M-Track-Zähler von MG. Config: `musik: musicgrabber:
+{album_offer: true, album_job_timeout: 3600}` (Defaults; album_offer
+schaltet die Buttons ganz ab).
+
 **Noch offen (Stories 1.2–2.x, siehe ToDo.md):** Quellen-/Qualitäts-Fein-
 konfiguration, Testmatrix-Abnahme (Single/Album/Spotify-Playlist/YouTube-
-Playlist/0-day), `musik ingest`-Timer für das Staging, MG-Playlists-M3U in
-die Plex-Playlist-Kette, Bot-Routing auf die MG-API.
+Playlist/0-day), MG-Playlists-M3U in die Plex-Playlist-Kette.
 
 ## Anmerkungen & Grenzen
 

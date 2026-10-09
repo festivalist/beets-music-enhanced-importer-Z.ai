@@ -21,6 +21,11 @@ DEFAULTS = {
     "url": "http://127.0.0.1:38274",
     "enabled": True,
     "job_timeout": 600.0,  # single-track budget; playlists go via links
+    # whole-album budget: one bulk import = N per-track jobs (~20 s/track
+    # live-measured; 18 tracks took ~5.5 min)
+    "album_job_timeout": 3600.0,
+    # bot offers "whole album instead?" buttons after a free-text track
+    "album_offer": True,
 }
 _API_TIMEOUT = (5, 30)  # (connect, read)
 
@@ -188,3 +193,61 @@ def wait_for_job(job_id, timeout: float | None = None,
                 f"job {job_id} not finished within "
                 f"{int(timeout or mg_config()['job_timeout'])}s (status: {status})")
         time.sleep(5)
+
+
+def resolve_release_group(release_group_mbid: str) -> dict:
+    """Release-group MBID → representative release, exactly what
+    download_album wants: {artist, album_title, release_mbid, year,
+    track_count}. MG picks the pressing (its own release-choice rules),
+    so the bot never has to. Raises MGUnavailable on HTTP errors."""
+    return _api("POST", "/api/albums/resolve-release-group",
+                {"release_group_mbid": release_group_mbid},
+                timeout=(5, 60))
+
+
+def download_album(artist: str, album_title: str, release_mbid: str) -> dict:
+    """Queue a full-album download: MG fetches the MusicBrainz tracklist and
+    runs a per-track bulk import into the staging tree
+    Albums/<Artist>/<Album>/ (.albuminfo sidecar, gap-aware — tracks already
+    in ITS staging dir are not re-queued). Returns the creation payload
+    ({import_id, track_count, queued_count, existing_count, ...})."""
+    d = _api("POST", "/api/albums/download",
+             {"artist": artist, "album_title": album_title,
+              "release_mbid": release_mbid},
+             timeout=(5, 120))
+    if not d.get("import_id"):
+        raise MGJobFailed(f"album download without import_id: {str(d)[:120]}")
+    return d
+
+
+def import_status(import_id) -> dict:
+    """One-shot bulk-import status snapshot (for /status live progress)."""
+    return _api("GET", f"/api/bulk-import/{import_id}/status",
+                timeout=(5, 30))
+
+
+def wait_for_import(import_id, timeout: float | None = None,
+                    progress=None) -> dict:
+    """Poll the bulk import until every track job has settled; returns the
+    final status dict ({status, total_tracks, searched, completed, failed,
+    tracks[], complete, ...}). `progress(status)` fires per poll (caller
+    rate-limits its own messages). A completed import with failed tracks is
+    a PARTIAL SUCCESS — returned, not raised; the caller reports the gaps.
+    Raises MGJobFailed only on import error/cancelled or timeout."""
+    deadline = time.monotonic() + (timeout or float(mg_config()["album_job_timeout"]))
+    while True:
+        d = _api("GET", f"/api/bulk-import/{import_id}/status",
+                 timeout=(5, 30))
+        if progress:
+            progress(d)
+        if d.get("complete"):
+            return d
+        status = (d.get("status") or "").lower()
+        if status in ("error", "cancelled", "canceled"):
+            raise MGJobFailed((d.get("error") or status)[:200])
+        if time.monotonic() >= deadline:
+            raise MGJobFailed(
+                f"album import {import_id} not finished within "
+                f"{int(timeout or mg_config()['album_job_timeout'])}s "
+                f"(status: {status})")
+        time.sleep(10)

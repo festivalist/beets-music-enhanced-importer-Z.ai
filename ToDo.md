@@ -65,7 +65,12 @@ Stories 4.1/4.3 weitergeführt.*
       smoke_playlists um MG-M3U-Fall erweitern
 - [ ] 2.3 Duplikat-/Qualitätsgrenzstelle absichern + dokumentieren: MG-Downloads
       vorhandener Alben laufen durch `_prepare_units` (Gap-Fill, _trash mit
-      Manifest); MG-Library-Index zeigt NICHT auf die echte Bibliothek
+      Manifest); MG-Library-Index zeigt NICHT auf die echte Bibliothek.
+      Live-Befund 2.5-Probe (Here We Stand): Doppel-Tracknummern im MG-
+      Release (Mistress Mabel #6+#17, Look Out Sunshine #4+#18) legten 2
+      mindere Duplikate INS Album statt in _trash (manuell geräumt) —
+      Gap-Fill sollte Items mit identischem Titel/Tracknr. desselben Albums
+      der Qualitätsvergleich unterziehen
 - [x] 2.4 Bot-Routing Freitext → MG-API mit Fallback — **2026-10-08**:
       `musik/musicgrabber.py` (dünner Client: available/search/download/
       wait_for_job; Fehlerklassen MGUnavailable/MGNoResults/MGJobFailed;
@@ -74,6 +79,23 @@ Stories 4.1/4.3 weitergeführt.*
       Links unverändert auf spotDL/SomeDL; automatischer Fallback mit
       Grund-Meldung; smoke_musicgrabber.py mit echten API-Fixtures;
       setup.py-Template + PI-SETUP 9.8 (inkl. Crash-Loop-Troubleshooting)
+- [x] 2.5 Track-Anfrage → Album-Angebot via MG (Top-3 inkl. neuester) —
+      **2026-10-09**: nach Freitext-Track-Import Inline-Buttons mit den
+      MB-Kandidaten (releases.track_album_candidates: Recording-Suche →
+      Album/EP-RGs, Kompilationen/Live/Singles gefiltert, Cover-Guard,
+      neueste RG garantiert in Top-3, ASCII→Umlaut-Fallback „Eisbaer");
+      Tap → MG-Albumpipeline (resolve-release-group → albums/download →
+      bulk-import-Status, alles live gegen 4.3.0 verifiziert) → sofortiger
+      ingest → Singleton der Track-Anfrage wird entfernt; Teilerfolge
+      namentlich gemeldet; kein stiller Lossy-Abstieg (Spotify-Link-
+      Hinweis); /status zeigt MG-Live-Zähler; Config album_offer/
+      album_job_timeout; smokes: track_album_candidates + album_offer +
+      musicgrabber-Albumbfälle; README + PI-SETUP 9.9; Live-Probe: Here
+      We Stand 13→18er-Release (Gap-Fill + 3× FLAC-Ersatz), 2 minder-
+      qualitative Duplikate als Known-Edge an EPIC 2.3 gemeldet
+- [ ] 2.6 (optional) Album-Angebot auch für Spotify/YouTube-TRACK-Links
+      (Kandidatensuche dann aus den importierten Tags) und Freitext-
+      Album-Intent („artist - albumname" direkt als Album-Anfrage)
 
 ## EPIC 3 — Beschaffung ohne Nutzerinteraktion
 
@@ -238,3 +260,6 @@ dann 7.4→7.5→7.6 an einem Abend. Rollback bis 7.6: Pi 5 unangetastet.
   Bestätigung, dass die Phase selbst ausgeführt wird
 - Testdaten für Story 1.3, falls nicht present: Spotify-Playlist-Link,
   YouTube-Playlist-Link, Album-Link, eine 0-day-Release
+- Story-2.5-Abnahme über echten Telegram-Bot: 1× Freitext-Track → Album-
+  Tap (inkl. ✓-Gap-Fill-Fall) + 1× EP-Kandidat + Verwerfen-Button;
+  Idealfall 0-day-Track als „neuester" Kandidat

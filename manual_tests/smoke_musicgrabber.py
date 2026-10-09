@@ -68,6 +68,28 @@ def route(method, url, json=None, timeout=None):
         })
     if url.endswith("/api/download"):
         return Resp(200, {"id": "816f3ba5"})  # string id (live-probed)
+    if url.endswith("/api/albums/resolve-release-group"):
+        # live shape, probed 2026-10-09 (Here We Stand RG)
+        return Resp(200, {"artist": "The Fratellis",
+                          "album_title": "Here We Stand",
+                          "release_mbid": "6d566ef6-199d-47f0-9df3-64c1f6f51a38",
+                          "year": "2008", "track_count": 18})
+    if url.endswith("/api/albums/download"):
+        return Resp(200, {"import_id": "693fde90", "track_count": 18,
+                          "queued_count": 18, "existing_count": 0,
+                          "missing_count": 18,
+                          "album_dir": "/music/Albums/The Fratellis/Here We Stand"})
+    if "/api/bulk-import/" in url and url.endswith("/status"):
+        # live shape, probed 2026-10-09: 14/18 done, 4 failed, complete=True
+        return Resp(200, {"import_id": "693fde90", "status": "completed",
+                          "total_tracks": 18, "searched": 18, "queued": 0,
+                          "completed": 14, "failed": 4, "skipped": 0,
+                          "dupe_skipped": 0, "rate_limited": False,
+                          "error": None,
+                          "tracks": [{"artist": "The Fratellis - Mistress Mabel",
+                                      "song": "Mistress Mabel", "status": "failed",
+                                      "error": "Duration mismatch", "job_id": "j1"}],
+                          "complete": True})
     if "/api/jobs/" in url:
         return Resp(200, {"id": "816f3ba5", "status": "completed",
                           "title": "The Fratellis - Chelsea Dagger",
@@ -169,5 +191,57 @@ assert B._is_free_text("https://open.spotify.com/track/abc") is False
 assert B._is_free_text("https://youtu.be/abc?si=x") is False
 assert B._is_free_text("https://www.youtube.com/watch?v=a&list=b") is False
 print("6) bot routing predicate OK")
+
+# 7) album client: resolve-release-group hands back the download fields
+MG.requests.request = route
+summary = MG.resolve_release_group("d8008a53-9c22-3468-b1f4-6dcbe1c87418")
+assert summary["release_mbid"] == "6d566ef6-199d-47f0-9df3-64c1f6f51a38"
+assert CALLS[-1]["json"] == {"release_group_mbid": "d8008a53-9c22-3468-b1f4-6dcbe1c87418"}
+print("7) resolve_release_group OK")
+
+# 8) download_album body (artist/album_title/release_mbid) + import_id
+d = MG.download_album("The Fratellis", "Here We Stand", summary["release_mbid"])
+assert d["import_id"] == "693fde90" and d["track_count"] == 18
+body = CALLS[-1]["json"]
+assert body["artist"] == "The Fratellis" and body["release_mbid"] == summary["release_mbid"]
+MG.requests.request = lambda *a, **kw: Resp(200, {"track_count": 18})
+try:
+    MG.download_album("x", "y", "z")
+    raise AssertionError("should have raised")
+except MG.MGJobFailed:
+    pass
+MG.requests.request = route
+print("8) download_album (body + missing import_id) OK")
+
+# 9) import_status / wait_for_import: complete, PARTIAL SUCCESS (returned,
+#    not raised), error status, timeout
+st = MG.import_status("693fde90")
+assert st["complete"] is True and st["completed"] == 14
+result = MG.wait_for_import("693fde90", timeout=10)
+assert result["completed"] == 14 and result["failed"] == 4  # partial: no raise
+print("9a) import_status + wait_for_import partial success OK")
+
+
+def error_route(method, url, json=None, timeout=None):
+    return Resp(200, {"status": "error", "error": "tracklist gone", "complete": False})
+
+
+MG.requests.request = error_route
+try:
+    MG.wait_for_import("abc", timeout=5)
+    raise AssertionError("should have raised")
+except MG.MGJobFailed as e:
+    assert "tracklist gone" in str(e)
+print("9b) wait_for_import error status -> MGJobFailed OK")
+
+MG.requests.request = lambda *a, **kw: Resp(
+    200, {"status": "processing", "complete": False})
+try:
+    MG.wait_for_import("abc", timeout=10)
+    raise AssertionError("should have raised")
+except MG.MGJobFailed as e:
+    assert "not finished" in str(e)
+print("9c) wait_for_import timeout -> MGJobFailed OK")
+MG.requests.request = route
 
 print("smoke_musicgrabber: all assertions passed")

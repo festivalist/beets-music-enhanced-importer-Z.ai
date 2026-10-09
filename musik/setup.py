@@ -132,7 +132,9 @@ musik:
     musicgrabber:
         url: http://127.0.0.1:38274
         enabled: true
-        # job_timeout: 600
+        # job_timeout: 600        # Budget pro Einzeltrack-Job
+        # album_offer: true       # nach Freitext-Track: Album/EP-Buttons anbieten
+        # album_job_timeout: 3600 # Budget fuer einen kompletten Album-Import
     # Plex (optional): refresh this library section after imports so new
     # albums show up in Plexamp without manual scans. Playlist links also
     # become Plex playlists (m3u under <library>/_playlists, uploaded via
