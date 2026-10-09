@@ -160,7 +160,8 @@ assert len(cands) == 2
 by_id = {c["rg_mbid"]: c for c in cands}
 assert by_id["rg-album"]["in_library"] is True
 assert by_id["rg-new"]["in_library"] is False
-assert QUERIES[0]["params"]["query"] == 'artist:"Example Band" AND recording:"Song"'
+assert QUERIES[0]["params"]["query"] == (
+    'artist:"Example Band" AND recording:"Song" AND status:official')
 # years came from the backfill (search fixtures carry none), original first
 assert cands[0]["rg_mbid"] == "rg-album" and cands[0]["year"] == "2001"
 assert cands[1]["rg_mbid"] == "rg-new" and cands[1]["year"] == "2024"
@@ -223,8 +224,10 @@ R.requests.get = umlaut_get
 cands = R.track_album_candidates("Grauzone", "Eisbaer")
 assert len(cands) == 1 and cands[0]["rg_mbid"] == "rg-grau"
 assert cands[0]["year"] == "1981"  # backfilled via the batched rgid lookup
-# recording search (ASCII) → recording search (umlaut) → rgid backfill
+# recording search (ASCII) → recording search (umlaut) → rgid backfill;
+# both searches carry the bootleg-suppressing status filter
 assert len(QUERIES) == 3 and QUERIES[1]["query"].count("ä") == 1
+assert QUERIES[1]["query"].endswith("AND status:official")
 assert QUERIES[2]["query"] == "rgid:rg-grau"
 print("7) de-transliteration fallback OK")
 

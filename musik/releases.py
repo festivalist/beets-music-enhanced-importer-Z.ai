@@ -301,7 +301,12 @@ def _detransliterate(text: str) -> str:
 
 def _mb_recording_search(artist: str, title: str) -> list[dict]:
     """Recording search with transient-503 retry and (only on zero results)
-    a de-transliterated second pass. Returns raw recordings or []."""
+    a de-transliterated second pass. `AND status:official` is load-bearing:
+    MB's search clusters return IP-dependent top-N compositions, and for
+    big-catalog tracks the top 25 can be ALL live-bootleg variants (live
+    2026-10-09: Bowie "Heroes" from the Pi — 25/25 bootleg releases, zero
+    candidates; the canonical studio recording never made the cut). Returns
+    raw recordings or []."""
     variants = [(artist, title)]
     detrans = (_detransliterate(artist), _detransliterate(title))
     if detrans != (artist, title):
@@ -311,11 +316,12 @@ def _mb_recording_search(artist: str, title: str) -> list[dict]:
         if v_artist.strip():
             parts.append(f'artist:"{v_artist.strip()}"')
         parts.append(f'recording:"{v_title.strip()}"')
+        parts.append("status:official")
         for attempt in range(3):  # MB 503 hiccups are transient
             try:
                 r = requests.get(SEARCH_URL,
                                  params={"query": " AND ".join(parts),
-                                         "limit": 25, "fmt": "json"},
+                                         "limit": 50, "fmt": "json"},
                          headers=HEADERS, timeout=30)
             except requests.RequestException as e:
                 print(f"releases: recording search failed "
