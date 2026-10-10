@@ -32,13 +32,14 @@ CANDS = [
      "type": "album", "year": "2024", "score": 50, "in_library": True},
 ]
 
-R.track_album_candidates = lambda artist, title, library=None, limit=3: list(CANDS)
+R.track_album_candidates = lambda artist, title, library=None, **kw: list(CANDS)
 
 
 class FakeItem:
-    def __init__(self, id, artist, title, added=1):
+    def __init__(self, id, artist, title, added=1, mb_artistid="f4ccf6c5-x"):
         self.id, self.artist, self.title, self.added = id, artist, title, added
         self.album_id = None
+        self.mb_artistid = mb_artistid
 
 
 class FakeLib:

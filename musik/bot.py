@@ -320,16 +320,19 @@ def _open_library():
                    beets_config["directory"].as_filename())
 
 
-def _find_singleton(lib, artist: str, title: str) -> int | None:
+def _find_singleton(lib, artist: str, title: str):
     """The item this track request just created (artist/title match,
-    singleton = no album row, newest added first). Its id rides along in
-    the album offer so the album job can remove the now-redundant copy."""
+    singleton = no album row, newest added first): (beets item id,
+    MusicBrainz artist id or None). The id rides along in the album offer
+    so the album job can remove the now-redundant copy; the artist MBID
+    lets the candidate search use MB's hard arid: filter."""
     try:
-        items = [i for i in lib.items(f"artist:{artist} title:{title}")
-                 if not i.album_id]
+        items = [i for i in lib.items(f"artist:{artist} title:{title}")]
         if not items:
             return None
-        return max(items, key=lambda i: i.added or 0).id
+        newest = max(items, key=lambda i: i.added or 0)
+        mbid = (newest.mb_artistid or "").strip().split(";")[0].strip()
+        return newest.id, mbid or None
     except Exception:
         traceback.print_exc()
         return None
@@ -374,10 +377,12 @@ def _maybe_album_offer(job: dict, query: str, pick: dict, send) -> None:
         if not artist or not title:
             return
         lib = _open_library()
-        cands = track_album_candidates(artist, title, library=lib)
+        found = _find_singleton(lib, artist, title)
+        singleton_id, artist_mbid = found if found else (None, None)
+        cands = track_album_candidates(artist, title, library=lib,
+                                       artist_mbid=artist_mbid)
         if not cands:
             return
-        singleton_id = _find_singleton(lib, artist, title)
     except Exception:
         traceback.print_exc()
         return

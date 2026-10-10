@@ -267,14 +267,16 @@ def _backfill_years(cands: list[dict]) -> list[dict]:
 
 
 def track_album_candidates(artist: str, title: str, library=None,
-                           limit: int = 5) -> list[dict]:
+                           limit: int = 5,
+                           artist_mbid: str | None = None) -> list[dict]:
     """Album/EP release groups containing the requested track — the bot's
     "whole album instead?" offer after a free-text track request. Returns
     [{rg_mbid, artist, title, type, year, score, in_library?}] or [] (MB
     unreachable/unmatched — the offer is optional and must never break the
-    track job). in_library marks groups already in beets via
-    mb_releasegroupid; those buttons mean gap-fill, not a fresh copy."""
-    recordings = _mb_recording_search(artist, title)
+    track job). artist_mbid (from the imported track) narrows the search
+    hard via arid:; in_library marks groups already in beets via
+    mb_releasegroupid — those buttons mean gap-fill, not a fresh copy."""
+    recordings = _mb_recording_search(artist, title, artist_mbid=artist_mbid)
     cands = _recording_release_groups(recordings, _tokens(artist), limit)
     cands = _backfill_years(cands)
     cands.sort(key=lambda c: (-(c["score"]), -(c.get("weight", 0)),
@@ -299,21 +301,29 @@ def _detransliterate(text: str) -> str:
                 .replace("ue", "ü").replace("ss", "ß"))
 
 
-def _mb_recording_search(artist: str, title: str) -> list[dict]:
+def _mb_recording_search(artist: str, title: str,
+                         artist_mbid: str | None = None) -> list[dict]:
     """Recording search with transient-503 retry and (only on zero results)
     a de-transliterated second pass. `AND status:official` is load-bearing:
     MB's search clusters return IP-dependent top-N compositions, and for
-    big-catalog tracks the top 25 can be ALL live-bootleg variants (live
+    big-catalog tracks the top hits can be ALL live-bootleg variants (live
     2026-10-09: Bowie "Heroes" from the Pi — 25/25 bootleg releases, zero
-    candidates; the canonical studio recording never made the cut). Returns
-    raw recordings or []."""
-    variants = [(artist, title)]
+    candidates; the canonical studio recording never made the cut).
+    `artist_mbid` (from the just-imported track's tags) switches the
+    artist clause to `arid:` — a HARD filter, immune to common-title
+    flooding: MB's search only BOOSTS by artist name, so "Deafheaven –
+    Hunter" could drown in other artists' "Hunter" recordings while the
+    brand-new EP wasn't indexed yet (live 2026-10-10: no offer, next
+    morning the same query finds the EP). Returns raw recordings or []."""
+    variants: list[tuple[str | None, str]] = [(artist, title)]
     detrans = (_detransliterate(artist), _detransliterate(title))
     if detrans != (artist, title):
         variants.append(detrans)
     for v_artist, v_title in variants:
         parts = []
-        if v_artist.strip():
+        if artist_mbid:
+            parts.append(f"arid:{artist_mbid}")
+        elif v_artist.strip():
             parts.append(f'artist:"{v_artist.strip()}"')
         parts.append(f'recording:"{v_title.strip()}"')
         parts.append("status:official")

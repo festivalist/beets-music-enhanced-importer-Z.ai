@@ -231,6 +231,30 @@ assert QUERIES[1]["query"].endswith("AND status:official")
 assert QUERIES[2]["query"] == "rgid:rg-grau"
 print("7) de-transliteration fallback OK")
 
+# 7b) artist MBID switches the artist clause to MB's HARD arid: filter —
+#     immune to common-title flooding (live: Deafheaven "Hunter" drowned
+#     in other artists' Hunter recordings; name clauses only BOOST)
+QUERIES.clear()
+
+
+def arid_get(url, params=None, headers=None, timeout=None):
+    QUERIES.append(params)
+    if "/release-group" in url:
+        return Resp(200, {"release-groups": []})
+    return Resp(200, {"recordings": [
+        rec(100, "Example Band", "Song",
+            [rel("rg-album", "Great Album", "Album", rg_date="2001-05-01")]),
+    ]})
+
+
+R.requests.get = arid_get
+R.time.sleep = lambda _s: None
+cands = R.track_album_candidates("Example Band", "Song", artist_mbid="abcd-1234")
+assert len(cands) == 1
+assert QUERIES[0]["query"] == (
+    'arid:abcd-1234 AND recording:"Song" AND status:official')
+print("7b) arid: hard artist filter OK")
+
 # 8) MB unreachable → [] (the offer is optional, the track job must live)
 R.requests.get = lambda *a, **kw: Resp(503, {})
 assert R.track_album_candidates("X", "Y") == []
