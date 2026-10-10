@@ -727,6 +727,20 @@ API löschen, während sie scannt** — das brachte den PMS am 2026-10-10 zum
 Absturz (Neustart unauffällig, TV/Film-Sections unversehrt). Location-Edit
 per PUT wird mit HTTP 200 quittiert, wirkt aber nicht.
 
+**Playlists nach einem Umzug (2026-10-10 live durchgearbeitet):**
+`state/playlists/` gehört zum Repo-Zustand, NICHT zur Bibliothek — beim
+Umzug separat mitkopieren, sonst findet `plex --playlist all` keine
+States. Veraltete m3u-Zeilen (Dateinamen-Renames seit der letzten
+Generierung, z. B. „00-01 …" → „01 …") lässt der PMS-Importer mit
+„Could not find path" + HTTP 500 sausen — dests aus den item_ids
+regenerieren (beets-DB gegenlesen). **Fallstricke dabei:** die beets-DB
+speichert seit der relative_path-Migration RELATIVE Pfade — ein nacktes
+`Library(db_path)` ohne `directory`-Argument kombiniert sie mit beets'
+Default `~/Music` und erzeugt Müll-Pfade; immer
+`Library(config['library'], config['directory'])` bzw. die musik-eigenen
+Helfer benutzen. Und: HTTP 500 beim Playlist-Upload heißt fast immer
+„Zeile matcht nicht" — die konkreten Zeilen stehen im PMS-Log.
+
 Randempfehlung: Die vorgefundene Filme-Section zeigte auf den GANZEN
 HDD-Root statt auf `Filme/` — jedes Musik-Write triggerte Film-Scans;
 Location in der UI auf den Filme-Ordner einengen.

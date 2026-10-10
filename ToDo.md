@@ -262,14 +262,18 @@ kein first-class Re-Home → Story 7.2.
       nachgezogen (fiel auf 128 zurück → wieder 192), Staging durch Symlink
       sichtbar+schreibbar; Pi-5-Bot VORher gestoppt (Single-Poller), Token
       kopiert, Ziel-Bot aktiv (journal sauber), Ingest-Unit läuft.
-- [ ] 7.6 Abkoppeln + Abnahme — **NUTZER-SCHRITTE OFFEN**: (1) Musik-
-      Section in Plex-Web-UI anlegen (Ordner /mnt/music, „Plex Music",
-      Deutsch), (2) Musik-Server-Instanz „Pi5HomeLab" im Plex-Konto
-      löschen → TV/Film-Erkennung normalisiert, (3) Optional Filme-Section
-      auf Filme/-Ordner einengen (steht auf ganzem HDD-Root), danach:
-      Playlist-Upload (`plex --playlist all`), Abnahme-Kette (Album-Link,
-      Playlist-Link, Freitext-MG lossless), Pi 5 ist freigegeben
-      (alles gestoppt/deaktiviert, Container entfernt).
+- [x] 7.6 Abkoppeln + Abnahme — **AUSGEFÜHRT 2026-10-10**: Nutzer-UI
+      erledigt (Musik-Section „Musik" auf /mnt/music, key=4; Pi5-Server
+      im Konto gelöscht → ein Home-Server). Erster Fullscan: 1.100
+      Künstler stabil. CLI-Akzeptanz: YouTube-Download (Cookies aktiv)
+      → Import → korrekte Duplikat-Erkennung (Grauzone-Re-Download
+      verworfen, bessere Kopie existierte). Playlists: state/playlists/
+      nachgezogen, dests aus item_ids regeneriert (zwei Fallstricke:
+      veraltete Dateinamen in m3us + Library()-relative-Pfade-Gotcha,
+      beide in PI-SETUP Phase 10 dokumentiert) — **alle 5 Playlists
+      serverseitig verifiziert** (6/51/11/57/5 Tracks). Plexamp-Endcheck
+      beim Nutzer. Nachtrag-Backlog: rebuild --refresh (dests aus
+      item_ids neu auflösen als first-class Option) — Kandidat für 7.1.
 - [ ] 7.7 NEU (Nutzer-Entscheidung 2026-10-10 „Importieren"): Alt-Kollek-
       tion im Musik-Share (581 Ordner / 108 GB) über musik importieren —
       scan → Trockenlauf → asis-Echtlauf (stundenlang, nohup) → cleanup →
