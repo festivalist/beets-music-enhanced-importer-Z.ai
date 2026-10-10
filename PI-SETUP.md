@@ -685,6 +685,52 @@ schaltet die Buttons ganz ab).
 konfiguration, Testmatrix-Abnahme (Single/Album/Spotify-Playlist/YouTube-
 Playlist/0-day), MG-Playlists-M3U in die Plex-Playlist-Kette.
 
+## Phase 10 — Umzug auf einen bestehenden Plex/OMV-Pi (EPIC 7, 2026-10-10 ausgeführt)
+
+Ziel-Box: ArgonEON (Debian 13 trixie, aarch64, OpenMediaVault, 2×16-TB-btrfs-
+HDD, Plex vorinstalliert). Musik-Root = OMV-Share `<HDD1>/Musik`.
+
+> **Pfade stabil halten:** `sudo ln -s /srv/dev-disk-by-uuid-…/Musik
+> /mnt/music` — beets-DB, config.yaml, Playlist-m3us und die docker-compose-
+> Staging-Mounts bleiben dadurch ohne jeden Re-Home gültig (live bewiesen:
+> `report --verify` = 0 fehlende Pfade direkt nach dem Umzug).
+
+Vorgehen (nachvollziehbar): Ziel-Plex-DB-Backup nach kurzem PMS-Stopp als
+tar aus „Plug-in **Support**/Databases" (+ Preferences.xml) — die DBs liegen
+NICHT unter „Plug-in Databases" → Docker installieren (Achtung: `docker-cli`
+ist auf trixie nur ein **Recommends** von docker.io; OMV setzt
+Install-Recommends=false → das CLI fehlt nach docker.io-Installation und
+muss separat installiert werden; Compose weiterhin als Standalone-Binary
+nach 9.1) → Repo klonen; config.yaml + cookies.txt + Tokens von der alten
+Box kopieren (base64-Pipe über SSH), Plex-Token der ZIEL-Box aus deren
+Preferences.xml in den `musik: plex:`-Block übernehmen → `bash install.sh
+--library /mnt/music` (bestehende config bleibt unangetastet, Wizard wird
+übersprungen; für sudo im nohup-Betrieb kurzzeitig ein NOPASSWD-sudoers-
+Schnipsel legen und danach sofort entfernen) → alte Box stilllegen
+(bot stoppen+deaktivieren, Timer deaktivieren, `docker compose down`) →
+`rsync -rlptD alt:  neu:` (~31 MB/s Pi-zu-Pi; exit 23 durch gescheiterte
+Verzeichnis-mtimes auf fremden Alt-Ordnern ist harmlos) → `musik.py report
+--verify` muss 0 fehlende Pfade zeigen → MG-Daten (`musicgrabber/data`) per
+tar über Pi-zu-Pi-SSH übernehmen; danach `min_audio_bitrate` prüfen (fiel
+beim Datenumzug live auf 128 zurück → per `PUT /api/settings` wieder auf
+192 setzen) → `telegram_token.json` ERST kopieren, nachdem der alte Bot
+gestoppt ist (ein Token darf nur von einem Prozess gepollt werden) →
+Bot starten, `systemctl start musik-ingest.service` einmal anstoßen
+(state/-Erst-Lücke ist seit dem install.sh-Fix vom 2026-10-10 geschlossen).
+
+**Plex-Fallstricke auf PMS 1.43 (live erlebt):** Section-Anlage per API
+schlägt fehl — `location[0]` wird als „missing or invalid" abgelehnt (in
+Query UND Body); richtig wären Scanner „Plex Music" (nicht „Plex Music
+Scanner"), Agent `tv.plex.agents.music`, Sprache `de-DE`. → Musik-Section
+über die Web-UI anlegen (Ordner `/mnt/music`). **NIEMALS eine Section per
+API löschen, während sie scannt** — das brachte den PMS am 2026-10-10 zum
+Absturz (Neustart unauffällig, TV/Film-Sections unversehrt). Location-Edit
+per PUT wird mit HTTP 200 quittiert, wirkt aber nicht.
+
+Randempfehlung: Die vorgefundene Filme-Section zeigte auf den GANZEN
+HDD-Root statt auf `Filme/` — jedes Musik-Write triggerte Film-Scans;
+Location in der UI auf den Filme-Ordner einengen.
+
 ## Anmerkungen & Grenzen
 
 - **Performance (Pi 5):** Fingerabdruck + Tagging ~25 s/Album zzgl. Download —

@@ -105,6 +105,11 @@ fi
 step "Self test (spotdl / somedl / ffmpeg / fpcalc)"
 "$PY_EXE" musik.py fetch --self-test
 
+# The ingest unit flocks state/ingest.lock; the app creates state/ only
+# lazily on its first state write — on a fresh box the timer failed with
+# EX_NOINPUT until then (live case EPIC 7 migration, 2026-10-10).
+mkdir -p "$PROJECT_DIR/state"
+
 # --- 7. systemd service for the bot -------------------------------------------
 if [[ $NO_SYSTEMD -eq 0 ]] && command -v systemctl >/dev/null 2>&1; then
     step "Installing systemd service (musik-bot.service)"

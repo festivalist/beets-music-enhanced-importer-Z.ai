@@ -227,45 +227,54 @@ geschrieben, Plex wird nie angefasst, Tokens/State unberührt); Lücken =
 Stories 7.1. Hardcodiert: MG-Staging-Mount in docker-compose.yml:32 und
 kein first-class Re-Home → Story 7.2.
 
-- [ ] 7.0 Sicherungsnetz + Ist-Aufnahme (Live, ~15 min): Ziel-PMS-Backup
-      (Plug-in Databases + Preferences.xml als tar auf die HDD), Ist-
-      Aufnahme per SSH (OS/OMV/Platten/Mountpoints/Plex-DB/Docker).
-- [ ] 7.1 Installer-Härtung (Code): (a) aktiven Bot nach Update neu
-      starten, (b) `--library` bei existierender config.yaml → laute
-      Warnung statt stiller Ignoranz, (c) Self-Test-Fehler nicht mehr
-      fatal vor systemd, (d) setup.py schreibt zeitgestempeltes config-
-      Backup vor Überschreiben. Tests: Re-Run-Simulation + Smokes + CI.
-      Doku: README, PI-SETUP Phase 2/7.
-- [ ] 7.2 Root-Flexibilisierung + `musik rehome <old> <new>` (Code):
-      docker-compose Staging-Mount via .env-Variable; Re-Home-Befehl
-      (Item.move aller Items auf neue Root, stale dests in
-      state/playlists invalidieren, m3us aus item_ids regenerieren,
-      Verify-Ausgabe; 5.7b-Präzedenz als first-class Befehl). Smoke mit
-      Temp-Beets-DB. Doku: README + PI-SETUP.
-- [ ] 7.3 Ziel-Pi vorbereiten (Live per SSH): OMV-Musik-Root auf HDD
-      neben TV/Filmen festlegen, Rechte (pi schreiben, plex lesen, PUID
-      für MG), Docker installieren (Phase-9.1-Weg, OMV-Koexistenz
-      prüfen), Repo klonen, `install.sh --library <HDD-Musik-Root>`,
-      Plex-Block (url 127.0.0.1 + Ziel-PMS-Token + Section), DB-Pfad
-      lokal; kopieren: cookies.txt, beatport-/discogs-Token,
-      musicgrabber/data (telegram_token.json BEWUSST noch nicht —
-      Token darf nur von einem Bot gepollt werden).
-- [ ] 7.4 Bibliothek transferieren + Re-Home (Live, Downtime-Fenster):
-      Pi-5-Dienste stoppen (bot/timer/MG), rsync /mnt/music → HDD-Root
-      (39 GB), `musik rehome`, doctor --quick, report --verify → 0 tote
-      Pfade, Musik-Section im Ziel-Plex (API oder 1 UI-Klick Nutzer),
-      `musik plex --playlist all` (neuer Server = frische Uploads).
-- [ ] 7.5 Bot + MusicGrabber umziehen (Live): MG-Docker auf Ziel-Pi
-      (Staging-Bind auf HDD-Root via 7.2, .env, data/, Settings:
-      min_bitrate 192, lossless-first), Pi-5-Bot STOPPEN →
-      telegram_token.json kopieren → Ziel-Bot starten, ingest.timer
-      aktivieren; Live-Smoke /status + Freitext-Track bis Plexamp.
-- [ ] 7.6 Abkoppeln + Abnahme: Nutzer löscht Musik-Server-Instanz im
-      Plex-Konto (ein Home-Server → TV/Film-Erkennung normal), Pi 5
-      freigegeben; Abnahme-Kette: Spotify-Album-Link, YT-Playlist-Link
-      (Plexamp-Playlist), Freitext-Track (MG, lossless via ffprobe),
-      doctor --quick; Doku-Abschluss (PI-SETUP-Sektion „Migration auf
-      bestehenden OMV/Plex-Pi", SCOPE-Datumseintrag, ToDo-Ticks).
+- [x] 7.0 Sicherungsnetz + Ist-Aufnahme — **AUSGEFÜHRT 2026-10-10**:
+      Ziel-PMS-DB-Backup **3,6 GB tar auf HDD2/Rest** (library.db +
+      blobs.db + Preferences.xml + LocalAdminToken, aus „Plug-in
+      Support/Databases" nach kurzem Stopp). Inventur: ArgonEON, Debian 13
+      trixie aarch64, OMV, 2×16,4-TB-btrfs (Musik/Filme/Serien2 auf HDD1,
+      Serien/Rest auf HDD2), 238-GB-SSD-Root, Plex 1.43.4, kein Docker.
+      ÜBERRASCHUNG: Musik-Share enthielt bereits **581 Alt-Ordner / 108 GB**
+      (alte Kollektion, Nutzer-Entscheidung: „Importieren" → neues 7.7).
+- [ ] 7.1 Installer-Härtung — **BACKLOG nach der Migration** (nicht
+      blockierend; die 4 Lücken aus der Exploration). Teilerfolg direkt
+      erledigt: state/-Erst-Lücke in install.sh gefixt (mkdir vor systemd;
+      Live-Fall: Ingest-Timer exit 66/NOINPUT auf frischer Box).
+- [x] 7.2 — **ENTFALLEN (Redundanzcheck)**: Symlink /mnt/music → HDD-Share
+      hält alle Pfade identisch (DB/config/Playlists/compose-Mounts) —
+      rehome-Befehl und compose-Env-Gerung werden nicht gebraucht; Symlink-
+      Trick in PI-SETUP Phase 10 dokumentiert.
+- [x] 7.3 Ziel-Pi vorbereiten — **AUSGEFÜHRT 2026-10-10**: Symlink, Docker
+      (docker.io + docker-cli — CLI ist auf trixie nur ein Recommends,
+      OMV-apt überspringt es!), Compose-Binary v5.6.0, Clone cdc81a4,
+      install.sh „Ready" (config unangetastet), config+cookies+discogs
+      kopiert (md5-identisch), Plex-Token der Ziel-Box übernommen, SSH-Key
+      Pi-zu-Pi.
+- [x] 7.4 Bibliothek transferieren — **AUSGEFÜHRT 2026-10-10**: Pi-5-Dienste
+      gestoppt/deaktiviert + MG compose down; rsync 44 GB/31 MB/s (exit 23
+      nur Verzeichnis-mtimes); **report --verify: 4.101 Items / 325 Alben /
+      0 fehlende Pfade**. Plex-Musik-Section: API-Anlage an PMS 1.43
+      gescheitert (location[0] abgelehnt; Scanner heißt „Plex Music");
+      Alt-Section-API-DELETE brachte den PMS zum ABSTURZ (Neustart ok,
+      TV/Film unversehrt — Backup stand bereit) → **Section-Anlage =
+      Nutzer-UI-Schritt**, Playlists folgen nach Scan (offen in 7.6).
+- [x] 7.5 Bot + MusicGrabber umziehen — **AUSGEFÜHRT 2026-10-10**: MG-Daten
+      (62 MB) übernommen, Container healthy, API 200, min_audio_bitrate
+      nachgezogen (fiel auf 128 zurück → wieder 192), Staging durch Symlink
+      sichtbar+schreibbar; Pi-5-Bot VORher gestoppt (Single-Poller), Token
+      kopiert, Ziel-Bot aktiv (journal sauber), Ingest-Unit läuft.
+- [ ] 7.6 Abkoppeln + Abnahme — **NUTZER-SCHRITTE OFFEN**: (1) Musik-
+      Section in Plex-Web-UI anlegen (Ordner /mnt/music, „Plex Music",
+      Deutsch), (2) Musik-Server-Instanz „Pi5HomeLab" im Plex-Konto
+      löschen → TV/Film-Erkennung normalisiert, (3) Optional Filme-Section
+      auf Filme/-Ordner einengen (steht auf ganzem HDD-Root), danach:
+      Playlist-Upload (`plex --playlist all`), Abnahme-Kette (Album-Link,
+      Playlist-Link, Freitext-MG lossless), Pi 5 ist freigegeben
+      (alles gestoppt/deaktiviert, Container entfernt).
+- [ ] 7.7 NEU (Nutzer-Entscheidung 2026-10-10 „Importieren"): Alt-Kollek-
+      tion im Musik-Share (581 Ordner / 108 GB) über musik importieren —
+      scan → Trockenlauf → asis-Echtlauf (stundenlang, nohup) → cleanup →
+      doctor → Plex-Scan; Überschneidungen mit dem Bestand klären die
+      Qualitätstiers; beets organisiert die Dateien nach config-Regeln um.
 
 Reihenfolge: 7.1+7.2 sofort baubar (deploy in 7.3/7.4); 7.0+7.3 live,
 dann 7.4→7.5→7.6 an einem Abend. Rollback bis 7.6: Pi 5 unangetastet.
