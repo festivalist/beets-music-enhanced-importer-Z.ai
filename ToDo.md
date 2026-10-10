@@ -70,7 +70,11 @@ Stories 4.1/4.3 weitergeführt.*
       Release (Mistress Mabel #6+#17, Look Out Sunshine #4+#18) legten 2
       mindere Duplikate INS Album statt in _trash (manuell geräumt) —
       Gap-Fill sollte Items mit identischem Titel/Tracknr. desselben Albums
-      der Qualitätsvergleich unterziehen
+      der Qualitätsvergleich unterziehen. Live-Befund 2026-10-10: Cross-
+      Engine-Dedup greift bei SINGLETONS nicht (Do Wrong Right als YouTube-
+      Fallback-Singleton UND MG-320k-Singleton parallel in der DB, kein
+      Trash-Eintrag; manuell geräumt) — Singleton-Neuimport sollte per
+      artist+title-Fingerprint gegen vorhandene Singletons verglichen werden
 - [x] 2.4 Bot-Routing Freitext → MG-API mit Fallback — **2026-10-08**:
       `musik/musicgrabber.py` (dünner Client: available/search/download/
       wait_for_job; Fehlerklassen MGUnavailable/MGNoResults/MGJobFailed;

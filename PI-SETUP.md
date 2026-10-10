@@ -628,6 +628,16 @@ bzw. nach jedem Cleanup `ensure_staging_layout()` auf (legt fehlende
 Anker host-seitig als User pi neu an — NIEMALS im Container, sonst
 root-owned → Crash-Loop). Manuelle Behebung:
 `mkdir -p /mnt/music/_incoming/musicgrabber/{Singles,Albums,Playlists}`.
+**Verdächtiger Sonderfall desselben Symptoms (Live-Befund 2026-10-10):**
+Anker existieren auf dem Host, der Container sieht `/music` trotzdem
+LEER und jedes Anlegen bleibt wirkungslos → der Bind-Mount hängt an einer
+gelöschten Inode (das Staging-Verzeichnis wurde nach Container-Start
+einmal entfernt und neu angelegt; Mounts folgen der alten Inode nach).
+Diagnose: `docker exec musicgrabber stat -c %i /music` vs.
+`stat -c %i /mnt/music/_incoming/musicgrabber` — unterschiedliche Inodes
+= toter Mount. Behebung: Anker host-seitig sicherstellen, dann
+`sudo docker restart musicgrabber` (frischer Mount auf die aktuelle
+Inode). Vorbeugend gilt: das Staging-Root NIE löschen (keep_root).
 
 **9.9 Bot-Integration Track → Album (Story 2.5, 2026-10-09):** Nach jedem
 erfolgreichen Freitext-Track-Import bietet der Bot das zugehörige Album /
