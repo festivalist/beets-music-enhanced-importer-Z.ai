@@ -1,16 +1,17 @@
-"""`musik ingest`: import staged downloader output (MusicGrabber) into the
-library.
+"""`musik ingest`: import staged downloader output into the library.
 
 The acquisition engines (MusicGrabber, PI-SETUP Phase 9) write ONLY into
-the staging area — beets/musik stays the only writer of the real library.
+staging areas — beets/musik stays the only writer of the real library.
 This command runs the proven fetch import chain minus the download part
-over a staging root:
+over one or more staging roots (config `musik: ingest: roots`; default:
+the MusicGrabber staging only; typical addition: the Windows dropzone
+`_incoming/windows`, see README "Musik vom Windows-PC"):
 
     scan -> gap-aware pre-pass -> MusicBrainz import -> asis fallback
          -> cleanup -> art/genre backfill -> Plex refresh
 
 Invoked periodically by musik-ingest.timer (every 15 min) so the staging
-area stays transient and nothing enters the library unprocessed. MG's own
+areas stay transient and nothing enters the library unprocessed. MG's own
 Playlists/*.m3u are not yet consumed (ToDo 2.2); cleanup archives them
 with the emptied folders.
 """
@@ -45,17 +46,58 @@ def _outcome(root: str) -> tuple[dict, list[tuple[str, str]]]:
     return counts, albums
 
 
+def _configured_roots() -> list[str]:
+    """Ingest roots from config `musik: ingest: roots` (list of paths).
+
+    Default when unset: the MusicGrabber staging root only — existing
+    setups keep their exact behavior. Typical extension: a Windows
+    dropzone next to it (README "Musik vom Windows-PC").
+    """
+    from .paths import incoming_dir
+
+    try:
+        from beets import config as beets_config
+
+        roots = beets_config["musik"]["ingest"]["roots"].get()
+    except Exception:
+        roots = None
+    if isinstance(roots, str):
+        roots = [roots]
+    if not roots:
+        return [os.path.normpath(os.path.join(incoming_dir(), "musicgrabber"))]
+    return [os.path.normpath(str(r).strip()) for r in roots if str(r).strip()]
+
+
 def cmd_ingest(root: str | None = None) -> int:
+    if root:
+        # ad-hoc single root: explicit path, never auto-created
+        roots = [os.path.normpath(root)]
+    else:
+        roots = _configured_roots()
+        # configured roots are part of the pipeline contract — they must
+        # exist so SMB drops and timers always find them (the Windows
+        # dropzone materializes with the first timer run)
+        for r in roots:
+            os.makedirs(r, exist_ok=True)
+    rc = 0
+    for r in roots:
+        rc = _ingest_one(r) or rc
+    # MG's downloader expects its layout anchors host-side (ENOENT
+    # incident 2026-10-09); no-op for roots that are not MG staging
+    from .musicgrabber import ensure_staging_layout
+    ensure_staging_layout()
+    return rc
+
+
+def _ingest_one(root: str) -> int:
     from . import asis as asis_mod
     from . import cleanup as cleanup_mod
     from . import engine
     from . import fetch as fetch_mod
     from . import plex as plex_mod
     from . import scan as scan_mod
-    from .paths import incoming_dir
     from .scan import collect_audio_tree
 
-    root = os.path.normpath(root or os.path.join(incoming_dir(), "musicgrabber"))
     if not os.path.isdir(root) or not collect_audio_tree(root):
         print(f"ingest: staging empty — nothing to do ({root})")
         return 0
@@ -111,11 +153,6 @@ def cmd_ingest(root: str | None = None) -> int:
         # MusicGrabber container (PermissionError for the PUID user).
         cleanup_mod.cmd_cleanup(root=root, keep_root=True)
     os.makedirs(root, exist_ok=True)
-    # MG's downloader expects Singles//Albums//Playlists/ to exist (no
-    # mkdir on its side); cleanup keeps them, this recreates them should
-    # they be missing for any other reason (ENOENT incident 2026-10-09)
-    from .musicgrabber import ensure_staging_layout
-    ensure_staging_layout()
 
     counts, albums = _outcome(root)
     if albums:

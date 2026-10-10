@@ -741,6 +741,29 @@ Default `~/Music` und erzeugt Müll-Pfade; immer
 Helfer benutzen. Und: HTTP 500 beim Playlist-Upload heißt fast immer
 „Zeile matcht nicht" — die konkreten Zeilen stehen im PMS-Log.
 
+**Windows-Ablage (`drop-here.bat`, Story 7.8):** der Windows-PC ist nach
+der Konsolidierung nur noch Quelle — `import-here.bat` würde in die tote
+lokale Kopie schreiben. Auf jedem Windows-Rechner mit Repo-Checkout:
+Ordner auf **`drop-here.bat`** ziehen (kopiert nach
+`\\<pi>\Musik\_incoming\windows\`, Share-Override per `MUSIK_DROP`-
+Umgebungsvariable; Quellen bleiben unangetastet). Der Ingest-Timer
+verarbeitet die Ablage automatisch — dafür muss sie als Root in der
+config.yaml stehen (ohne den Key bleibt alles beim MG-Staging-Default):
+
+```yaml
+    musik:
+        ingest:
+            roots:
+                - /mnt/music/_incoming/musicgrabber
+                - /mnt/music/_incoming/windows
+```
+
+Konfigurierte Roots legt der Ingest selbst an; `musik.py ingest --root
+<folder>` nimmt zusätzlich jeden Ad-hoc-Ordner. Review-Reste bleiben in
+der Ablage liegen (Cleanup schiebt sie nicht weg), bis sie entschieden
+sind — Re-Import desselben Ordners ist gefahrlos (Qualitäts-Duplikats-
+vergleich). Details im README-Abschnitt „Windows-PC → Pi library".
+
 Randempfehlung: Die vorgefundene Filme-Section zeigte auf den GANZEN
 HDD-Root statt auf `Filme/` — jedes Musik-Write triggerte Film-Scans;
 Location in der UI auf den Filme-Ordner einengen.

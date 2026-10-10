@@ -181,11 +181,12 @@ def main(argv: list[str] | None = None) -> int:
 
     p_ingest = sub.add_parser(
         "ingest",
-        help="import staged MusicGrabber output (scan -> import -> asis -> "
-             "cleanup -> art/genre -> Plex refresh; used by musik-ingest.timer)",
+        help="import staged output (scan -> import -> asis -> cleanup -> "
+             "art/genre -> Plex refresh; used by musik-ingest.timer)",
     )
     p_ingest.add_argument("--root",
-                          help="staging root (default: <library>/_incoming/musicgrabber)")
+                          help=("ad-hoc staging root (default: configured "
+                                "roots from musik:ingest:roots, see README)"))
     sub.add_parser(
         "bot",
         help="run the Telegram bot service (link in -> music in the library)",

@@ -274,6 +274,15 @@ kein first-class Re-Home → Story 7.2.
       serverseitig verifiziert** (6/51/11/57/5 Tracks). Plexamp-Endcheck
       beim Nutzer. Nachtrag-Backlog: rebuild --refresh (dests aus
       item_ids neu auflösen als first-class Option) — Kandidat für 7.1.
+- [x] 7.8 Windows-Ablage (Nutzer-Wunsch 2026-10-10) — **AUSGEFÜHRT**:
+      ingest-Roots konfigurierbar (`musik: ingest: roots`, Default =
+      MG-Staging nur → bestehende Setups unverändert; Smoke
+      smoke_ingest_roots.py, 5 Fälle, alle 11 Smokes grün);
+      drop-here.bat (robocopy-Kopie auf `\<pi>\Musik\_incoming\windows`,
+      Multi-Drop, Namenskollisionen mit -2-Suffix, MUSIK_DROP-Override,
+      Share-Probe vor dem ersten Kopieren); README „Windows-PC → Pi
+      library" + Dateitabelle, PI-SETUP Phase 10; Deploy auf Ziel-Pi
+      (config-Roots + Dropzone) im selben Zug.
 - [ ] 7.7 NEU (Nutzer-Entscheidung 2026-10-10 „Importieren"): Alt-Kollek-
       tion im Musik-Share (581 Ordner / 108 GB) über musik importieren —
       scan → Trockenlauf → asis-Echtlauf (stundenlang, nohup) → cleanup →
