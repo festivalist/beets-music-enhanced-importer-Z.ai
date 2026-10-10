@@ -284,8 +284,10 @@ def track_album_candidates(artist: str, title: str, library=None,
     if library is not None:
         for c in cands:
             try:
+                # beets Results is iterable but NOT an iterator — next()
+                # needs iter() (live 2026-10-10: every ✓ silently False)
                 c["in_library"] = next(
-                    library.albums(f"mb_releasegroupid:{c['rg_mbid']}"),
+                    iter(library.albums(f"mb_releasegroupid:{c['rg_mbid']}")),
                     None) is not None
             except Exception:
                 c["in_library"] = False
