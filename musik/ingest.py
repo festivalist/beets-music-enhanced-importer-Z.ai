@@ -169,6 +169,24 @@ def _ingest_one(root: str) -> int:
         cleanup_mod.cmd_cleanup(root=root, keep_root=True)
     os.makedirs(root, exist_ok=True)
 
+    # Scene packaging sweep: .nfo/.sfv/.log/.m3u/.txt are import-
+    # irrelevant junk (the tags carry everything) — cleanup skips dirs
+    # that still hold audio (review/pending units), so their packaging
+    # would linger forever and block the husk prune (live 2026-10-11:
+    # 32 nfo husks after a 454-file drop). Cover images stay — they can
+    # still serve as art sources.
+    from .scan import is_audio
+    junk = []
+    for dirpath, _dn, filenames in os.walk(root):
+        junk += [os.path.join(dirpath, f) for f in filenames
+                 if not is_audio(f)
+                 and f.lower().endswith(('.nfo', '.sfv', '.log', '.m3u', '.txt'))]
+    if junk:
+        from . import trash as trash_mod
+        trash_mod.trash_files(junk, 'source-cleanup',
+                              detail='scene packaging (ingest sweep)')
+        print(f"ingest: archived {len(junk)} packaging file(s) from staging")
+
     counts, albums = _outcome(root)
     if albums:
         print("ingest: enriching art/genre for imported albums")
