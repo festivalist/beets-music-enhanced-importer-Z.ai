@@ -134,7 +134,17 @@ def _dedupe_fingerprint(lib, apply: bool = False) -> int:
                       f"{i.artist} - {i.title} {os.fsdecode(i.path)}")
             continue
         reported += 1
-        members.sort(key=lambda i: quality.score(os.fsdecode(i.path)), reverse=True)
+
+        def meta_rank(i) -> int:
+            # among equal audio quality prefer the copy with real tags:
+            # an "Unknown artist" junk copy must never win over the
+            # properly attributed one (live case: Bowie "Heroes")
+            return (bool(i.artist and i.artist.lower() != "unknown"),
+                    bool(i.albumartist),
+                    bool(i.album))
+
+        members.sort(key=lambda i: (quality.score(os.fsdecode(i.path)),
+                                    meta_rank(i)), reverse=True)
         winner, losers = members[0], members[1:]
         print(f"fingerprint group {key[:16]}…: "
               f"keep {winner.artist} - {winner.title} "
