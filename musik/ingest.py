@@ -82,6 +82,21 @@ def cmd_ingest(root: str | None = None) -> int:
     rc = 0
     for r in roots:
         rc = _ingest_one(r) or rc
+    # Imported units MOVE their files away — empty husk dirs would pile
+    # up in the dropzone forever (keep_root protects them as MG layout
+    # anchors). Prune empty CHILD dirs everywhere; the roots themselves
+    # stay (SMB drop targets must exist between timer runs) and
+    # ensure_staging_layout() below re-anchors the MusicGrabber root
+    # (Albums/Playlists/Singles).
+    root_set = {os.path.normcase(os.path.abspath(r)) for r in roots}
+    for r in roots:
+        for dirpath, dirnames, filenames in os.walk(r, topdown=False):
+            if os.path.normcase(os.path.abspath(dirpath)) in root_set:
+                continue
+            try:
+                os.rmdir(dirpath)  # succeeds only when empty
+            except OSError:
+                pass
     # MG's downloader expects its layout anchors host-side (ENOENT
     # incident 2026-10-09); no-op for roots that are not MG staging
     from .musicgrabber import ensure_staging_layout
