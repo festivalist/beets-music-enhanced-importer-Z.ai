@@ -764,6 +764,15 @@ der Ablage liegen (Cleanup schiebt sie nicht weg), bis sie entschieden
 sind — Re-Import desselben Ordners ist gefahrlos (Qualitäts-Duplikats-
 vergleich). Details im README-Abschnitt „Windows-PC → Pi library".
 
+> **Voraussetzung (Live-Fall 2026-10-11 „Zugriff verweigert"):** die
+> Musik-Share braucht in OMV `force user = pi` (Share-Extra-Optionen),
+> sonst darf der Gast nicht in die vom Ingest (pi, 755) angelegte
+> Dropzone schreiben — und ohne force user landen SMB-Dateien als
+> nobody:nogroup, die der Ingest nicht lesen könnte. Per OMV-UI
+> (Speicher → SMB → Share → Zusatzoptionen) oder confdb
+> (`conf.service.smb.share` → extraoptions, dann `omv-salt deploy run
+> samba`). Lesen prüfen: `smbstatus -S` zeigt die Tree-Connects.
+
 Randempfehlung: Die vorgefundene Filme-Section zeigte auf den GANZEN
 HDD-Root statt auf `Filme/` — jedes Musik-Write triggerte Film-Scans;
 Location in der UI auf den Filme-Ordner einengen.
