@@ -83,28 +83,56 @@ def _dedupe_fingerprint(lib, apply: bool = False) -> int:
     dedupe; chroma stores acoustid_id / acoustid_fingerprint on items, so we
     can group by those. Groups spanning one album folder only are skipped
     (that is the album dedupe's job).
+
+    Grouping safety (live false-positive 2026-10-11: a 24-char fp prefix
+    lumped Lebanon Hanover together with Ray Charles/Cat Stevens/Supremes
+    — different songs!): fingerprints are grouped by their FULL value
+    (fpcalc is deterministic per decoded audio), acoustid_id groups get a
+    duration guard, and every group whose members differ >4 s in length is
+    reported as suspicious and never auto-trashed.
     """
+    import hashlib
+
     groups: dict[str, list] = defaultdict(list)
     no_fp = 0
     for item in lib.items():
-        key = item.get("acoustid_id")
-        if not key:
-            fp = item.get("acoustid_fingerprint")
-            if not fp:
+        fp = item.get("acoustid_fingerprint")
+        if fp:
+            # full fingerprint: identical decoded audio -> identical fp
+            # (MP3/FLAC of the same master decode to the same PCM). The
+            # acoustid_id alone must NOT be the primary key — items with
+            # the id and twin items with only a fingerprint would never
+            # meet in one group.
+            key = "fp:" + hashlib.md5(fp.encode()).hexdigest()
+        else:
+            key = item.get("acoustid_id")
+            if not key:
                 no_fp += 1
                 continue
-            # fingerprints of the same audio share long prefixes
-            key = "fp:" + fp[:24]
+            key = "aid:%s|%s" % (key, round((item.length or 0) / 4))
         groups[key].append(item)
 
     trashed = 0
     reported = 0
+    suspicious = 0
     for key, members in sorted(groups.items()):
         if len(members) < 2:
             continue
         folders = {os.path.dirname(os.fsdecode(i.path)) for i in members}
         if len(folders) < 2:
             continue  # same-album copies are the album dedupe's territory
+        durs = [i.length or 0 for i in members]
+        if max(durs) - min(durs) > 4:
+            # defense in depth: same fp/acoustid_id but wildly different
+            # lengths means the grouping key lied (short fp prefixes did
+            # exactly that) — report, never auto-trash
+            suspicious += 1
+            print(f"SUSPICIOUS group {key[:16]}… (length spread "
+                  f"{min(durs):.0f}-{max(durs):.0f}s) — skipped:")
+            for i in members:
+                print(f"  [{i.albumartist} / {i.album}] "
+                      f"{i.artist} - {i.title} {os.fsdecode(i.path)}")
+            continue
         reported += 1
         members.sort(key=lambda i: quality.score(os.fsdecode(i.path)), reverse=True)
         winner, losers = members[0], members[1:]
@@ -130,7 +158,8 @@ def _dedupe_fingerprint(lib, apply: bool = False) -> int:
             loser.remove(with_album=False)
 
     print(
-        f"fingerprint dedupe: {reported} cross-album group(s), {no_fp} item(s) "
+        f"fingerprint dedupe: {reported} cross-album group(s), "
+        f"{suspicious} suspicious group(s) skipped, {no_fp} item(s) "
         "without fingerprint skipped"
         + ("" if apply else " — report only, re-run with --apply to trash losers")
         + (f", {trashed} file(s) moved to _trash" if apply else "")
