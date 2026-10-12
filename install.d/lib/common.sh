@@ -78,6 +78,7 @@ finish() { # ok|skip|fail [Meldung] — Status schreiben (nicht im Dry-Run) + be
     name=$(module_name)
     case "$status" in
         ok)   log "MODUL $name: ok — $msg"
+              printf '    ✓ %s\n' "${msg:-Modul abgeschlossen}" >&2
               [[ ${INSTALLER_DRY_RUN:-0} == 1 ]] || mod_set "$name" ok "${msg:+$msg}"
               exit 0 ;;
         skip) log "MODUL $name: übersprungen — $msg"

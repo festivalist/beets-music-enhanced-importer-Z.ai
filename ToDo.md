@@ -359,12 +359,23 @@ dann 7.4→7.5→7.6 an einem Abend. Rollback bis 7.6: Pi 5 unangetastet.
       Harness manual_tests/harness_samba.sh: 9/9 grün (Share-Anlage,
       Idempotenz byte-identisch, OMV-Rückzug, Ubuntu-Skip), disks-
       Harness 23/23 unverändert
-- [ ] 8.4 Docker- + Plex-Modul — docker.io + docker-cli separat (trixie:
-      nur Recommends, OMV-apt lässt es weg — Live-Fall 7.3) + Compose-v2-
-      Binary arch-bewusst (aarch64/x86_64 statt hartkodiert); Plex nativ:
-      apt-Repo, sqv/SHA1-Fehler erkennen → auto Plan B (.deb via plex.tv-
-      API arch-bewusst), Claim-URL + Token-Extraktion Preferences.xml +
-      `musik: plex:`-Block-Setter
+- [x] 8.4 Docker- + Plex-Modul — **2026-10-12**: 40-docker — Distribution-
+      pakete (docker.io + docker-cli explizit: trixie-Recommends-Falle aus
+      7.3), Compose-v2-Standalone-Binary arch-bewusst (aarch64/x86_64 statt
+      hartkodiertem aarch64 aus 9.1), Dienst-Probe, Run-User in docker-
+      Gruppe mit Neu-Anmelde-Hinweis, Menü ja/nein; 50-plex — nativer
+      apt-Repo-Weg mit automatischer SHA1/sqv-Erkennung → Plan B (Repo
+      .disabled + neuestes .deb arch+distro-bewusst von plex.tv-API),
+      danach Assistenz: Claim-URL, PlexOnlineToken aus Preferences.xml,
+      plex-Block-Setter für config.yaml per Inline-Python (ersetzt
+      kommentierte Platzhalter ODER fügt unter musik: ein, Backup vorher;
+      ohne config.yaml → --only plex später), Berechtigungs- und Remote-
+      Access-Hinweise; finish(ok) meldet jetzt auch auf Konsole;
+      hostname -I unter pipefail robust (Git-Bash-Live-Fund); Harness
+      manual_tests/harness_dockerplex.sh 17/17 (Frischinstall, Idempotenz,
+      Claim-Pfade, Setter mit kommentierten Platzhaltern UND ohne
+      plex-Block — echtes venv-Python), Regression disks 23/23 +
+      samba 9/9
 - [ ] 8.5 musik-Modul polished + MusicGrabber-Modul — Kern-Verhalten
       gegen altes install.sh verifizieren (Parität CI?), 70-musicgrabber:
       .env auto (PUID/PGID/TZ), Staging-Anker host-seitig als Run-User
