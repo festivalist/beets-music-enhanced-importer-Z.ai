@@ -227,7 +227,11 @@ for i in "${PLAN_IDX[@]}"; do
     deps="${MODULES_DEPS[$i]}"; req="${MODULES_REQ[$i]}"
 
     st=$(mod_status "$name")
-    if [[ "$st" == "ok" && ${INSTALLER_DRY_RUN:-0} != 1 ]]; then
+    # Resume-Skip NICHT im Add-Disk-Modus: das ist eine Wartungsaktion auf
+    # einem längst fertig installierten System (MOD_disks=ok), kein Teil der
+    # Erstinstallation (Live-Fund QEMU-Matrix 2026-10-12: --add-disk wurde
+    # still übersprungen).
+    if [[ "$st" == "ok" && ${INSTALLER_DRY_RUN:-0} != 1 && ${INSTALLER_ADD_DISK:-0} != 1 ]]; then
         printf '\n✓ %-14s bereits erledigt — übersprungen (Resume)\n' "$name"
         RESUMED_OK=$((RESUMED_OK+1))
         continue
