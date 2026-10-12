@@ -36,9 +36,12 @@ else
     echo "deb https://downloads.plex.tv/repo/deb public main" \
         | run sudocmd tee /etc/apt/sources.list.d/plexmediaserver.list >/dev/null
     if [[ ${INSTALLER_DRY_RUN:-0} != 1 ]]; then
+        # --yes ist Idempotenz: ein vorhandenes plex.gpg aus einem früheren
+        # Lauf würde gpg sonst interaktiv überschreiben wollen (EOF → Fail;
+        # QEMU-Matrix-Live-Fund Nr. 6).
         curl -fsSL https://downloads.plex.tv/plex-keys/PlexSign.key \
-            | sudocmd gpg --dearmor -o /etc/apt/trusted.gpg.d/plex.gpg \
-            || finish fail "Plex-Signatur-Key nicht ladbar — Netz prüfen, --resume"
+            | sudocmd gpg --yes --dearmor -o /etc/apt/trusted.gpg.d/plex.gpg \
+            || finish fail "Plex-Signatur-Key nicht ladbar (Netz/gpg) — --resume"
     fi
 
     step "apt update (Repo-Probe — SHA1-Fehler → Plan B)"

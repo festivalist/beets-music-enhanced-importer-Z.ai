@@ -29,10 +29,15 @@ if have docker; then
     ok "docker bereits vorhanden: $(docker --version 2>/dev/null || echo '?')"
 else
     run sudocmd apt-get update -qq || true
-    # docker-cli explizit: auf trixie nur Recommends (OMV-apt lässt es weg)
-    run sudocmd apt-get install -y -qq docker.io docker-cli \
+    # docker-cli existiert als eigenes Paket erst ab trixie (dort nur als
+    # Recommends — OMV-apt lässt es weg, deshalb explizit). Auf bookworm &
+    # Ubuntu gehört das CLI fest zu docker.io; ein hartes Mitinstallieren
+    # würde die Installation komplett sprengen (QEMU-Matrix-Live-Fund Nr. 6).
+    DOCKER_PKGS="docker.io"
+    if apt-cache show docker-cli >/dev/null 2>&1; then DOCKER_PKGS="docker.io docker-cli"; fi
+    run sudocmd apt-get install -y -qq $DOCKER_PKGS \
         || finish fail "docker.io-Installation fehlgeschlagen — Repos/Netz prüfen, dann --resume"
-    ok "docker.io + docker-cli installiert"
+    ok "installiert: $DOCKER_PKGS"
 fi
 if have systemctl; then
     run sudocmd systemctl enable --now docker
