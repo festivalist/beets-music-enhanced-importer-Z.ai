@@ -95,6 +95,45 @@ HELP_TEXT = (
 # worker (runs in a thread; one job at a time)
 # --------------------------------------------------------------------------
 
+def _run_exclusive(fn, patience: float = 120.0) -> bool:
+    """Run fn while holding the ingest lockfile (same one the ingest
+    timer's `flock -n` uses) so a bot import and a long timer run never
+    write the beets DB / state.json concurrently. Waits up to `patience`
+    seconds for a running timer ingest to finish; returns False (without
+    calling fn) when the lock stays busy — the timer ingests all roots
+    anyway and will pick the file up. No fcntl (Windows bot): run
+    directly, nothing competes there."""
+    try:
+        import fcntl
+    except ImportError:
+        fn()
+        return True
+    import time as _time
+
+    from .paths import state_dir
+
+    lock_path = os.path.join(state_dir(), "ingest.lock")
+    os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+    deadline = _time.monotonic() + patience
+    fh = open(lock_path, "a+")
+    try:
+        while True:
+            try:
+                fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError:
+                if _time.monotonic() >= deadline:
+                    return False
+                _time.sleep(5)
+        try:
+            fn()
+        finally:
+            fcntl.flock(fh, fcntl.LOCK_UN)
+        return True
+    finally:
+        fh.close()
+
+
 def _is_free_text(query: str) -> bool:
     """True for plain search text (no Spotify/YouTube link) — those go to
     MusicGrabber first; links keep the spotDL/SomeDL chain."""
@@ -149,14 +188,23 @@ def _try_musicgrabber(job: dict, query: str, send) -> bool:
         send(f"⬇️ via MusicGrabber [{pick['source']}{quality}]:\n"
              f"{pick['artist'][:60]} - {pick['title'][:80]}")
         # file is in the MG staging area -> import now, no 15-min-timer wait
-        # (the ingest timer's flock skips while this run holds the same
-        # library; ingest itself refreshes Plex at the end)
         from . import ingest as ingest_mod
+        from .paths import state_dir
 
         send("📦 geladen — Import & Tagging laufen…")
-        ingest_mod.cmd_ingest()
-        summary = (f"✅ via MusicGrabber [{pick['source']}{quality}] "
-                   f"importiert: {pick['artist'][:50]} - {pick['title'][:70]}")
+        # Same lockfile as the ingest timer (flock -n): a long timer run
+        # (big dropzone batch) and a bot import must never write the
+        # beets DB / state.json concurrently. Wait briefly for the timer
+        # run to finish; if it still holds the lock, hand the work to
+        # the timer (it ingests all roots anyway) instead of stacking.
+        locked = _run_exclusive(ingest_mod.cmd_ingest, patience=120)
+        if not locked:
+            send("⏳ Ein größerer Import läuft gerade — der Timer übernimmt "
+                 "deinen Titel in spätestens 15 Minuten.")
+        prefix = ("✅ via MusicGrabber" if locked
+                  else "📦 via MusicGrabber (Import über Timer)")
+        summary = (f"{prefix} [{pick['source']}{quality}]:\n"
+                   f"{pick['artist'][:50]} - {pick['title'][:70]}")
         send(summary)
         jobs_mod.update_job(job["id"], status="done", finished=time.time(),
                             summary=summary)
@@ -466,7 +514,7 @@ def _execute_album(job: dict, send) -> None:
         from . import ingest as ingest_mod
 
         send("📦 geladen — Import & Tagging laufen …")
-        ingest_mod.cmd_ingest()
+        _run_exclusive(ingest_mod.cmd_ingest, patience=120)
 
         removed = _remove_singleton(a.get("singleton_id"))
         ok, note = plex_mod.refresh_library()
