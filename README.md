@@ -44,9 +44,10 @@ workflow*. So musik:
 
 The installer: finds or installs Python, creates a local `.venv`, installs
 beets and dependencies, downloads the `fpcalc` acoustic fingerprinter
-(chromaprint), and starts the **setup wizard** — which asks for your music
+(chromaprint), starts the **setup wizard** — which asks for your music
 library root and (optionally) your Discogs token, then writes `config.yaml`
-for *your* machine. Your config and token stay local; nothing personal is
+for *your* machine — and finishes with a **self test** (spotdl/somedl/
+ffmpeg/fpcalc). Your config and token stay local; nothing personal is
 committed or sent anywhere.
 
 Manual alternative:

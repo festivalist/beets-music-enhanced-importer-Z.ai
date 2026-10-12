@@ -376,10 +376,19 @@ dann 7.4→7.5→7.6 an einem Abend. Rollback bis 7.6: Pi 5 unangetastet.
       Claim-Pfade, Setter mit kommentierten Platzhaltern UND ohne
       plex-Block — echtes venv-Python), Regression disks 23/23 +
       samba 9/9
-- [ ] 8.5 musik-Modul polished + MusicGrabber-Modul — Kern-Verhalten
-      gegen altes install.sh verifizieren (Parität CI?), 70-musicgrabber:
-      .env auto (PUID/PGID/TZ), Staging-Anker host-seitig als Run-User
-      (Crash-Loop-Lehre PI-SETUP 9.8), compose up -d, HTTP-200-Probe :38274
+- [x] 8.5 musik-Modul polished + MusicGrabber-Modul — **2026-10-12**:
+      60-musik per Kommentar-Diff gegen den alten install.sh-Kern
+      verifiziert (nur intendierte Rahmen-Änderungen: run/sudocmd/have,
+      finish-with-Resume-Hinweis, Dry-Run-Guards; systemd-Units und
+      venv-Gate waren Dry-Run-undicht — gefixt); 70-musicgrabber —
+      Staging-Anker host-seitig als Run-User (Crash-Loop-Lehre 9.8),
+      .env aus Example mit PUID/PGID (KEIN API-Key — UI-Lockout-Lektion),
+      compose up nur wenn Container nicht läuft (2,6-GB-Pull),
+      HTTP-Probe mit Geduld (INSTALLER_MG_WAIT, Default 600 s),
+      ohne Musik-Root sauberer Skip; install.ps1 Self-Test nachgerüstet
+      (6.5-Drift, Parität zu install.sh) + README-Satz, PI-SETUP-Statusnote;
+      Harness manual_tests/harness_mg.sh 9/9, Regression: disks 23/23,
+      samba 9/9, dockerplex 17/17
 - [ ] 8.6 Verify-Modul — Proben (musik-bot/ingest-Units, Plex-API-
       Erreichbarkeit, MG-HTTP, doctor --quick) + Report-Karte
       ok/fail/manuell-offen (z. B. „Plex claim: http://IP:32400/web")

@@ -185,6 +185,14 @@ if (Test-Path (Join-Path $ProjectDir "config.yaml")) {
     }
 }
 
+# --- 4b. Self test (Parität zu install.sh: spotdl/somedl/ffmpeg/fpcalc) -------
+Write-Step "Self test (spotdl / somedl / ffmpeg / fpcalc)"
+& $PyExe musik.py fetch --self-test
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "    WARNING: self test failed - check the message above; usually a" -ForegroundColor Yellow
+    Write-Host "    missing binary (fpcalc/ffmpeg in bin\) or a blocked download." -ForegroundColor Yellow
+}
+
 # --- 5. Done ------------------------------------------------------------------
 Write-Step "Ready. Usage (from this folder):"
 Write-Host @"

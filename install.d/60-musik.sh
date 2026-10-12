@@ -33,7 +33,12 @@ if [[ ! -d .venv ]]; then
     run "$PYTHON" -m venv .venv
 fi
 PY_EXE="$PROJECT_DIR/.venv/bin/python"
-[[ -x "$PY_EXE" ]] || finish fail "venv angelegt, aber $PY_EXE fehlt — manuell prüfen"
+if [[ ${INSTALLER_DRY_RUN:-0} == 1 ]]; then
+    step "Dry-Run: venv/pip/deno nur angedeutet, Self-Test & Wizard übersprungen"
+    run true
+elif [[ ! -x "$PY_EXE" ]]; then
+    finish fail "venv angelegt, aber $PY_EXE fehlt — manuell prüfen"
+fi
 run "$PY_EXE" -m pip install --upgrade pip --quiet
 step "Installing dependencies (beets, spotdl, somedl, telegram bot)"
 run "$PY_EXE" -m pip install -r requirements.txt \
@@ -97,10 +102,14 @@ fi
 # The ingest unit flocks state/ingest.lock; the app creates state/ only
 # lazily on its first state write — on a fresh box the timer failed with
 # EX_NOINPUT until then (live case EPIC 7 migration, 2026-10-10).
-mkdir -p "$PROJECT_DIR/state"
+run mkdir -p "$PROJECT_DIR/state"
 
 # --- systemd service for the bot + ingest timer ----------------------------------
-if [[ $NO_SYSTEMD -eq 0 ]] && have systemctl; then
+if [[ ${INSTALLER_DRY_RUN:-0} == 1 ]]; then
+    step "Dry-Run: systemd-Units (musik-bot.service, musik-ingest.*) nur angedeutet"
+    printf '    [dry-run] tee /etc/systemd/system/musik-bot.service + enable\n'
+    printf '    [dry-run] tee /etc/systemd/system/musik-ingest.{service,timer} + enable --now\n'
+elif [[ $NO_SYSTEMD -eq 0 ]] && have systemctl; then
     step "Installing systemd service (musik-bot.service)"
     RUN_USER="${SUDO_USER:-$(id -un)}"
     RUN_HOME="$(getent passwd "$RUN_USER" | cut -d: -f6)"

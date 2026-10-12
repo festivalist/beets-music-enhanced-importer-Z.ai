@@ -102,10 +102,12 @@ systemd-Dienst `musik-bot.service`.
 > (8.2, ersetzt Phase 1), OMV optional nur Debian-Familie + SMB-Freigabe
 > „Musik“ mit force user für den ohne-OMV/Ubuntu-Pfad (8.3, ersetzt den
 > Share-Teil von Phase 10), Docker+Compose arch-bewusst inkl.
-> docker-cli-Recommends-Falle (8.4, ersetzt 9.1) und Plex nativ mit
+> docker-cli-Recommends-Falle (8.4, ersetzt 9.1), Plex nativ mit
 > automatischem SHA1-Plan-B + Claim/Token/config.yaml-Assistenz (8.4,
-> ersetzt Phase 5.1–5.5). Noch manuell: Phase 9.2+ (MG-Deploy) — folgt
-> mit Story 8.5; der große Kapitel-Umbau kommt mit 8.7.
+> ersetzt Phase 5.1–5.5) und MusicGrabber-Deploy aus dem Repo-Compose mit
+> host-seitigen Staging-Ankern, .env (PUID/PGID) und HTTP-Probe (8.5,
+> ersetzt 9.2/9.3). Manuell bleiben die UI-Schritte (OMV-Share, Plex-Claim,
+> MG-Settings) und Phase 3 (Cookies); der große Kapitel-Umbau kommt mit 8.7.
 
 **Wizard-Fragen:**
 
