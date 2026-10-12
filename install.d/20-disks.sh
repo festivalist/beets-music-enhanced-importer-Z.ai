@@ -116,10 +116,15 @@ select_disks() { # MAXN prompt-key "Frage" → SEL_DEVS[] (global, validiert+cac
 }
 
 fstab_add_entry() { # "UUID=… /mount type opts dump pass" — Backup+Probe+Rollback
-    local entry=$1 fstab="$FSTAB_PATH" bak
-    if grep -q " $MOUNT " "$fstab" 2>/dev/null; then
-        warn "fstab hat bereits einen Eintrag für $MOUNT — keiner wird hinzugefügt:"
-        grep " $MOUNT " "$fstab" | sed 's/^/      /'
+    # QEMU-Matrix-Live-Fund Nr. 5: der Doppel-Check greift auf den MOUNTPOINT
+    # des EINTRAGS zu (add-disk mountet auch /mnt/disk2 & Co), nicht auf die
+    # Modulvariable MOUNT — und der Erfolg wird per findmnt verifiziert,
+    # nicht nur am mount-rc.
+    local entry=$1 fstab="$FSTAB_PATH" bak mp
+    mp=$(awk '{print $2}' <<< "$entry")
+    if grep -q " $mp " "$fstab" 2>/dev/null; then
+        warn "fstab hat bereits einen Eintrag für $mp — keiner wird hinzugefügt:"
+        grep " $mp " "$fstab" | sed 's/^/      /'
         return 0
     fi
     if [[ ${INSTALLER_DRY_RUN:-0} == 1 ]]; then
@@ -129,13 +134,13 @@ fstab_add_entry() { # "UUID=… /mount type opts dump pass" — Backup+Probe+Rol
     bak="$fstab.bak.$(date +%Y%m%d%H%M%S)"
     sudocmd cp "$fstab" "$bak"
     printf '%s\n' "$entry" | sudocmd tee -a "$fstab" >/dev/null
-    if ! sudocmd mount -a; then
+    if ! sudocmd mount -a || ! findmnt "$mp" >/dev/null 2>&1; then
         err "Probe-Mount (mount -a) fehlgeschlagen — fstab wird zurückgespielt."
         sudocmd cp "$bak" "$fstab"
         sudocmd mount -a || true
-        finish fail "fstab-Eintrag funktionierte nicht (Backup liegt neben der fstab)"
+        finish fail "fstab-Eintrag für $mp funktionierte nicht (Backup: $bak)"
     fi
-    ok "fstab-Eintrag aktiv (Backup: $bak)"
+    ok "fstab-Eintrag aktiv für $mp (Backup: $bak)"
 }
 
 set_library_answer() { # /mnt/music als Bibliotheks-Default hinterlegen (nur wenn ungesetzt)
@@ -198,6 +203,8 @@ if [[ ${INSTALLER_ADD_DISK:-0} == 1 ]]; then
             fstab_add_entry "UUID=$uuid $target $fs defaults,nofail 0 $pass"
             run sudocmd mount "$target" 2>/dev/null || run sudocmd mount -a
             run sudocmd chown "$RUN_USER:$RUN_USER" "$target"
+            findmnt "$target" >/dev/null 2>&1 \
+                || finish fail "$target ist nach dem Mount-Schritt nicht eingehängt"
             finish ok "$dev → $target ($fs)" ;;
         *)
             select_disks 1 adddisk_sel "Welche Platte in den Pool?" || finish fail "Auswahl fehlgeschlagen"
@@ -331,6 +338,8 @@ pass=0; [[ "$fs" != btrfs* ]] && pass=2
 fstab_add_entry "UUID=$uuid $MOUNT $tname defaults,nofail 0 $pass"
 run sudocmd mount "$MOUNT" 2>/dev/null || run sudocmd mount -a
 run sudocmd chown "$RUN_USER:$RUN_USER" "$MOUNT"
+findmnt "$MOUNT" >/dev/null 2>&1 \
+    || finish fail "$MOUNT ist nach dem Mount-Schritt nicht eingehängt (fstab/Rechte prüfen)"
 
 if ! write_probe "$MOUNT"; then
     warn "Schreibprobe fehlgeschlagen — Rechte von $MOUNT manuell prüfen (chown $RUN_USER)."
