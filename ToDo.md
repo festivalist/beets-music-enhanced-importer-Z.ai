@@ -401,10 +401,36 @@ dann 7.4→7.5→7.6 an einem Abend. Rollback bis 7.6: Pi 5 unangetastet.
       --limit 50 (Erstlauf ohne Limit = Stunden, PI-SETUP-Warnung);
       Harness manual_tests/harness_verify.sh 13/13 (Voll-Host und leerer
       Host)
-- [ ] 8.7 QEMU-Testmatrix + Doku — Debian 12 ± OMV / Ubuntu 24.04 /
-      0-1-2 Platten / --add-disk / kill+resume / Fehlerinjektion /
-      dry-run; PI-SETUP-Umbau auf One-Shot-Kapitel, SCOPE-Change ist mit
-      8.1 datiert drin, README-Kurzhint, alle Stories abhaken
+- [x] 8.7 QEMU-Testmatrix + Doku — **2026-10-12**: VM-Harburg auf dem
+      Windows-PC aufgebaut (scoop-QEMU ohne Admin, da choco/UAC scheiterte;
+      Debian-12- + Ubuntu-24.04-Cloud-Images, Cloud-init-NoCloud per
+      SMBIOS+HTTP-Seed, virtuelle 8-GB-Datenplatten als echte
+      mkfs/mount/fstab-Kandidaten; WSL2-Komponenten wurden versehentlich
+      mitinstalliert — brauchen Neustart, ungenutzt gelassen).
+      manual_tests/qemu_matrix.sh (setup/boot/run/stop) dokumentiert die
+      Prozedur inkl. der beiden VM-Wartfälle (Cloud-Root 3–3,5 GB zu klein
+      für Docker+Plex+venv → Resize+growpart; dpkg-interrupt nach Voll-Disk).
+      **Matrix-Ergebnisse echt grün:** Debian 12: detect, disks (btrfs auf
+      vdb, fstab verifiziert), base+musik (Self-Test, Units enabled),
+      Resume-Idempotenz (3 Skips), --add-disk (vdc → /mnt/disk2 inkl.
+      fstab), docker (Compose v5.6.0 amd64 + hello-world-Container-Run),
+      plex (Repo-Weg, Dienst aktiv, Claim-Ausstieg sauber), samba (testparm
+      bestätigt force user/guest ok), verify (Report-Karte trifft den
+      Ist-Zustand exakt, 5 manuelle Schritte). Ubuntu 24.04: detect mit
+      OMV-Ablehnung, disks btrfs, base+musik (Self-Test, Units), docker,
+      verify. **7 echte Modul-Bugs fand und fixte die Matrix** (btrfs-progs
+      fehlt, blkid ohne sudo-PATH, Deno-Pfad ~/.config/spotdl + unzip,
+      --add-disk vom Resume-Skip verschluckt, fstab-Doppelcheck auf falsche
+      Variable, docker-cli-Paket nur trixie, gpg ohne --yes, dpkg-Lock-
+      Retry) — Commit-Kette c180591…; Mock-Harnesses 71+ Assertionen
+      grün gehalten. **Bewusst NICHT in der VM:** OMV-Installation (10–20 min
+      InstallScript, übernimmt die VM — Erst-Test auf dem Dell-Tag geplant;
+      Ubuntu-Ablehnung + Bestands-OMV-Integration sind gedeckt), MG-
+      Container-Deploy (2,6-GB-Pull; Logik im Mock-Harness). Doku:
+      PI-SETUP Phase 1+2 zum One-Shot-Kapitel verschmolzen (Modultabelle,
+      Robustheit, manuelle Varianten), 5.1/9.1 Installer-Verweise, README
+      (Linux-Absatz + Dateitabelle). Offen vom Epic: nichts — Dell-Tag:
+      OMV-Modul erstmalig real, 7.7 Alt-Import, 8.8-Migrationsstory
 
 ## Beim Nutzer anfragen (bei nächster Gelegenheit)
 

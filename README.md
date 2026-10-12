@@ -59,12 +59,17 @@ python -m venv .venv
 .venv\Scripts\python musik.py setup
 ```
 
-**Linux / Raspberry Pi:** see [PI-SETUP.md](PI-SETUP.md) for the full from-scratch walkthrough (USB/NAS mount, YouTube-Premium cookies, Telegram, Plex/Plexamp). Short version: run `bash install.sh` — same steps
-(Python ≥ 3.10, `.venv`, all dependencies, self test, setup wizard) plus a
-`musik-bot.service` systemd unit for the Telegram bot. Native tools come
-from apt (`ffmpeg`, `libchromaprint-tools`, `flac`). Already have a tagged
-library on another machine? PI-SETUP.md **Phase 5b** migrates it
-(SMB over LAN → scan → asis re-import).
+**Linux / Raspberry Pi / Ubuntu server:** `bash install.sh` is a modular
+one-shot installer (EPIC 8, 2026-10-12) — OS detection, data disks
+(btrfs/ext4 with typed-confirmation guards, `--add-disk` for disks added
+later), optional OpenMediaVault (Debian only; Ubuntu gets the equivalent
+fstab + Samba path), Docker + Compose, native Plex, the musik tool and
+MusicGrabber, with resume state and `--dry-run`. It survives interruptions:
+every module is idempotent, a re-run continues where it stopped, and the
+final module prints a report card of what works and which manual steps
+(claim, cookies, allowlist) remain. Full walkthrough incl. YouTube-Premium
+cookies, Telegram and Plexamp: [PI-SETUP.md](PI-SETUP.md). Already have a
+tagged library on another machine? PI-SETUP.md **Phase 5b** migrates it.
 
 ## Remote downloads: link in, album in the library
 
@@ -490,7 +495,8 @@ Rules baked in (no manual work needed):
 
 | Path | Purpose |
 |---|---|
-| `install.bat` / `install.ps1` | one-click installer (Python, venv, deps, fpcalc, setup) |
+| `install.bat` / `install.ps1` | one-click installer (Python, venv, deps, fpcalc, setup, self test) |
+| `install.sh` + `install.d/` | Linux one-shot installer (modular: disks, OMV optional, Docker, Plex, MusicGrabber — see PI-SETUP.md) |
 | `musik.bat` | command shim (`musik.bat <command> …`) |
 | `import-here.bat` | drag & drop a folder onto this to run the full import cycle |
 | `drop-here.bat` | Windows: copy folders to the Pi dropzone (`\_incoming\windows`) for timer ingest |

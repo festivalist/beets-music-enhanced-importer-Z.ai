@@ -113,6 +113,13 @@ vm_prepare() {         # Repo von GitHub klonen (testet den gepushten Stand)
 }
 
 # --- Szenario-Funktionen (in der VM ausgeführt) -----------------------------------
+# VM-Wartfall aus der Matrix 2026-10-12: Die Cloud-Root-Disks (3–3,5 G) sind
+# für Docker+Plex+venv ZU KLEIN. Debian wächst dank cloud-initramfs-growroot
+# automatisch nach dem qemu-img resize; Ubuntu nicht — dort einmalig:
+#   sudo apt-get clean
+#   echo ",+" | sudo sfdisk -N 1 /dev/vda --no-reread --force
+#   sudo partprobe || sudo partx -u /dev/vda; sudo resize2fs /dev/vda1
+# Nach einem Voll-Disk-Absturz zusätzlich: sudo dpkg --configure -a
 scen_disks_btrfs() { vm_ssh "$1" 'cd ~/musik && bash install.sh --only detect --non-interactive >/dev/null 2>&1; bash install.sh --only disks --non-interactive --force 2>&1 | tail -3; findmnt -no FSTYPE,SOURCE /mnt/music && grep -c "/mnt/music" /etc/fstab'; }
 scen_core() { vm_ssh "$1" 'cd ~/musik && bash install.sh --only base,musik --non-interactive 2>&1 | tail -3; .venv/bin/python musik.py fetch --self-test >/dev/null 2>&1 && echo SELFTEST-OK; systemctl is-enabled musik-bot.service musik-ingest.timer'; }
 scen_resume() { vm_ssh "$1" 'cd ~/musik && bash install.sh --core-only --non-interactive 2>&1 | grep -c "bereits erledigt"'; }
