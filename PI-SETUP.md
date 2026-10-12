@@ -98,10 +98,12 @@ systemd-Dienst `musik-bot.service`.
 > unter `/var/lib/musik-installer`, `--dry-run`, `--add-disk` für
 > nachträglich eingebaute Platten; `--list` zeigt die Module). Der
 > Aufruf oben verhält sich unverändert; `bash install.sh --core-only`
-> erzwingt das alte Nur-Repo-Verhalten. Das vorliegende Kapitel wird mit
-> Story 8.7 zum durchgängigen One-Shot-Kapitel umgebaut — bis dahin
-> gelten Phase 1 (Platten), Phase 5 (Plex) und Phase 9 (Docker/MG) als
-> manuelle Ergänzungen, die die Module nach und nach ersetzen.
+> erzwingt das alte Nur-Repo-Verhalten. Module schon fertig: Platten
+> (8.2, ersetzt Phase 1), OMV optional nur Debian-Familie + SMB-Freigabe
+> „Musik“ mit force user für den ohne-OMV/Ubuntu-Pfad (8.3, ersetzt den
+> Share-Teil von Phase 10). Noch manuell: Phase 5 (Plex) und Phase 9
+> (Docker/MG) — folgen mit Stories 8.4/8.5; der große Kapitel-Umbau kommt
+> mit 8.7.
 
 **Wizard-Fragen:**
 

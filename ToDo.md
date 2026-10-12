@@ -342,11 +342,23 @@ dann 7.4→7.5→7.6 an einem Abend. Rollback bis 7.6: Pi 5 unangetastet.
       auch Git Bash): fstab-Lauf, Idempotenz, OMV-Skip, beide Add-Disk-
       Wege, destruktiv-ohne--force → alles grün; INSTALLER_MUSIC_MOUNT/
       INSTALLER_FSTAB als dokumentierte Harness-Overrides
-- [ ] 8.3 OMV- + Samba-Modul — 30-omv nur bei ANSWER_omv_supported=1
-      (offizielles omv-extras-InstallScript, Vorab-Warnung SSH-Härtung/
-      Dauer/apt-Übernahme; Bestands-OMV wie ArgonEON → nur Symlink +
-      force-user-Checkliste + SMB-Probe); 32-samba für ohne-OMV-Pfad:
-      Share „Musik" mit force user (drop-here.bat-Kompatibilität)
+- [x] 8.3 OMV- + Samba-Modul — **2026-10-12**: 30-omv — nur bei
+      ANSWER_omv_supported=1 (Ubuntu → ehrlicher Skip mit Pfad-Verweis);
+      Bestands-OMV (ArgonEON) → nichts ändern, Integrations-Checkliste
+      (force user, smbmd-Probe, --only disks nach Share-Anlage); frische
+      Installation über das offizielle omv-extras-InstallScript mit
+      Vorab-Warnung (10–20 min, apt-Übernahme, SSH-HÄRTUNG — Key-Login
+      sichern!), Install-Entscheidung durch disks_mode=omv vorbefriedigt
+      oder explizites Menü; 32-samba — skippt bei OMV, braucht
+      Musik-Root (ANSWER_library), samba apt + idempotenter Share-Block
+      „Musik“ (Marker) mit force user + guest ok (drop-here.bat-Parität,
+      Live-Lektion Phase 10), map to guest per sed in den BESTEHENDEN
+      [global]-Block (kein Dublett-Abschnitt — testparm duldet das nicht),
+      smbd enable+Probe Port 445, kein Port-Forwarding-Hinweis;
+      finish(skip) gibt Meldung jetzt auch auf Konsole (stderr);
+      Harness manual_tests/harness_samba.sh: 9/9 grün (Share-Anlage,
+      Idempotenz byte-identisch, OMV-Rückzug, Ubuntu-Skip), disks-
+      Harness 23/23 unverändert
 - [ ] 8.4 Docker- + Plex-Modul — docker.io + docker-cli separat (trixie:
       nur Recommends, OMV-apt lässt es weg — Live-Fall 7.3) + Compose-v2-
       Binary arch-bewusst (aarch64/x86_64 statt hartkodiert); Plex nativ:

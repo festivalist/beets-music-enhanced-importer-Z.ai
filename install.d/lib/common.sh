@@ -81,6 +81,7 @@ finish() { # ok|skip|fail [Meldung] — Status schreiben (nicht im Dry-Run) + be
               [[ ${INSTALLER_DRY_RUN:-0} == 1 ]] || mod_set "$name" ok "${msg:+$msg}"
               exit 0 ;;
         skip) log "MODUL $name: übersprungen — $msg"
+              printf '    → übersprungen: %s\n' "$msg" >&2
               [[ ${INSTALLER_DRY_RUN:-0} == 1 ]] || mod_set "$name" skip "$msg"
               exit 77 ;;
         fail) log "MODUL $name: FEHLGESCHLAGEN — $msg"
