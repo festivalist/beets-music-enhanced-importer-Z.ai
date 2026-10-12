@@ -35,7 +35,7 @@ else
     # würde die Installation komplett sprengen (QEMU-Matrix-Live-Fund Nr. 6).
     DOCKER_PKGS="docker.io"
     if apt-cache show docker-cli >/dev/null 2>&1; then DOCKER_PKGS="docker.io docker-cli"; fi
-    run sudocmd apt-get install -y -qq $DOCKER_PKGS \
+    apt_install $DOCKER_PKGS \
         || finish fail "docker.io-Installation fehlgeschlagen — Repos/Netz prüfen, dann --resume"
     ok "installiert: $DOCKER_PKGS"
 fi

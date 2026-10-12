@@ -220,3 +220,16 @@ as_user() { # USER cmd… → als bestimmter Nutzer ausführen (Schreibproben)
 }
 
 have() { command -v "$1" >/dev/null 2>&1; }   # have ffmpeg → 0=ja
+
+apt_install() { # Pakete… — apt-get install mit Lock-Retry
+    # Frisch gebootete Systeme lassen unattended-upgrades im Hintergrund die
+    # dpkg-Locks halten; der erste Install-Versuch stirbt dann an
+    # "could not get lock" (QEMU-Matrix-Live-Fund Nr. 7). 3 Versuche, 20 s Pause.
+    local try rc=1
+    for try in 1 2 3; do
+        if run sudocmd apt-get install -y -qq "$@"; then rc=0; break; fi
+        [[ $try -lt 3 ]] && warn "apt-Install fehlgeschlagen (Versuch $try/3) — Lock (unattended-upgrades?) oder Netz; warte 20 s"
+        sleep 20
+    done
+    return $rc
+}

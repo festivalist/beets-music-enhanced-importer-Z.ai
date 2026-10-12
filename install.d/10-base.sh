@@ -12,8 +12,7 @@ step "Systempakete (git, python3+venv, ffmpeg, fpcalc, flac)"
 run sudocmd apt-get update -qq \
     || warn "apt-get update fehlgeschlagen (Spiegel offline?) — Installation wird trotzdem versucht."
 
-run sudocmd apt-get install -y -qq \
-        git curl unzip python3 python3-venv python3-pip \
+apt_install git curl unzip python3 python3-venv python3-pip \
         ffmpeg libchromaprint-tools flac \
     || { dpkg_hint=$(sudocmd apt-get install -y -qq git 2>&1 | grep -c "interrupted" || true)
          [[ $dpkg_hint -gt 0 ]] && err "Hinweis: dpkg wurde unterbrochen — sudo dpkg --configure -a, dann --resume"
