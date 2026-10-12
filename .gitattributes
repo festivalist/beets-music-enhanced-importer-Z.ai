@@ -1,0 +1,5 @@
+# Shell-Skripte brauchen LF auf jeder Plattform — der Installer läuft auf
+# Linux-Hosts, ein CRLF-Checkout unter Windows (core.autocrlf=true) würde
+# beim Deploy `bash\r`-Fehler produzieren. Windows-eigene Skripte (.bat/.ps1)
+# bleiben von dieser Regel unberührt.
+*.sh text eol=lf

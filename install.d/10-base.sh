@@ -1,0 +1,21 @@
+#MODULE base|Systempakete (git, Python, ffmpeg, fpcalc, flac)|detect|1
+# Grundpakete für Tool und Module. Idempotent (apt install überpringt
+# vorhandene). fpcalc steckt im Paket libchromaprint-tools (6.5-Drift-Label
+# korrigiert — der alte install.sh-Warntext nannte es falsch herum).
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+source "$HERE/lib/common.sh"
+
+step "Systempakete (git, python3+venv, ffmpeg, fpcalc, flac)"
+
+run sudocmd apt-get update -qq \
+    || warn "apt-get update fehlgeschlagen (Spiegel offline?) — Installation wird trotzdem versucht."
+
+run sudocmd apt-get install -y -qq \
+        git curl python3 python3-venv python3-pip \
+        ffmpeg libchromaprint-tools flac \
+    || finish fail "apt-Installation der Grundpakete fehlgeschlagen — Netz/Repos prüfen und --resume"
+
+ok "git, curl, python3(+venv/pip), ffmpeg, fpcalc (libchromaprint-tools), flac"
+finish ok "Systempakete installiert"

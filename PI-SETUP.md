@@ -84,6 +84,17 @@ Python-venv, alle Abhängigkeiten (beets, spotDL, SomeDL, Telegram-Bot),
 **Deno-Runtime** (wichtig für manche YouTube-Videos), Setup-Wizard,
 systemd-Dienst `musik-bot.service`.
 
+> **EPIC 8 (ab 2026-10-12):** `install.sh` ist ein modularer One-Shot-
+> Installer geworden (Treiber + `install.d/`-Module: OS-Erkennung,
+> Festplatten, OMV optional, Docker, Plex, MusicGrabber — State/Resume
+> unter `/var/lib/musik-installer`, `--dry-run`, `--add-disk` für
+> nachträglich eingebaute Platten; `--list` zeigt die Module). Der
+> Aufruf oben verhält sich unverändert; `bash install.sh --core-only`
+> erzwingt das alte Nur-Repo-Verhalten. Das vorliegende Kapitel wird mit
+> Story 8.7 zum durchgängigen One-Shot-Kapitel umgebaut — bis dahin
+> gelten Phase 1 (Platten), Phase 5 (Plex) und Phase 9 (Docker/MG) als
+> manuelle Ergänzungen, die die Module nach und nach ersetzen.
+
 **Wizard-Fragen:**
 
 | Frage | Antwort |

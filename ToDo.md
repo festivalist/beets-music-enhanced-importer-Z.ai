@@ -235,10 +235,12 @@ kein first-class Re-Home → Story 7.2.
       Serien/Rest auf HDD2), 238-GB-SSD-Root, Plex 1.43.4, kein Docker.
       ÜBERRASCHUNG: Musik-Share enthielt bereits **581 Alt-Ordner / 108 GB**
       (alte Kollektion, Nutzer-Entscheidung: „Importieren" → neues 7.7).
-- [ ] 7.1 Installer-Härtung — **BACKLOG nach der Migration** (nicht
-      blockierend; die 4 Lücken aus der Exploration). Teilerfolg direkt
-      erledigt: state/-Erst-Lücke in install.sh gefixt (mkdir vor systemd;
-      Live-Fall: Ingest-Timer exit 66/NOINPUT auf frischer Box).
+- [x] 7.1 Installer-Härtung — **2026-10-12 aufgegangen in EPIC 8**: die
+      Exploration-Lücken (Idempotenz, state/-Erst-Lücke — letztere direkt
+      gefixt: mkdir vor systemd, Live-Fall Ingest-Timer exit 66/NOINPUT —,
+      fehlende Resume-Fähigkeit, keine OS-Erkennung) werden dort als
+      Framework-/Modul-Stories 8.1–8.6 gebaut; rebuild --refresh bleibt
+      als separates Playlist-Thema offen (Kandidat EPIC 2-Umfeld).
 - [x] 7.2 — **ENTFALLEN (Redundanzcheck)**: Symlink /mnt/music → HDD-Share
       hält alle Pfade identisch (DB/config/Playlists/compose-Mounts) —
       rehome-Befehl und compose-Env-Gerung werden nicht gebraucht; Symlink-
@@ -291,6 +293,68 @@ kein first-class Re-Home → Story 7.2.
 
 Reihenfolge: 7.1+7.2 sofort baubar (deploy in 7.3/7.4); 7.0+7.3 live,
 dann 7.4→7.5→7.6 an einem Abend. Rollback bis 7.6: Pi 5 unangetastet.
+
+## EPIC 8 — Portabler One-Shot-Installer (Plan genehmigt 2026-10-12)
+
+> Nutzerentscheidungen (2026-10-12): **beide Pfade gleichwertig** — OMV nur
+> auf Debian/Raspberry Pi OS, Ubuntu bekommt den ohne-OMV-Pfad (fstab +
+> Samba mit force user, kein Hack für OMV-auf-Ubuntu); **Plex nativ** per
+> Paket (apt-Repo, trixie-SHA1 → auto Plan B direktes .deb); **Tests in
+> QEMU-VMs** auf dem Windows-PC. Der laufende Pi (192.168.50.43) bleibt
+> unangetastet — kein Installer-Code gegen ihn, er sieht den Epic nur per
+> git pull; install.sh bleibt über `--core-only` abwärtskompatibel.
+> Architektur: modularer Treiber + install.d/-Module, State/Resume unter
+> /var/lib/musik-installer, Destruktiv-Guards, --dry-run/--answers/
+> --non-interactive, offene Modul-Registry für spätere Tandoor/Immich-
+> Stories. Nicht-Ziele: Datenmigration Pi→Dell (später eigene Story),
+> Plex als Docker, OMV auf Ubuntu erzwingen.
+
+- [x] 8.1 Installer-Framework — **2026-10-12**: install.sh = modularer
+      Treiber (Module als eigene Prozesse: 0=ok/77=skip/78=fail; Pflicht-
+      modul-Fail stoppt mit Resume-Hinweis, Optionalmodul-Fail fragt/
+      läuft weiter), install.d/lib/common.sh (State %q-atomar, Prompts
+      never-ask-twice, menu/confirm, run()=Dry-Run-fähig, sudocmd),
+      Module 00-detect (OS/Arch-Matrix, OMV nur Debian-Familie, RAM/Platz-
+      Warnung, sauberer Abbruch auf Nicht-Linux VOR jeder Änderung),
+      10-base (Grundpakete, fpcalc-Label-Drift aus 6.5 korrigiert),
+      60-musik (bisheriger install.sh-Kern, Verhalten unverändert,
+      --library/--no-systemd weiter gültig); CLI: --core-only/--only/
+      --list/--fresh/--resume/--add-disk/--dry-run/--answers/--non-
+      interactive; Treiber-Logiktests unter Git Bash: Pflichtfail-Stop,
+      Resume-Skip, Optionalfail-Weiterlauf, Dry-Run ohne MOD-Persistenz
+      (Laufzeit-Statustabelle gefixt), Answers-Parser zeilenweise (kein
+      source), Prompt-Rückgabe stderr-getrennt; .gitattributes pinnt *.sh
+      auf LF (autocrlf=true hätte CRLF-Checkouts produziert); subsummiert
+      7.1. **Offen bis 8.7:** QEMU-Matrix gegen echte Debian/Ubuntu-VMs
+- [ ] 8.2 Platten-Modul — lsblk-Auswahl mit Identitätsanzeige (Modell/
+      Seriennummer/Size/FSType/Mount), btrfs (single/raid1) oder ext4,
+      /mnt/music als echter Mount oder OMV-Symlink (Phase-10-Konvention),
+      fstab per UUID+nofail mit Backup/Probe/Rollback, eingehängte/
+      befahrene Platten nie anfassen, `--add-disk` (neuer Mount oder
+      btrfs device add + balance); OMV-Pfad: Platten macht OMV selbst,
+      Installer nur Erkennung + Integration
+- [ ] 8.3 OMV- + Samba-Modul — 30-omv nur bei ANSWER_omv_supported=1
+      (offizielles omv-extras-InstallScript, Vorab-Warnung SSH-Härtung/
+      Dauer/apt-Übernahme; Bestands-OMV wie ArgonEON → nur Symlink +
+      force-user-Checkliste + SMB-Probe); 32-samba für ohne-OMV-Pfad:
+      Share „Musik" mit force user (drop-here.bat-Kompatibilität)
+- [ ] 8.4 Docker- + Plex-Modul — docker.io + docker-cli separat (trixie:
+      nur Recommends, OMV-apt lässt es weg — Live-Fall 7.3) + Compose-v2-
+      Binary arch-bewusst (aarch64/x86_64 statt hartkodiert); Plex nativ:
+      apt-Repo, sqv/SHA1-Fehler erkennen → auto Plan B (.deb via plex.tv-
+      API arch-bewusst), Claim-URL + Token-Extraktion Preferences.xml +
+      `musik: plex:`-Block-Setter
+- [ ] 8.5 musik-Modul polished + MusicGrabber-Modul — Kern-Verhalten
+      gegen altes install.sh verifizieren (Parität CI?), 70-musicgrabber:
+      .env auto (PUID/PGID/TZ), Staging-Anker host-seitig als Run-User
+      (Crash-Loop-Lehre PI-SETUP 9.8), compose up -d, HTTP-200-Probe :38274
+- [ ] 8.6 Verify-Modul — Proben (musik-bot/ingest-Units, Plex-API-
+      Erreichbarkeit, MG-HTTP, doctor --quick) + Report-Karte
+      ok/fail/manuell-offen (z. B. „Plex claim: http://IP:32400/web")
+- [ ] 8.7 QEMU-Testmatrix + Doku — Debian 12 ± OMV / Ubuntu 24.04 /
+      0-1-2 Platten / --add-disk / kill+resume / Fehlerinjektion /
+      dry-run; PI-SETUP-Umbau auf One-Shot-Kapitel, SCOPE-Change ist mit
+      8.1 datiert drin, README-Kurzhint, alle Stories abhaken
 
 ## Beim Nutzer anfragen (bei nächster Gelegenheit)
 
