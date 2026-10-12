@@ -54,7 +54,10 @@ run "$PY_EXE" -m spotdl --download-deno \
 # (without it every YouTube download dies with "Requested format is not
 # available" after "n challenge solving failed"). Best effort:
 DENO_SRC=""
-for cand in "$HOME/.spotdl/deno" "$HOME/.deno/bin/deno"; do
+# spotdl versteckt sein Deno je nach Version in ~/.config/spotdl/deno
+# (neuere spotDL) oder ~/.spotdl/deno (ältere) — beide prüfen
+# (Live-Fund QEMU-Matrix 2026-10-12: nur der alte Pfad stand hier).
+for cand in "$HOME/.config/spotdl/deno" "$HOME/.spotdl/deno" "$HOME/.deno/bin/deno"; do
     [[ -x "$cand" ]] && DENO_SRC="$cand" && break
 done
 if [[ -z "$DENO_SRC" ]] && ! have deno; then

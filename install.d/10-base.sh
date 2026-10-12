@@ -13,9 +13,12 @@ run sudocmd apt-get update -qq \
     || warn "apt-get update fehlgeschlagen (Spiegel offline?) — Installation wird trotzdem versucht."
 
 run sudocmd apt-get install -y -qq \
-        git curl python3 python3-venv python3-pip \
+        git curl unzip python3 python3-venv python3-pip \
         ffmpeg libchromaprint-tools flac \
     || finish fail "apt-Installation der Grundpakete fehlgeschlagen — Netz/Repos prüfen und --resume"
 
-ok "git, curl, python3(+venv/pip), ffmpeg, fpcalc (libchromaprint-tools), flac"
+ok "git, curl, unzip, python3(+venv/pip), ffmpeg, fpcalc (libchromaprint-tools), flac"
+# unzip: der Deno-Installer braucht unzip oder 7z — auf Cloud-Minimal-Images
+# fehlt es (Live-Fund QEMU-Matrix 2026-10-12), sonst stirbt die Deno-Fallback-
+# Installation und YouTube-Downloads laufen ohne JS-Runtime ins Leere.
 finish ok "Systempakete installiert"
