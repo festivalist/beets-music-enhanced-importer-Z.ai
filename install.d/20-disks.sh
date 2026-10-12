@@ -155,6 +155,15 @@ write_probe() { # Pfad → 0 wenn RUN_USER dort schreiben darf
         || { sudocmd rm -f "$1/.musik-installer-probe"; return 1; }
 }
 
+ensure_btrfs_tools() { # btrfs-progs nachinstallieren, falls gewählt/fehlt
+    # btrfs-progs ist auf frischem Debian NICHT vorinstalliert — Live-Fund
+    # der QEMU-Matrix 2026-10-12; das Paket bringt mkfs.btrfs UND btrfs CLI.
+    have mkfs.btrfs && return 0
+    run sudocmd apt-get update -qq || true
+    run sudocmd apt-get install -y -qq btrfs-progs \
+        || finish fail "btrfs-progs nicht installierbar — Repo/Netz prüfen, dann --resume"
+}
+
 # --- Add-Disk-Modus (--add-disk): Platte nachträglich -------------------------
 if [[ ${INSTALLER_ADD_DISK:-0} == 1 ]]; then
     step "Festplatte nachträglich einbinden (--add-disk)"
@@ -177,6 +186,7 @@ if [[ ${INSTALLER_ADD_DISK:-0} == 1 ]]; then
             fs=$(menu_select adddisk_fs "Dateisystem" "btrfs" "ext4")
             confirm_destructive "Formatieren von $dev für separaten Mount $target" \
                 || finish skip "nicht bestätigt — nichts passiert"
+            ensure_btrfs_tools
             run sudocmd wipefs -a "$dev"
             if [[ "$fs" == btrfs* ]]; then run sudocmd mkfs.btrfs -L musik2 "$dev"
             else run sudocmd mkfs.ext4 -L musik2 "$dev"; fi
@@ -194,6 +204,7 @@ if [[ ${INSTALLER_ADD_DISK:-0} == 1 ]]; then
             dev="${SEL_DEVS[0]}"
             confirm_destructive "Formatieren von $dev und Aufnahme in den btrfs-Pool $MOUNT" \
                 || finish skip "nicht bestätigt — nichts passiert"
+            ensure_btrfs_tools
             run sudocmd wipefs -a "$dev"
             run sudocmd btrfs device add "$dev" "$MOUNT" \
                 || finish fail "btrfs device add fehlgeschlagen (btrfs-progs installiert?)"
@@ -299,6 +310,7 @@ confirm_destructive "Formatieren von $devlist als $tname (Musik-Root $MOUNT)" \
     || finish skip "nicht bestätigt — nichts wurde verändert"
 
 # 7) Formatieren + Mount + fstab
+ensure_btrfs_tools
 run sudocmd wipefs -a "${SEL_DEVS[@]}"
 if [[ "$fs" == btrfs* ]]; then
     if [[ ${#SEL_DEVS[@]} -eq 1 ]]; then
