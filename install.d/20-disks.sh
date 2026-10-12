@@ -201,11 +201,13 @@ if [[ ${INSTALLER_ADD_DISK:-0} == 1 ]]; then
             run sudocmd mkdir -p "$target"
             pass=0; [[ "$fs" != btrfs* ]] && pass=2
             fstab_add_entry "UUID=$uuid $target $fs defaults,nofail 0 $pass"
-            run sudocmd mount "$target" 2>/dev/null || run sudocmd mount -a
-            run sudocmd chown "$RUN_USER:$RUN_USER" "$target"
-            findmnt "$target" >/dev/null 2>&1 \
-                || finish fail "$target ist nach dem Mount-Schritt nicht eingehängt"
-            finish ok "$dev → $target ($fs)" ;;
+run sudocmd mount "$target" 2>/dev/null || run sudocmd mount -a
+run sudocmd chown "$RUN_USER:$RUN_USER" "$target"
+if [[ ${INSTALLER_DRY_RUN:-0} != 1 ]]; then
+    findmnt "$target" >/dev/null 2>&1 \
+        || finish fail "$target ist nach dem Mount-Schritt nicht eingehängt"
+fi
+finish ok "$dev → $target ($fs)" ;;
         *)
             select_disks 1 adddisk_sel "Welche Platte in den Pool?" || finish fail "Auswahl fehlgeschlagen"
             dev="${SEL_DEVS[0]}"
@@ -338,8 +340,10 @@ pass=0; [[ "$fs" != btrfs* ]] && pass=2
 fstab_add_entry "UUID=$uuid $MOUNT $tname defaults,nofail 0 $pass"
 run sudocmd mount "$MOUNT" 2>/dev/null || run sudocmd mount -a
 run sudocmd chown "$RUN_USER:$RUN_USER" "$MOUNT"
-findmnt "$MOUNT" >/dev/null 2>&1 \
-    || finish fail "$MOUNT ist nach dem Mount-Schritt nicht eingehängt (fstab/Rechte prüfen)"
+if [[ ${INSTALLER_DRY_RUN:-0} != 1 ]]; then
+    findmnt "$MOUNT" >/dev/null 2>&1 \
+        || finish fail "$MOUNT ist nach dem Mount-Schritt nicht eingehängt (fstab/Rechte prüfen)"
+fi
 
 if ! write_probe "$MOUNT"; then
     warn "Schreibprobe fehlgeschlagen — Rechte von $MOUNT manuell prüfen (chown $RUN_USER)."

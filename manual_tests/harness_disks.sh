@@ -47,6 +47,11 @@ if [[ "\$1" == "-no" && "\${MOCK_MUSIC_MOUNTED:-0}" == 1 && "\$3" == "\$MUSIC_MO
   [[ "\$2" == FSTYPE ]] && echo btrfs || echo "/dev/sdb btrfs"; exit 0
 fi
 if [[ "\$1" == "\$MUSIC_MOUNT" && "\${MOCK_MUSIC_MOUNTED:-0}" == 1 ]]; then exit 0; fi
+# simuliert mount -a: jeder Pfad mit fstab-Eintrag gilt als eingehängt
+# (die Modul-Verifikation fragt findmnt <pfad> nach dem Anlegen)
+if [[ "\$#" -eq 1 && -r "\$MOCKDIR/fstab" ]] && grep -q " \$1 " "\$MOCKDIR/fstab"; then
+  exit 0
+fi
 exit 1
 EOF
 cat > "$ROOT/fakebin/blkid" <<'EOF'

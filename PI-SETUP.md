@@ -30,28 +30,55 @@ Handy (unterwegs) ──Link──> Telegram-Bot (auf dem Pi)
 - [ ] Diese Dinge bereithalten: Telegram-Bot-Token, YouTube-Cookies (Phase 3),
       Plex-Account
 
-## Phase 1 — Pi vorbereiten
+## Phase 1 — Installation: ein Befehl (one-shot)
+
+> **Gilt seit EPIC 8 (2026-10-12) auf der ganzen Debian-Familie:**
+> Raspberry Pi OS / Debian 12+ (arm64 & amd64) und Ubuntu 22.04/24.04.
+> OMV ist optional und nur auf Debian/RasPiOS — Ubuntu bekommt den
+> gleichwertigen ohne-OMV-Pfad (fstab + Samba-Freigabe mit force user).
 
 **Noch frisch geflasht?** Raspberry Pi Imager: *Raspberry Pi OS (64-bit, Lite
 reicht)* wählen, im Zahnrad-Settings Hostname (z. B. `musikpi`), **SSH
-aktivieren**, User/Passwort setzen → flashen, booten. Dann:
-`ssh <user>@192.168.50.47`.
+aktivieren**, User/Passwort setzen → flashen, booten. Dann
+`ssh <user>@<host-ip>` und:
 
 ```bash
 sudo apt update && sudo apt full-upgrade -y
 sudo apt install -y git
+git clone https://github.com/festivalist/beets-music-enhanced-importer-Z.ai.git ~/musik
+cd ~/musik
+bash install.sh
 ```
 
-**Optional: USB-Platte als Musik-Ziel dauerhaft mounten** (ext4 empfohlen;
-NTFS funktioniert, ist aber langsamer und mäßiger bei Berechtigungen):
+`bash install.sh` erkennt OS/Architektur und arbeitet eine Modulliste ab
+(`bash install.sh --list` zeigt sie) — jede Frage nur einmal, Abbrüche
+werden beim nächsten Lauf automatisch fortgesetzt:
 
-> **EPIC 8 / Story 8.2 (2026-10-12):** dieser Handgriff ist jetzt Teil des
-> Installers — `bash install.sh` fragt die Musik-Platte interaktiv ab
-> (Kandidatenliste nur freier, nicht eingehängter Datenplatten; Identität +
-> Eintippen von „JA“ vor jedem Formatieren; fstab-Eintrag per UUID mit nofail
-> und Probe-Mount mit Rollback). Platten, die später eingebaut werden:
-> `bash install.sh --add-disk` (eigener Mount oder Aufnahme in den
-> btrfs-Pool). Die folgende Anleitung bleibt als manuelle Variante gültig:
+| Modul | Was passiert | Frage/Entscheidung |
+|---|---|---|
+| detect | OS/Arch-Matrix, OMV ja/nein auf diesem System | — |
+| base | git, Python 3.10+, ffmpeg, fpcalc, flac | — |
+| disks | Musik-Datenplatte: btrfs/ext4 formatieren, `/mnt/music` mounten, fstab per UUID+nofail mit Probe+Rollback | Platte(n) aus Kandidatenliste (nur freie, nicht eingehängte); Identität + Eintippen von **JA** vor jedem Formatieren; „später“ möglich |
+| omv | optional, nur Debian-Familie: offizielles InstallScript + Integrations-Checkliste | OMV installieren? (SSH-Härtung-Warnung!) |
+| samba | ohne-OMV-Pfad: SMB-Freigabe „Musik“ mit force user (drop-here.bat-fähig) | — |
+| docker | docker.io + docker-cli + Compose-v2-Binary (arch-bewusst) | Docker installieren? |
+| plex | nativ per apt-Repo; trixie-SHA1 automatisch erkannt → Plan B (.deb von plex.tv); danach Claim/Token/config.yaml-Assistenz | Plex installieren? |
+| musik | venv, beets/spotDL/SomeDL, Deno, Setup-Wizard, Self-Test, systemd bot+timer | Wizard (unten) |
+| musicgrabber | Compose-Deploy aus dem Repo, Staging-Anker host-seitig, HTTP-Probe | — |
+| verify | Report-Karte: jede Komponente real angeprobt + Liste manuell offener Schritte | — |
+
+**Robustheit:** Pflichtmodul-Fail stoppt mit Resume-Hinweis, Optionalmodul-
+Fail läuft weiter; `--dry-run` probt alles durch (auch destruktive Schritte
+werden nur angezeigt), `--answers <file>` + `--non-interactive` für
+Automatisierung, `--core-only` = altes Nur-Repo-Verhalten,
+`--add-disk` = später ausgebaute Platte nachtragen (eigener Mount oder
+`btrfs device add` in den Musik-Pool). State: `/var/lib/musik-installer/`.
+
+### Manuelle Variante: USB-Platte ohne Installer mounten
+
+(ext4 empfohlen; NTFS funktioniert, ist aber langsamer und mäßiger bei
+Berechtigungen — der Installer-Platten-Dialog macht all das ab Story 8.2
+automatisch, dieser Block ist die Handvariante für Sonderfälle:)
 
 ```bash
 lsblk -f                                   # UUID der Platte finden
@@ -76,38 +103,11 @@ sudo mount -a
 > beschreibbar sein. Ein nur-lesendes Share taugt als Bibliotheks-Ziel, aber
 > nicht als Import-Quelle.
 
-Ohne USB-Platte: einfach `~/Music` nutzen (Standard) und in Phase 2 den
-`--library`-Parameter weglassen.
+Ohne USB-Platte: einfach `~/Music` nutzen (Standard) — der Wizard fragt den
+Bibliotheksordner ab bzw. nimmt `--library` entgegen.
 
-## Phase 2 — Repo holen und installieren
-
-```bash
-git clone https://github.com/festivalist/beets-music-enhanced-importer-Z.ai.git ~/musik
-cd ~/musik
-bash install.sh --library /mnt/music      # oder ohne Parameter → ~/Music
-```
-
-`install.sh` erledigt automatisch: Systempakete (ffmpeg, fpcalc, flac),
-Python-venv, alle Abhängigkeiten (beets, spotDL, SomeDL, Telegram-Bot),
-**Deno-Runtime** (wichtig für manche YouTube-Videos), Setup-Wizard,
-systemd-Dienst `musik-bot.service`.
-
-> **EPIC 8 (ab 2026-10-12):** `install.sh` ist ein modularer One-Shot-
-> Installer geworden (Treiber + `install.d/`-Module: OS-Erkennung,
-> Festplatten, OMV optional, Docker, Plex, MusicGrabber — State/Resume
-> unter `/var/lib/musik-installer`, `--dry-run`, `--add-disk` für
-> nachträglich eingebaute Platten; `--list` zeigt die Module). Der
-> Aufruf oben verhält sich unverändert; `bash install.sh --core-only`
-> erzwingt das alte Nur-Repo-Verhalten. Module schon fertig: Platten
-> (8.2, ersetzt Phase 1), OMV optional nur Debian-Familie + SMB-Freigabe
-> „Musik“ mit force user für den ohne-OMV/Ubuntu-Pfad (8.3, ersetzt den
-> Share-Teil von Phase 10), Docker+Compose arch-bewusst inkl.
-> docker-cli-Recommends-Falle (8.4, ersetzt 9.1), Plex nativ mit
-> automatischem SHA1-Plan-B + Claim/Token/config.yaml-Assistenz (8.4,
-> ersetzt Phase 5.1–5.5) und MusicGrabber-Deploy aus dem Repo-Compose mit
-> host-seitigen Staging-Ankern, .env (PUID/PGID) und HTTP-Probe (8.5,
-> ersetzt 9.2/9.3). Manuell bleiben die UI-Schritte (OMV-Share, Plex-Claim,
-> MG-Settings) und Phase 3 (Cookies); der große Kapitel-Umbau kommt mit 8.7.
+> Die alte Phase 2 (Repo holen + install.sh) ist 2026-10-12 in Phase 1
+> aufgegangen; die Nummerierung der Folgephasen bleibt unverändert.
 
 **Wizard-Fragen:**
 
@@ -201,6 +201,12 @@ wartende Import-Einheiten als Knöpfe. Fertig.
 ## Phase 5 — Plex Media Server (auf dem Pi) + Plexamp-Anbindung
 
 **5.1 Installation (ARM64):**
+
+> **Installer (EPIC 8, Plex-Modul)** richtet Repo+Key ein, erkennt das
+> SHA1-Problem automatisch und weicht dann auf Plan B (direktes .deb von
+> der plex.tv-API) aus — plus Claim/Token/config.yaml-Assistenz über
+> `bash install.sh --only plex`. Die folgende Handschrift bleibt als
+> Referenz und für manuelle Reparaturen:
 
 > **Bekanntes Problem (Stand 2026-09-21), betrifft trixie:** Der
 > Plex-Repo-Signatur-Key hat nur SHA1-Selbstsignaturen. Aktuelles Raspberry Pi
@@ -537,6 +543,11 @@ aktualisieren (Zeile oben); Bot antwortet nicht → `journalctl -u musik-bot -n 
 > geprüft 2026-10-08) und läuft unverändert auf dem Pi 5.
 
 **9.1 Docker installieren (einmalig, aus den Debian-Quellen — kein fremdes apt-Repo):**
+
+> **Installer (EPIC 8):** Docker-Modul (`bash install.sh --only docker`)
+> macht 9.1–9.3 inkl. MG-Deploy automatisch (arch-bewusstes Compose-Binary,
+> docker-cli-Recommends-Falle, .env, Staging-Anker, HTTP-Probe). Die
+> Handschrift bleibt als Referenz:
 
 > **trixie-Realität (Stand 2026-10-08, so deployed):** `docker-compose-v2` liegt
 > nicht in den Debian-Quellen; das dortige `docker-compose` ist das EOL-v1-
