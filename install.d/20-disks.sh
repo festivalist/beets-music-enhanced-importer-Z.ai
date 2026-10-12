@@ -190,7 +190,7 @@ if [[ ${INSTALLER_ADD_DISK:-0} == 1 ]]; then
             run sudocmd wipefs -a "$dev"
             if [[ "$fs" == btrfs* ]]; then run sudocmd mkfs.btrfs -L musik2 "$dev"
             else run sudocmd mkfs.ext4 -L musik2 "$dev"; fi
-            uuid=$(blkid -s UUID -o value "$dev")
+            uuid=$(sudocmd blkid -s UUID -o value "$dev")
             if [[ -z "$uuid" && ${INSTALLER_DRY_RUN:-0} == 1 ]]; then uuid="DRYRUN-UUID"; fi
             [[ -n "$uuid" ]] || finish fail "keine UUID nach Formatierung ($dev)"
             run sudocmd mkdir -p "$target"
@@ -323,7 +323,7 @@ if [[ "$fs" == btrfs* ]]; then
 else
     run sudocmd mkfs.ext4 -L musik "${SEL_DEVS[@]}"
 fi
-uuid=$(blkid -s UUID -o value "${SEL_DEVS[0]}")
+uuid=$(sudocmd blkid -s UUID -o value "${SEL_DEVS[0]}")
 if [[ -z "$uuid" && ${INSTALLER_DRY_RUN:-0} == 1 ]]; then uuid="DRYRUN-UUID"; fi
 [[ -n "$uuid" ]] || finish fail "keine UUID nach Formatierung (${SEL_DEVS[0]})"
 run sudocmd mkdir -p "$MOUNT"
