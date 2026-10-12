@@ -163,6 +163,27 @@ menu_select() { # KEY "Frage" "Opt1" "Opt2" … → gewählte Option (Text)
 }
 
 # --- Ausführung ----------------------------------------------------------------
+confirm_destructive() { # "Beschreibung der Aktion" → 0=ausführen
+    # Bewusst NICHT im State speicherbar: eine gecachte JA-Bestätigung würde
+    # bei jedem Resume-Run destruktive Schritte automatisch freigeben.
+    # Nicht-interaktiv geht es nur mit dem ausdrücklichen Treiber-Flag
+    # --force (INSTALLER_FORCE=1) — für Test-Harnesses dokumentiert.
+    local desc=$1 ans
+    if [[ ${INSTALLER_NONINTERACTIVE:-0} == 1 ]]; then
+        if [[ ${INSTALLER_FORCE:-0} == 1 ]]; then
+            warn "nicht-interaktiv + --force: destruktiver Schritt erlaubt: $desc"
+            return 0
+        fi
+        err "Destruktiver Schritt braucht interaktive Bestätigung: $desc"
+        err "Oder bewusst: bash install.sh --force (Test/Automatisierung)."
+        return 1
+    fi
+    printf '    !!! %s\n' "$desc" >&2
+    printf '    Alle Daten darauf gehen verloren.\n' >&2
+    read -r -p "    Eintippen von JA bestätigt: " ans || ans=""
+    [[ "$ans" == "JA" ]]
+}
+
 run() { # Dry-Run-fähiger Befehlsaufruf: zeigt statt auszuführen
     if [[ ${INSTALLER_DRY_RUN:-0} == 1 ]]; then
         printf '    [dry-run] %s\n' "$*"
@@ -178,6 +199,20 @@ sudocmd() { # root → direkt; sonst sudo; beides fehlend → Fehler
         sudo "$@"
     else
         err "Root-Rechte nötig für: $* — weder root noch sudo verfügbar." >&2
+        return 1
+    fi
+}
+
+as_user() { # USER cmd… → als bestimmter Nutzer ausführen (Schreibproben)
+    local u=$1; shift
+    if [[ "$(id -un)" == "$u" ]]; then
+        "$@"
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo -u "$u" "$@"
+    elif [[ $EUID -eq 0 ]]; then
+        su -s /bin/bash "$u" -c "$*"
+    else
+        err "kann Befehl nicht als Nutzer '$u' ausführen (kein sudo, nicht root)." >&2
         return 1
     fi
 }

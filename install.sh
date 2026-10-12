@@ -57,6 +57,7 @@ while [[ $# -gt 0 ]]; do
         --dry-run)         export INSTALLER_DRY_RUN=1; shift ;;
         --answers)         ANSWERS_FILE="${2:?--answers braucht eine Datei}"; shift 2 ;;
         --non-interactive) export INSTALLER_NONINTERACTIVE=1; shift ;;
+        --force)           export INSTALLER_FORCE=1; shift ;;   # destruktive Schritte ohne Interaktion (Tests)
         --library)         LIBRARY_ARG="${2:?--library braucht einen Pfad}"; shift 2 ;;
         --no-systemd)      NO_SYSTEMD=1; shift ;;
         --list)            LIST=1; shift ;;

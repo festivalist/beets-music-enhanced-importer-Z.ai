@@ -326,13 +326,22 @@ dann 7.4→7.5→7.6 an einem Abend. Rollback bis 7.6: Pi 5 unangetastet.
       source), Prompt-Rückgabe stderr-getrennt; .gitattributes pinnt *.sh
       auf LF (autocrlf=true hätte CRLF-Checkouts produziert); subsummiert
       7.1. **Offen bis 8.7:** QEMU-Matrix gegen echte Debian/Ubuntu-VMs
-- [ ] 8.2 Platten-Modul — lsblk-Auswahl mit Identitätsanzeige (Modell/
-      Seriennummer/Size/FSType/Mount), btrfs (single/raid1) oder ext4,
-      /mnt/music als echter Mount oder OMV-Symlink (Phase-10-Konvention),
-      fstab per UUID+nofail mit Backup/Probe/Rollback, eingehängte/
-      befahrene Platten nie anfassen, `--add-disk` (neuer Mount oder
-      btrfs device add + balance); OMV-Pfad: Platten macht OMV selbst,
-      Installer nur Erkennung + Integration
+- [x] 8.2 Platten-Modul — **2026-10-12**: install.d/20-disks.sh — Kandidaten
+      nur ganze, NICHT eingehängte Datenplatten (Root-Platte fällt unter
+      dieselbe Regel), Identitätsanzeige (Modell/Serie/Größe/alter Typ/
+      Partitionen) vor Formatierung, Bestätigung nur durch Eintippen von
+      JA — bewusst NICHT State-speicherbar (confirm_destructive; nicht-
+      interaktiv nur mit --force), wipefs+mkfs btrfs (single/raid1,
+      1–2 Platten) oder ext4, fstab per UUID+nofail mit Backup+mount -a-
+      Probe+Rollback, Idempotenz (bereits gemountet/OMV-Symlink → ok ohne
+      Format), OMV-Bestandserkennung → nur /mnt/music-Symlink auf den
+      Share (+Schreibprobe, force-user-Hinweis), Strategie-Menü fstab|
+      OMV|ohne Platte; --add-disk: separater Mount oder btrfs device add
+      (Balance nur als Hinweis — Stunden auf Multi-TB); Mock-Harness
+      manual_tests/harness_disks.sh (6 Szenarien, 23 Assertionen, läuft
+      auch Git Bash): fstab-Lauf, Idempotenz, OMV-Skip, beide Add-Disk-
+      Wege, destruktiv-ohne--force → alles grün; INSTALLER_MUSIC_MOUNT/
+      INSTALLER_FSTAB als dokumentierte Harness-Overrides
 - [ ] 8.3 OMV- + Samba-Modul — 30-omv nur bei ANSWER_omv_supported=1
       (offizielles omv-extras-InstallScript, Vorab-Warnung SSH-Härtung/
       Dauer/apt-Übernahme; Bestands-OMV wie ArgonEON → nur Symlink +

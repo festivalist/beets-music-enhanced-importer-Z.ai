@@ -45,6 +45,14 @@ sudo apt install -y git
 **Optional: USB-Platte als Musik-Ziel dauerhaft mounten** (ext4 empfohlen;
 NTFS funktioniert, ist aber langsamer und mäßiger bei Berechtigungen):
 
+> **EPIC 8 / Story 8.2 (2026-10-12):** dieser Handgriff ist jetzt Teil des
+> Installers — `bash install.sh` fragt die Musik-Platte interaktiv ab
+> (Kandidatenliste nur freier, nicht eingehängter Datenplatten; Identität +
+> Eintippen von „JA“ vor jedem Formatieren; fstab-Eintrag per UUID mit nofail
+> und Probe-Mount mit Rollback). Platten, die später eingebaut werden:
+> `bash install.sh --add-disk` (eigener Mount oder Aufnahme in den
+> btrfs-Pool). Die folgende Anleitung bleibt als manuelle Variante gültig:
+
 ```bash
 lsblk -f                                   # UUID der Platte finden
 sudo mkfs.ext4 /dev/sda1                   # NUR wenn Platte leer/neu ist!
