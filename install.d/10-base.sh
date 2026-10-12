@@ -15,7 +15,9 @@ run sudocmd apt-get update -qq \
 run sudocmd apt-get install -y -qq \
         git curl unzip python3 python3-venv python3-pip \
         ffmpeg libchromaprint-tools flac \
-    || finish fail "apt-Installation der Grundpakete fehlgeschlagen — Netz/Repos prüfen und --resume"
+    || { dpkg_hint=$(sudocmd apt-get install -y -qq git 2>&1 | grep -c "interrupted" || true)
+         [[ $dpkg_hint -gt 0 ]] && err "Hinweis: dpkg wurde unterbrochen — sudo dpkg --configure -a, dann --resume"
+         finish fail "apt-Installation der Grundpakete fehlgeschlagen — Netz/Repos prüfen und --resume"; }
 
 ok "git, curl, unzip, python3(+venv/pip), ffmpeg, fpcalc (libchromaprint-tools), flac"
 # unzip: der Deno-Installer braucht unzip oder 7z — auf Cloud-Minimal-Images
