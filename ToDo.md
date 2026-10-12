@@ -389,9 +389,18 @@ dann 7.4→7.5→7.6 an einem Abend. Rollback bis 7.6: Pi 5 unangetastet.
       (6.5-Drift, Parität zu install.sh) + README-Satz, PI-SETUP-Statusnote;
       Harness manual_tests/harness_mg.sh 9/9, Regression: disks 23/23,
       samba 9/9, dockerplex 17/17
-- [ ] 8.6 Verify-Modul — Proben (musik-bot/ingest-Units, Plex-API-
-      Erreichbarkeit, MG-HTTP, doctor --quick) + Report-Karte
-      ok/fail/manuell-offen (z. B. „Plex claim: http://IP:32400/web")
+- [x] 8.6 Verify-Modul — **2026-10-12**: 90-verify tastet jede Komponente
+      REAL ab (nicht dem State glauben): Musik-Root (Mount/Symlink/Ordner +
+      Schreibprobe als Run-User), musik-Tool (venv+config) + Erinnerungen
+      für fehlende Tokens/Cookies/Allowlist, systemd-Units (enabled/aktiv),
+      Docker (docker info) + MG (Container + Web-UI-Probe), Plex (API
+      :32400/identity + Claim-Check), SMB (OMV-Zweig vs. samba-Share +
+      Dropzone-Pfad), OMV-Hinweis nur wenn Musik-Root nicht verdrahtet;
+      sammelt „manuell offen“-Liste (bewusste UI-/Einmal-Schritte) statt
+      zu failen — Modul ist reine Diagnose; doctor-Empfehlung mit
+      --limit 50 (Erstlauf ohne Limit = Stunden, PI-SETUP-Warnung);
+      Harness manual_tests/harness_verify.sh 13/13 (Voll-Host und leerer
+      Host)
 - [ ] 8.7 QEMU-Testmatrix + Doku — Debian 12 ± OMV / Ubuntu 24.04 /
       0-1-2 Platten / --add-disk / kill+resume / Fehlerinjektion /
       dry-run; PI-SETUP-Umbau auf One-Shot-Kapitel, SCOPE-Change ist mit
