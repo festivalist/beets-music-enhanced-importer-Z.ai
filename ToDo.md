@@ -30,8 +30,37 @@ Stories 4.1/4.3 weitergeführt.*
       Review/Unmatched/Network-Units, deren Dateien vollständig weg sind
       (→ `ignored`, reversibel) — Lauf über alle Stale-Roots: 52 Units
       retired, 32 tote Pending-Zeilen gelöscht, 2 echte Review-Fälle
-      bleiben bewusst (s. 4.1). **Offen: Pi-Stock gleich prüfen**
-      (`musik.py scan --root /mnt/music/_incoming` + `import --status review`)
+      bleiben bewusst (s. 4.1). Pi-Stock-Check **nachgeholt 2026-10-16** →
+      Befunde als 4.5/6.9
+- [ ] 4.5 Review-Queue auf dem Pi hat keinen Verbraucher + Contradiction-
+      Rule feuert nicht + Multi-Disc-asis-Lücke — **Befund 2026-10-16**:
+      drei per drop-here.bat gekommene Greatest-Hits-Alben (Clapton/Tom
+      Jones/Judas-Priest-Tribute, 12.10.) lagen 4 Tage in
+      `_incoming/windows`. Drei geschichtete Ursachen: (1) Decider setzte
+      sie auf `review` („below auto-accept confidence") statt der
+      2026-09-17-Policy folgend as-is zu übernehmen — Tom Jones bekam den
+      NACHWEISLICH falschen Kandidaten („Gold" 2005 statt GH 2009), das
+      Tribute den echten Judas-Priest-Kandidaten, The Coral (1001-#0950)
+      sogar „Coldplay" — alles klare Contradiction-Signale; die Regel
+      greift offenbar NICHT, wenn schon die Distanz-Schwelle zuschlägt.
+      (2) Multi-Disc-Lücke im asis-Pfad: beide 2CD-Rips tragen pro CD
+      unterschiedliche Album-Tags („… CD1"/„… CD2") → `tags_complete`
+      meldet „inconsistent album tags across files" → asis-Fallback des
+      Ingest meldete jeden Zyklus „0 tag-complete unit(s) eligible" und
+      auch `asis --unit` griff nicht; Multi-Disc-Units mit per-CD-Tags
+      sind im asis-Pfad strukturell nie wählbar. (3) Review-Units haben
+      im 15-min-Ingest keinen Verbraucher (import-Filter ignoriert sie).
+      **Behoben 2026-10-16 (Betrieb, nicht Code):** Tag-Normalisierung
+      pro Unit (Album-Tag vereinheitlicht, discnumber 1/2 gesetzt, Jahr
+      aus Ordnernamen) + `asis --unit` Echtlauf als Waiter-Skript
+      (Timer stop → Zyklus-Ende abwarten → fix+asis → Plex-Scan → Timer
+      an; Log state/asis-fix3.log); Tribute bleibt bewusst in Review
+      (Nutzer-Entscheidung 2026-10-16). Stories daraus: (a) Decider-
+      Contradiction-Erkennung auch auf Distanz-Review-Fälle anwenden,
+      (b) Multi-Disc-Erkennung in `tags_complete` (per-CD-Album-Konsistenz
+      + discnumber genügt), (c) Policy-konformer automatischer asis-
+      Fallback für eindeutig widersprüchliche Review-Units im Ingest
+      (SCOPE-§5.3-Schutzfälle weiter ausgenommen)
 
 ## EPIC 1 — MusicGrabber auf dem Pi (Beschaffungs-Engine Nr. 2)
 
@@ -165,6 +194,12 @@ drin sein.*
       engine↔review/report + fetch↔playlists entflechten, gapfill-Modul,
       beatport-Rename, Decider-Konstanten nach oben, systemd-Template,
       install.ps1 --library, Sprachregel CLI/Bot
+- [ ] 6.9 IndexError im Pi-Ingest — **Befund 2026-10-16**: Unit „0773.
+      G. Love & Special Sauce - G. Love & Special Sauce [1994]" (1001-
+      Kollektion, `_incoming/windows`) hängt mit Status `error` und
+      „IndexError: list index out of range" (siehe unidentified.csv);
+      Ursache ungeklärt — Stacktrace fangen, Unit-Fehlerklasse schärfen
+      und den Fall in smoke_scan/smoke_decider abdecken
 
 ## EPIC 5 + Späteres
 
