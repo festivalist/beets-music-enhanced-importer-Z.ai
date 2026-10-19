@@ -541,7 +541,16 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       Abfänger-Zweige, CSV/Report-Refresh) + erweiterter smoke_bot_http
       grün; Browser-Abnahme gegen echte bot_http-Instanz: K1/K2/Ignore/
       Ingest-Trigger mit confirm-Dialog, Queue-Zähler wächst, Screenshot
-      ok. **Offen: Pi-Echtläufe** (je Aktionstyp 1× gegen echte Daten)
+      ok. — **Pi-Rollout + Echt-Abnahme 2026-10-19 Abend**: Pi auf
+      d12432a (3 Smokes grün auf dem Pi), MG-Container auf 4.3.1 +
+      Overlay-Mount (ro) recreiert, Bot-Restart (Endpoint im Journal
+      bestätigt), Monitor-Tab am echten Bestand: „🔄 Ingest läuft“-
+      Lock-Probe live korrekt (1147 Units, 9 Review, Stau 299, The-Coral-
+      Coldplay-Kandidaten sichtbar), Ingest-Trigger-Echtlauf ee80ee72:
+      POST→Queue→Executor→120 s Lock-Warte→ehrliche Deferral-Antwort.
+      **Offen (Nutzer-Taps):** Review-Entscheidungen zu den 9 echten
+      Units (Tribute bleibt bewusst in Review!), Telegram-/status-Tap
+      (Story 9.2), Hell-Theme-Blick, Override-prompt-Fluss
 
 Bewusst später (eigene Story, kein Teil dieses EPICs): generelles
 Versions-Pinning für alle Import-Abhängigkeiten (Nutzer-Strategie
