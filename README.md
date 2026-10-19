@@ -145,6 +145,14 @@ when ignored; taps on stale offers (bot restart) get an alert.
    plus the timer-ingest stand from `state.json` (unit counts, last
    change, whether an ingest is running right now) and a review-backlog
    callout when units are waiting on a decision (Story 9.2).
+5. While the bot runs it also serves the **Import-Monitor endpoint** on
+   `http://<host>:8283` (LAN-only, no auth — same posture as the
+   MusicGrabber UI): `GET /api/status` returns a JSON snapshot (job
+   queue, ingest stand incl. per-unit statuses, review queue,
+   `_incoming` backlog), `POST /api/action` accepts `{action: asis |
+   retry | ingest}` jobs into the same serial queue the Telegram bot
+   uses. Config override: `musik: bot_http: {enabled, host, port}`.
+   This is the data source for the EPIC 9 web tab.
 
 This bot is **independent** of the ZCode desktop Telegram relay — it runs
 as its own service with its own token.

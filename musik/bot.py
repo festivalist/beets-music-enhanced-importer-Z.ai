@@ -232,6 +232,12 @@ def _execute_job(job: dict, send) -> None:
     if job.get("kind") == "album":
         _execute_album(job, send)
         return
+    if job.get("kind") == "retry":
+        _execute_retry(job, send)
+        return
+    if job.get("kind") == "ingest":
+        _execute_ingest(job, send)
+        return
     query = job["text"].strip()
     print(f"bot: job {job['id']} running: {query[:120]}")
     if _is_free_text(query) and _try_musicgrabber(job, query, send):
@@ -313,6 +319,72 @@ def _execute_asis(job: dict, send) -> None:
                         status="error" if failed else "done",
                         finished=time.time(), summary=summary)
     send(summary or "fertig")
+
+
+def _execute_retry(job: dict, send) -> None:
+    """Network/unmatched-Units zurück auf pending setzen — der nächste
+    Ingest-Lauf versucht sie erneut. Dasselbe Koordinationsmuster wie
+    überall im Bot: state.json nur unter dem ingest.lock schreiben."""
+    paths = job.get("unit_paths") or []
+    targets = {os.path.normcase(os.path.normpath(p)) for p in paths}
+    box: list[int] = []
+
+    def flip() -> None:
+        st = state_mod.load()
+        n = 0
+        for u in state_mod.units(st).values():
+            up = os.path.normcase(os.path.normpath(u.get("path") or ""))
+            if targets and up not in targets:
+                continue
+            if u.get("status") in ("network", "unmatched"):
+                state_mod.set_status(u, "pending", "")
+                n += 1
+        state_mod.save(st)
+        box.append(n)
+
+    try:
+        locked = _run_exclusive(flip, patience=120)
+    except Exception as e:
+        traceback.print_exc()
+        msg = f"❌ Retry fehlgeschlagen: {type(e).__name__}: {str(e)[:200]}"
+        jobs_mod.update_job(job["id"], status="error",
+                            finished=time.time(), summary=msg)
+        send(msg)
+        return
+    if locked:
+        summary = (f"🔁 {box[0] if box else 0} Unit(s) auf pending — "
+                   "der nächste Ingest versucht sie erneut.")
+    else:
+        summary = ("⏳ Ein Ingest läuft gerade — der Retry wirkt beim "
+                   "nächsten Lauf mit.")
+    jobs_mod.update_job(job["id"], status="done", finished=time.time(),
+                        summary=summary)
+    send(summary)
+
+
+def _execute_ingest(job: dict, send) -> None:
+    """Manueller Ingest-Lauf — exakt derselbe Aufruf wie der Timer
+    (cmd_ingest unter dem ingest.lock)."""
+    from . import ingest as ingest_mod
+
+    send("🔄 Ingest-Lauf angestoßen …")
+    try:
+        locked = _run_exclusive(ingest_mod.cmd_ingest, patience=120)
+    except Exception as e:
+        traceback.print_exc()
+        msg = f"❌ Ingest fehlgeschlagen: {type(e).__name__}: {str(e)[:200]}"
+        jobs_mod.update_job(job["id"], status="error",
+                            finished=time.time(), summary=msg)
+        send(msg)
+        return
+    if locked:
+        summary = "✅ Ingest-Lauf abgeschlossen."
+    else:
+        summary = ("⏳ Ein anderer Ingest läuft — dein Auftrag ist damit "
+                   "abgedeckt (der Lauf nimmt alle Units mit).")
+    jobs_mod.update_job(job["id"], status="done", finished=time.time(),
+                        summary=summary)
+    send(summary)
 
 
 def _asis_candidates() -> list[dict]:
@@ -567,6 +639,8 @@ def _run_job(job: dict, app, loop) -> None:
     chat_id = job["chat_id"]
 
     def send(text: str, markup=None) -> None:
+        if not chat_id:
+            return  # Import-Monitor-Job (HTTP): kein Telegram-Push
         try:
             fut = asyncio.run_coroutine_threadsafe(
                 app.bot.send_message(chat_id=chat_id, text=text[:4000],
@@ -595,6 +669,15 @@ async def _worker(app) -> None:
 async def _post_init(app) -> None:
     app.bot_data["queue"] = asyncio.Queue()
     app.create_task(_worker(app))
+    http_cfg = musik_config().get("bot_http") or {}
+    if http_cfg.get("enabled", True):
+        from . import bot_http
+
+        bot_http.start(app, asyncio.get_running_loop(),
+                       app.bot_data["queue"],
+                       host=http_cfg.get("host", ""),
+                       port=int(http_cfg.get("port",
+                                             bot_http.DEFAULT_PORT)))
     me = await app.bot.get_me()
     print(f"bot: listening as @{me.username} (long polling, Ctrl+C to stop)")
 

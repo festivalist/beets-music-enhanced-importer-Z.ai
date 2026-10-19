@@ -198,6 +198,19 @@ journalctl -u musik-bot -f                # Log live mitverfolgen
 Danach: `/start` → Begrüßung, `/status` → „gerade läuft nichts", `/asis` →
 wartende Import-Einheiten als Knöpfe. Fertig.
 
+**Import-Monitor-Endpoint (ab Story 9.1):** Der Bot öffnet im selben
+Prozess einen LAN-HTTP-Endpoint — **Port 8283**, nur LAN, keine Auth
+(dieselbe Betriebsart wie die MusicGrabber-UI; kein Port-Forwarding!).
+`GET http://<pi>:8283/api/status` liefert den Import-Snapshot
+(Job-Queue, Ingest-Stand, Review-Queue, `_incoming`-Stau), `POST
+/api/action` nimmt Aufträge an (asis/retry/ingest) — die Grundlage für
+den Web-Tab aus EPIC 9. Abschalten oder Port ändern in `config.yaml`:
+
+```yaml
+musik:
+    bot_http: {enabled: false}     # oder {port: 8xxx, host: 127.0.0.1}
+```
+
 ## Phase 5 — Plex Media Server (auf dem Pi) + Plexamp-Anbindung
 
 **5.1 Installation (ARM64):**

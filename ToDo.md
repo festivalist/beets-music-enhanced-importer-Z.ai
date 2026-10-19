@@ -484,6 +484,14 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       Job-Queue: review-apply, retry, asis, ingest-trigger). Wiederverwendet
       `_run_exclusive`/jobs vollständig, keine neue Executor-Logik. Test:
       Smoke gegen seeded state.json; Abnahme auf dem Pi mit echtem Ingest.
+      — **Code erledigt 2026-10-19** (`musik/bot_http.py` + Job-Kinds
+      retry/ingest im Bot; chat_id 0 = kein Telegram-Push; Smoke
+      manual_tests/smoke_bot_http.py inkl. HTTP-Roundtrip grün; Port
+      8283, config `musik: bot_http: {enabled, host, port}`). **Offen:
+      Abnahme auf dem Pi** (endpoint live gegen echten Ingest) —
+      review-apply als Aktion bewusst auf 9.5 verschoben
+      (apply_decisions ist CSV-zentriert, bekommt mit dem Web-Tab seine
+      per-Unit-API)
 - [ ] 9.2 `/status`-Erweiterung — Telegram-Kurzüberblick (Nutzer-Wunsch
       „ganz kurz“): eine Zeile Timer-Ingest-Stand aus state.json (Counts +
       letzte Änderung + „läuft gerade“ via ingest.lock-Probe; Windows-Dev
