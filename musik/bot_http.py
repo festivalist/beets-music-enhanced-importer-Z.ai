@@ -28,6 +28,9 @@ DEFAULT_PORT = 8283
 # Status, aus denen eine Unit per Aktion wieder angestoßen werden darf
 # (deckungsgleich mit _asis_candidates im Bot).
 CANDIDATE_STATUSES = ("review", "unmatched", "network", "pending")
+# review.csv-Vokabular (review.py) + reviewbare Ausgangs-Statusse
+REVIEW_DECISIONS = ("accept", "accept2", "override", "unmatched", "ignore")
+REVIEWABLE_STATUSES = ("review", "unmatched", "network")
 
 _refs: dict | None = None
 _refs_lock = threading.Lock()
@@ -63,6 +66,28 @@ def snapshot() -> dict:
           "n_files": len(u.get("files") or [])}
          for u in state_mod.units(st).values()),
         key=lambda u: (u["status"], u["path"] or ""))
+    # Review-Liste reicher als die slim Units: Kandidaten-Labels für die
+    # Aktions-Buttons im Tab (Story 9.5), ohne ids — die Apply-Logik liest
+    # sie selbst aus dem state.
+    review = []
+    for u in state_mod.units(st).values():
+        if u.get("status") != "review":
+            continue
+        review.append({
+            "path": u.get("path"),
+            "reason": (u.get("reason") or "")[:200],
+            "updated": u.get("updated"),
+            "n_files": len(u.get("files") or []),
+            "guessed": {k: (u.get("guessed") or {}).get(k, "")
+                        for k in ("artist", "album")},
+            "candidates": [
+                {"source": c.get("source", ""), "artist": c.get("artist", ""),
+                 "album": c.get("album", ""), "year": c.get("year", ""),
+                 "distance": c.get("distance", "")}
+                for c in (u.get("candidates") or [])[:3]
+            ],
+        })
+    review.sort(key=lambda u: u["path"] or "")
     sd = state_dir()
     if os.path.isdir(sd):
         from .bot import _ingest_busy  # lazy: kein Import-Zirkel
@@ -84,7 +109,7 @@ def snapshot() -> dict:
                                default=None),
             "units": units,
         },
-        "review": [u for u in units if u["status"] == "review"],
+        "review": review,
         "backlog": {"audio_files": backlog},
     }
 
@@ -103,9 +128,43 @@ def handle_action(payload: dict) -> tuple[int, dict]:
     if action == "ingest":
         return _enqueue_job("Ingest-Trigger (Import-Monitor)", kind="ingest")
     if action == "review":
-        return 400, {"error": "review-apply folgt mit dem Web-Tab "
-                              "(Story 9.5)"}
+        return _action_review(payload)
     return 400, {"error": f"unbekannte Aktion: {action!r}"}
+
+
+def _action_review(payload: dict) -> tuple[int, dict]:
+    """Review-Entscheidungen (review.csv-Vokabular) in die Queue legen;
+    der Executor läuft unter dem ingest.lock."""
+    rows = payload.get("decisions") or []
+    if not rows:
+        return 400, {"error": "decisions fehlt"}
+    st = state_mod.load()
+    bad: list[str] = []
+    canon: list[dict] = []
+    for d in rows:
+        unit = state_mod.get_unit(st, d.get("unit_path", ""))
+        decision = (d.get("decision") or "").strip().lower()
+        if (not unit or decision not in REVIEW_DECISIONS
+                or unit.get("status") not in REVIEWABLE_STATUSES):
+            bad.append(d.get("unit_path", "?"))
+            continue
+        canon.append({
+            "unit_path": unit.get("path") or d["unit_path"],
+            "decision": decision,
+            "override_artist": (d.get("override_artist") or "").strip(),
+            "override_album": (d.get("override_album") or "").strip(),
+            "override_mbid": (d.get("override_mbid") or "").strip(),
+            "notes": (d.get("notes") or "").strip(),
+        })
+    if bad:
+        return 400, {"error": "Entscheidungen nicht ausführbar (fremder "
+                              "Pfad, unbekannte decision oder Status "
+                              f"außerhalb {list(REVIEWABLE_STATUSES)})",
+                     "units": bad}
+    if not canon:
+        return 400, {"error": "keine gültigen Entscheidungen"}
+    return _enqueue_job(f"review apply {len(canon)} (Import-Monitor)",
+                        kind="review", decisions=canon)
 
 
 def _action_asis(payload: dict) -> tuple[int, dict]:

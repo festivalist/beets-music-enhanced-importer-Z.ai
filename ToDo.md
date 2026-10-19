@@ -529,6 +529,19 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       Ingest-Trigger als Buttons → POST auf 9.1; Bestätigungsstufe für
       bibliotheksschreibende Aktionen; Fortschritt aus der Job-Queue.
       Blockiert von 9.4. Test: je Aktionstyp ein Echtlauf auf dem Pi.
+      — **Code erledigt 2026-10-19**: `review.apply_decisions_rows()`
+      (CSV-freier Kern, apply_decisions delegiert nur noch), Bot-Job-Kind
+      `review` (apply unter ingest.lock), Endpoint-Aktion `review`
+      (Vokabular accept/accept2/override/unmatched/ignore, Pre-Validierung
+      gegen Status+Pfad), Snapshot-Review trägt jetzt Kandidaten-Labels;
+      Tab-Buttons K1/K2/As-is/Override/Ignorieren je Review-Unit + global
+      „Ingest jetzt“/„Netz-Retry“, Bestätigungsdialoge, Erfolgsmeldung
+      überlebt Poll-Re-Renders. Smoke smoke_review_apply_rows.py (gemockter
+      Engine-Layer: accept/accept2 forcieren die richtigen Kandidaten-IDs,
+      Abfänger-Zweige, CSV/Report-Refresh) + erweiterter smoke_bot_http
+      grün; Browser-Abnahme gegen echte bot_http-Instanz: K1/K2/Ignore/
+      Ingest-Trigger mit confirm-Dialog, Queue-Zähler wächst, Screenshot
+      ok. **Offen: Pi-Echtläufe** (je Aktionstyp 1× gegen echte Daten)
 
 Bewusst später (eigene Story, kein Teil dieses EPICs): generelles
 Versions-Pinning für alle Import-Abhängigkeiten (Nutzer-Strategie

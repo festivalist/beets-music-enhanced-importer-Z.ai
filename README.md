@@ -150,12 +150,15 @@ when ignored; taps on stale offers (bot restart) get an alert.
    MusicGrabber UI): `GET /api/status` returns a JSON snapshot (job
    queue, ingest stand incl. per-unit statuses, review queue,
    `_incoming` backlog), `POST /api/action` accepts `{action: asis |
-   retry | ingest}` jobs into the same serial queue the Telegram bot
-   uses. Config override: `musik: bot_http: {enabled, host, port}`.
-   The **Monitor tab** in the MusicGrabber UI (`musicgrabber/overlay/`,
-   EPIC 9) renders this snapshot: ingest run state, filterable unit
-   list, review backlog, `_incoming` count — see
-   `musicgrabber/overlay/README.md`.
+   retry | ingest | review}` jobs into the same serial queue the
+   Telegram bot uses (`review` carries `decisions` in the review.csv
+   vocabulary: accept/accept2/override/unmatched/ignore). Config
+   override: `musik: bot_http: {enabled, host, port}`. The **Monitor
+   tab** in the MusicGrabber UI (`musicgrabber/overlay/`, EPIC 9)
+   renders the snapshot AND drives the actions: per review unit the
+   candidate buttons (K1/K2), as-is, override and ignore — each behind
+   a confirmation, executed by the bot under the ingest lock, progress
+   visible in the Bot-Jobs block. See `musicgrabber/overlay/README.md`.
 
 This bot is **independent** of the ZCode desktop Telegram relay — it runs
 as its own service with its own token.

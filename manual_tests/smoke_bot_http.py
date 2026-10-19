@@ -80,6 +80,16 @@ def main() -> int:
         paths_mod.incoming_dir = lambda: inc
         jobs_mod.state_dir = lambda: sd  # Module-Bindung in jobs.py
         _seed_state(sd)
+        # Review-Unit mit Kandidaten anreichern (Snapshot/Action-Tests)
+        st = state_mod.load()
+        ru = state_mod.get_unit(st, r"C:\lib\review-album")
+        ru["candidates"] = [{"id": "cand-1", "artist": "A One",
+                             "album": "Alpha", "year": "2001",
+                             "distance": 0.1, "source": "mb"},
+                            {"id": "cand-2", "artist": "A Two",
+                             "album": "Beta", "year": "2002",
+                             "distance": 0.2, "source": "mb"}]
+        state_mod.save(st)
 
         loop = asyncio.new_event_loop()
         threading.Thread(target=loop.run_forever, daemon=True).start()
@@ -150,9 +160,25 @@ def main() -> int:
             ijob = qget()
             assert ijob["kind"] == "ingest", ijob
 
-            # 6) review → 400 mit 9.5-Hinweis; Unbekanntes → 400; 404
+            # 6) review-Aktion (Story 9.5): gültige Entscheidung → 200 +
+            #    kind-review-Job; ohne decisions / unbekanntes Vokabular → 400
             code, out = _post(port, "/api/action", {"action": "review"})
-            assert code == 400 and "9.5" in out["error"], (code, out)
+            assert code == 400 and "decisions fehlt" in out["error"], (code, out)
+            code, out = _post(port, "/api/action", {
+                "action": "review",
+                "decisions": [{"unit_path": r"C:\lib\review-album",
+                               "decision": "accept"}]})
+            assert code == 200, (code, out)
+            revjob = qget()
+            assert revjob["kind"] == "review", revjob
+            assert revjob["decisions"][0]["decision"] == "accept", revjob
+            assert revjob["decisions"][0]["unit_path"].endswith(
+                "review-album"), revjob
+            code, out = _post(port, "/api/action", {
+                "action": "review",
+                "decisions": [{"unit_path": r"C:\lib\review-album",
+                               "decision": "hokuspokus"}]})
+            assert code == 400 and "nicht ausführbar" in out["error"], (code, out)
             code, out = _post(port, "/api/action", {"action": "hokuspokus"})
             assert code == 400, (code, out)
             code, _out, _hdr = _get(port, "/api/nope")

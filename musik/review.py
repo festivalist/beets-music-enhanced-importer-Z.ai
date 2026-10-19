@@ -137,39 +137,55 @@ def read_decisions(csv_path: str) -> list[dict]:
 
 def apply_decisions(csv_path: str | None = None) -> int:
     """Process an edited review.csv: re-import accepted/overridden units."""
-    from . import engine
     from .paths import reports_dir
 
     csv_path = csv_path or os.path.join(reports_dir(), "review.csv")
     if not os.path.isfile(csv_path):
         print(f"no review csv at {csv_path}")
         return 1
+    apply_decisions_rows(read_decisions(csv_path))
+    return 0
 
-    decisions = read_decisions(csv_path)
-    if not decisions:
-        print("review.csv contains no decisions")
-        return 0
+
+def apply_decisions_rows(rows: list[dict]) -> tuple[int, list[str]]:
+    """Entscheidungen direkt ausführen (Shape wie read_decisions-Zeilen:
+    unit_path/decision/override_*/notes). Der CSV-freie Einstieg für den
+    Import-Monitor (Story 9.5) — Aufrufer koordiniert den ingest.lock.
+    Liefert (Anzahl angewandt, Meldungen je Entscheidung)."""
+    from . import engine
 
     st = state_mod.load()
     applied = 0
-    for d in decisions:
+    messages: list[str] = []
+    for d in rows:
         unit = state_mod.get_unit(st, d["unit_path"])
         if unit is None:
+            msg = f"unbekannte Unit (übersprungen): {d['unit_path']}"
             print(f"  unknown unit (skipped): {d['unit_path']}")
+            messages.append(msg)
             continue
         if unit.get("status") not in ("review", "unmatched", "network"):
+            msg = (f"nicht reviewbar (Status {unit.get('status')}): "
+                   f"{os.path.basename(d['unit_path'])}")
             print(f"  not reviewable, current status {unit.get('status')}: {d['unit_path']}")
+            messages.append(msg)
             continue
 
         if d["decision"] == "ignore":
-            state_mod.set_status(unit, "ignored", d["notes"] or "ignored via review")
+            state_mod.set_status(unit, "ignored",
+                                 d.get("notes") or "ignored via review")
             state_mod.save(st)
             applied += 1
+            messages.append(f"🔇 ignoriert: "
+                            f"{os.path.basename(unit.get('import_path') or d['unit_path'])}")
             continue
         if d["decision"] == "unmatched":
-            state_mod.set_status(unit, "unmatched", "confirmed unmatched via review")
+            state_mod.set_status(unit, "unmatched",
+                                 "confirmed unmatched via review")
             state_mod.save(st)
             applied += 1
+            messages.append(f"❓ auf unmatched gesetzt: "
+                            f"{os.path.basename(unit.get('import_path') or d['unit_path'])}")
             continue
 
         forced = {}
@@ -180,18 +196,23 @@ def apply_decisions(csv_path: str | None = None) -> int:
             forced["album_id"] = _cand_id(unit, 2)
             forced["track_id"] = _cand_id(unit, 2)
         elif d["decision"] == "override":
-            if d["override_mbid"]:
+            if d.get("override_mbid"):
                 forced["album_id"] = d["override_mbid"]
                 forced["track_id"] = d["override_mbid"]
-            if d["override_artist"]:
+            if d.get("override_artist"):
                 forced["artist"] = d["override_artist"]
-            if d["override_album"]:
+            if d.get("override_album"):
                 forced["album"] = d["override_album"]
             if not forced:
+                msg = (f"override ohne Felder (übersprungen): "
+                       f"{os.path.basename(d['unit_path'])}")
                 print(f"  override without fields (skipped): {d['unit_path']}")
+                messages.append(msg)
                 continue
         else:
+            msg = f"unbekannte Entscheidung {d['decision']!r} (übersprungen)"
             print(f"  unknown decision '{d['decision']}' (skipped): {d['unit_path']}")
+            messages.append(msg)
             continue
 
         # Singleton units have no album-level search: an artist/album-only
@@ -199,8 +220,11 @@ def apply_decisions(csv_path: str | None = None) -> int:
         # reporting "applied".
         if (unit.get("singleton") or unit.get("split_into_singletons")) \
                 and not (forced.get("album_id") or forced.get("track_id")):
+            msg = (f"override am Singleton braucht eine MBID: "
+                   f"{os.path.basename(d['unit_path'])}")
             print(f"  override on a singleton needs an MBID "
                   f"(artist/album search is album-only): {d['unit_path']}")
+            messages.append(msg)
             continue
 
         engine.setup_beets()
@@ -217,10 +241,15 @@ def apply_decisions(csv_path: str | None = None) -> int:
             outcome = engine.run_unit_real(lib, unit, decider)
             engine._merge_result(unit, outcome)
             state_mod.set_status(unit, outcome["status"], outcome.get("reason", ""))
+            msg = (f"angewandt [{unit['status']}] "
+                   f"{os.path.basename(unit['import_path'])}")
             print(f"  applied [{unit['status']}] {os.path.basename(unit['import_path'])}")
+            messages.append(msg)
         except Exception as exc:
             state_mod.set_status(unit, "error", f"{type(exc).__name__}: {exc}")
+            msg = f"FEHLER bei {os.path.basename(d['unit_path'])}: {exc}"
             print(f"  ERROR applying {d['unit_path']}: {exc}")
+            messages.append(msg)
         state_mod.save(st)
         applied += 1
 
@@ -231,7 +260,7 @@ def apply_decisions(csv_path: str | None = None) -> int:
 
     report_mod.write_import_report(st)
     print(f"processed {applied} decision(s)")
-    return 0
+    return applied, messages
 
 
 def _cand_id(unit: dict, n: int) -> str:

@@ -238,6 +238,9 @@ def _execute_job(job: dict, send) -> None:
     if job.get("kind") == "ingest":
         _execute_ingest(job, send)
         return
+    if job.get("kind") == "review":
+        _execute_review(job, send)
+        return
     query = job["text"].strip()
     print(f"bot: job {job['id']} running: {query[:120]}")
     if _is_free_text(query) and _try_musicgrabber(job, query, send):
@@ -384,6 +387,42 @@ def _execute_ingest(job: dict, send) -> None:
                    "abgedeckt (der Lauf nimmt alle Units mit).")
     jobs_mod.update_job(job["id"], status="done", finished=time.time(),
                         summary=summary)
+    send(summary)
+
+
+def _execute_review(job: dict, send) -> None:
+    """Review-Entscheidungen aus dem Import-Monitor ausführen —
+    apply_decisions_rows unter dem ingest.lock (kann die Bibliothek
+    schreiben, also dieselbe Koordination wie jeder Import)."""
+    from . import review as review_mod
+
+    rows = job.get("decisions") or []
+    box: list = []
+
+    def run() -> None:
+        box.append(review_mod.apply_decisions_rows(rows))
+
+    try:
+        locked = _run_exclusive(run, patience=120)
+    except Exception as e:
+        traceback.print_exc()
+        msg = (f"❌ Review-Apply fehlgeschlagen: {type(e).__name__}: "
+               f"{str(e)[:200]}")
+        jobs_mod.update_job(job["id"], status="error",
+                            finished=time.time(), summary=msg)
+        send(msg)
+        return
+    if locked and box:
+        applied, messages = box[0]
+        summary = (f"📋 Review: {applied} Entscheidung(en) angewandt\n"
+                   + "\n".join(messages[:10]))
+    elif locked:
+        summary = "📋 Review: 0 Entscheidungen angewandt."
+    else:
+        summary = ("⏳ Ein Ingest läuft gerade — Entscheidungen beim "
+                   "nächsten Lauf erneut senden.")
+    jobs_mod.update_job(job["id"], status="done", finished=time.time(),
+                        summary=summary[:1500])
     send(summary)
 
 
