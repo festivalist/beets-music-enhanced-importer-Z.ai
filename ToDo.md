@@ -467,6 +467,51 @@ dann 7.4→7.5→7.6 an einem Abend. Rollback bis 7.6: Pi 5 unangetastet.
       (Linux-Absatz + Dateitabelle). Offen vom Epic: nichts — Dell-Tag:
       OMV-Modul erstmalig real, 7.7 Alt-Import, 8.8-Migrationsstory
 
+## EPIC 9 — Import-Monitor (Grilling 2026-10-19; Scope-Change in SCOPE §2 dokumentiert)
+
+Sichtbarkeit der Automatisierung ohne SSH: Web-Tab in der MusicGrabber-UI
+zeigt Laufstatus, Unit-Status, Review-Queue und `_incoming`-Stau; Aktionen
+laufen über den Bot-Executor. Schließt die Sichtbarkeitslücke aus 4.5(3)
+(Review-Units lagen tagelang unbemerkt). Entscheidungen 2026-10-19:
+Overlay-Fork auf gepinntem MG-Image 4.3.1 (ADR-0001), Aktionen nur über
+Bot-HTTP-Endpoint mit ingest.lock (ADR-0002), LAN-only ohne Login (gleiche
+Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
+
+- [ ] 9.1 Bot-HTTP-Endpoint (Executor-API) — bot.py bekommt LAN-Endpoint
+      (Bind nur LAN-Interface, keine Auth wie MG-UI): GET-Snapshot
+      (Job-Queue + state.json-Counts + Units je Status + Review-Liste +
+      `_incoming`-Stau) und POST-Aktionen (enqueue in die bestehende
+      Job-Queue: review-apply, retry, asis, ingest-trigger). Wiederverwendet
+      `_run_exclusive`/jobs vollständig, keine neue Executor-Logik. Test:
+      Smoke gegen seeded state.json; Abnahme auf dem Pi mit echtem Ingest.
+- [ ] 9.2 `/status`-Erweiterung — Telegram-Kurzüberblick (Nutzer-Wunsch
+      „ganz kurz“): eine Zeile Timer-Ingest-Stand aus state.json (Counts +
+      letzte Änderung + „läuft gerade“ via ingest.lock-Probe; Windows-Dev
+      ohne fcntl → „unbekannt“) + Review-Stau-Zeile. Freistehend,
+      kleinster Tracer. Test: seeded state.json; echte `/status` auf dem
+      Pi beim nächsten Bot-Deploy. — **Code + Smoke
+      (manual_tests/smoke_status_state.py) erledigt 2026-10-19; offen:
+      /status-Echtprüfung auf dem Pi beim nächsten Deploy**
+- [ ] 9.3 Overlay-Deployment — docker-compose pinnt
+      `g33kphr33k/musicgrabber:4.3.1` (statt latest) + Bind-Mount
+      `musicgrabber/overlay/static` → MG-static (Tab-Dateien aus diesem
+      Repo, Upstream-Backend unangetastet); install.d-Modul + PI-SETUP.md
+      same-commit; Testmatrix-Punkt „Overlay-Verträglichkeit bei Bump“.
+      Blockiert: —
+- [ ] 9.4 Web-Tab „Import-Monitor“ (Anzeige) — Vanilla-JS-Tab in
+      `musicgrabber/overlay/static`: Laufstatus (a), Statuszahlen +
+      filterbare Unit-Liste (b), Review-Queue (c), `_incoming`-Stau (d);
+      Poll ~5 s gegen den 9.1-Endpoint. Blockiert von 9.1, 9.3. Test:
+      Browser-Check gegen Mock-Endpoint + Pi.
+- [ ] 9.5 Aktionen im Tab — Review annehmen/override, Retry, asis,
+      Ingest-Trigger als Buttons → POST auf 9.1; Bestätigungsstufe für
+      bibliotheksschreibende Aktionen; Fortschritt aus der Job-Queue.
+      Blockiert von 9.4. Test: je Aktionstyp ein Echtlauf auf dem Pi.
+
+Bewusst später (eigene Story, kein Teil dieses EPICs): generelles
+Versions-Pinning für alle Import-Abhängigkeiten (Nutzer-Strategie
+2026-10-19).
+
 ## Beim Nutzer anfragen (bei nächster Gelegenheit)
 
 - Pi: SSH-Zugang/Host bekannt geben für Ferndeployment von Phase 9 — oder
