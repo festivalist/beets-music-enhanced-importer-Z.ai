@@ -605,6 +605,15 @@ docker compose logs -f           # Start beobachten (erste Init kann dauern)
 Web-UI: `http://192.168.50.47:38274` — nur LAN, kein Port-Forwarding (von
 unterwegs läuft alles über Telegram-Bot und Plexamp, nicht über MG).
 
+**9.3b Overlay-UI (Story 9.3, ADR-0001):** Das Image ist **gepinnt
+(`g33kphr33k/musicgrabber:4.3.1`)**; Updates sind bewusste Tag-Bumps. Die
+statischen UI-Dateien werden per Bind-Mount
+(`./overlay/static:/app/static:ro`) aus dem Repo-Checkout überlagert —
+dort lebt später der Import-Monitor-Tab (EPIC 9). Das Upstream-Backend
+bleibt unangetastet. Bump-Prozedur mit Overlay-Verträglichkeitscheck:
+`musicgrabber/overlay/README.md`. Der Installer (70-musicgrabber) prüft
+Overlay-Datei und `/static/app.js`-Auslieferung.
+
 **9.4 Grundeinstellungen (Settings-Tab):**
 
 - Quellen: Monochrome, YouTube, SoundCloud, FreeMp3Cloud aktiv; JioSaavn
@@ -641,7 +650,7 @@ errors einer Seite, der nächste Timer-Lauf holt nach.
 | Aufgabe | Befehl |
 |---|---|
 | Status / Logs | `docker compose ps` / `docker compose logs -f` |
-| Update | `cd ~/musik/musicgrabber && docker compose pull && docker compose up -d` |
+| Update | `cd ~/musik/musicgrabber && docker compose pull && docker compose up -d` — vorher Overlay-Bump-Prozedur (`overlay/README.md`) |
 | Stop / Start | `docker compose down` / `docker compose up -d` |
 | Backup | `musicgrabber/data/` mitsichern (sqlite-Index + Einstellungen) |
 | Staging manuell importieren | `.venv/bin/python musik.py ingest` (macht der Timer sonst alle 15 min) |

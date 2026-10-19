@@ -10,11 +10,13 @@ mkdir -p "$ROOT/fakebin" "$ROOT/mods/lib" "$ROOT/state" "$ROOT/proj/musicgrabber
 cp "$REPO/install.d/lib/common.sh" "$ROOT/mods/lib/"
 cp "$REPO/install.d/70-musicgrabber.sh" "$ROOT/mods/"
 cp "$REPO/musicgrabber/.env.example" "$ROOT/proj/musicgrabber/.env.example"
+mkdir -p "$ROOT/proj/musicgrabber/overlay/static"
+printf '<html>overlay</html>' > "$ROOT/proj/musicgrabber/overlay/static/index.html"
 
 cat > "$ROOT/fakebin/docker" <<'EOF'
 #!/usr/bin/env bash
 case "$1 $2" in
-  "compose ps")   printf 'NAME IMAGE COMMAND SERVICE\nmusicgrabber g33kphr33k/musicgrabber:latest Up musicgrabber\n'; exit 0 ;;
+  "compose ps")   printf 'NAME IMAGE COMMAND SERVICE\nmusicgrabber g33kphr33k/musicgrabber:4.3.1 Up musicgrabber\n'; exit 0 ;;
   "inspect -f")   echo true; exit 0 ;;   # Container läuft (Up-Pfad übersprungen)
 esac
 exit 0
@@ -62,6 +64,14 @@ rm -rf "$ROOT/state" "$ROOT/lib-music"; mkdir -p "$ROOT/state"
 echo "MOD_detect=ok" > "$ROOT/state/state.env"
 out=$(run_mod) || true
 check "Skip mit Hinweis"              "echo \"\$out\" | grep -q 'kein Musik-Root'"
+
+echo "== Szenario 4: Overlay fehlt → klarer Fail (ADR-0001) =="
+reset_state
+rm -f "$ROOT/proj/musicgrabber/overlay/static/index.html"
+out=$(run_mod) || true
+check "Overlay-Fail mit Hinweis"      "echo \"\$out\" | grep -q 'overlay/static/index.html fehlt'"
+check "kein .env angelegt bei Fail"   "[[ ! -f '$ROOT/proj/musicgrabber/.env' ]]"
+printf '<html>overlay</html>' > "$ROOT/proj/musicgrabber/overlay/static/index.html"
 
 echo
 echo "================ ERGEBNIS: $PASS bestanden, $FAIL fehlgeschlagen ==============="

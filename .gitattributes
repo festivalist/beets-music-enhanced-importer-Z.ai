@@ -3,3 +3,7 @@
 # beim Deploy `bash\r`-Fehler produzieren. Windows-eigene Skripte (.bat/.ps1)
 # bleiben von dieser Regel unberührt.
 *.sh text eol=lf
+
+# Vendored Upstream-UI-Dateien (Overlay-Fork, ADR-0001): byte-identisch
+# zum gepinnten Tag halten — keine EOL-Konvertierung, saubere Bump-Diffs.
+musicgrabber/overlay/static/** -text

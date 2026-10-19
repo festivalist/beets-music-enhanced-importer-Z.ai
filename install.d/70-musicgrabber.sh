@@ -2,8 +2,9 @@
 # Beschaffungs-Engine Nr. 2 aus dem Repo-Compose-File (PI-SETUP Phase 9).
 # Nordstern/SCOPE: MG beschafft ausschließlich bis ins Staging
 # <library>/_incoming/musicgrabber — beets/musik bleibt einzige schreibende
-# Instanz der echten Bibliothek; das compose-File mountet deshalb NUR das
-# Staging und bleibt unangetastet (Pfadstabilität über /mnt/music).
+# Instanz der echten Bibliothek; das compose-File mountet deshalb nur das
+# Staging (plus read-only die Overlay-UI-Dateien, ADR-0001) und fasst die
+# Bibliothek nie an (Pfadstabilität über /mnt/music).
 #
 # Live-Lehren eingebaut (Phase 9.8/10): Layout-Anker (Singles/Albums/
 # Playlists) HOST-seitig als Run-User anlegen — NIEMALS im Container
@@ -36,6 +37,13 @@ STAGING="$LIB/_incoming/musicgrabber"
 run sudocmd mkdir -p "$STAGING/Singles" "$STAGING/Albums" "$STAGING/Playlists"
 run sudocmd chown -R "$RUN_UID:$RUN_GID" "$STAGING"
 ok "Staging + Anker (Singles/Albums/Playlists) als $RUN_USER: $STAGING"
+
+# 2b) Overlay-Static muss da sein (ADR-0001: Bind-Mount über /app/static —
+# fehlt er, mountet Docker ein leeres Verzeichnis und die UI 500-t)
+if [[ ! -s "$MGDIR/overlay/static/index.html" ]]; then
+    finish fail "musicgrabber/overlay/static/index.html fehlt — Checkout unvollständig (git pull)? Overlay-Deploy, ADR-0001"
+fi
+ok "Overlay-Static vorhanden (gepinntes Image 4.3.1, ADR-0001)"
 
 # 3) .env aus dem Example (PUID/PGID vom Run-User; KEIN API_KEY — s. compose)
 if [[ ! -f "$MGDIR/.env" ]]; then
@@ -79,8 +87,12 @@ until curl -fsS -o /dev/null "http://127.0.0.1:$MGPORT" 2>/dev/null; do
     printf '    … %ss\n' "$waited"
 done
 ok "Web-UI antwortet (HTTP 200 auf :$MGPORT)"
+if ! curl -fsS -o /dev/null "http://127.0.0.1:$MGPORT/static/app.js"; then
+    finish fail "Web-UI antwortet, aber /static/app.js nicht — Overlay-Mount prüfen (docker compose config; ADR-0001)"
+fi
+ok "Overlay-Static wird ausgeliefert (/static/app.js)"
 
 info "Quellen/Qualität (Monochrome-FLAC lossless-first, Bitrate-Schwelle) im Settings-Tab"
 info "der UI pflegen — Story 1.2. Telegram-Notify: NICHT den musik-bot-Token eintragen!"
-info "Update:  cd musicgrabber && docker compose pull && docker compose up -d"
+info "Update:  docker compose pull && up -d — vorher Overlay-Bump-Prozedur (overlay/README.md)"
 finish ok "MusicGrabber läuft auf :$MGPORT (Staging: $STAGING)"

@@ -505,7 +505,12 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       `musicgrabber/overlay/static` → MG-static (Tab-Dateien aus diesem
       Repo, Upstream-Backend unangetastet); install.d-Modul + PI-SETUP.md
       same-commit; Testmatrix-Punkt „Overlay-Verträglichkeit bei Bump“.
-      Blockiert: —
+      Blockiert: — — **erledigt 2026-10-19 (Repo-Seite)**: Pin + ro-Mount
+      im Compose, alle 6 static-Dateien von Tag v4.3.1 vendored
+      (`.gitattributes -text`), Bump-Prozedur in overlay/README.md,
+      Modul prüft Overlay + `/static/app.js` (Harness 11/11), PI-SETUP
+      9.3b + Update-Zeile. **Offen: Rollout auf dem Pi** (git pull +
+      compose up — beim nächsten Pi-Tag mit 9.1/9.2-Abnahme)
 - [ ] 9.4 Web-Tab „Import-Monitor“ (Anzeige) — Vanilla-JS-Tab in
       `musicgrabber/overlay/static`: Laufstatus (a), Statuszahlen +
       filterbare Unit-Liste (b), Review-Queue (c), `_incoming`-Stau (d);

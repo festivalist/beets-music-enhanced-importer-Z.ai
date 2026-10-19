@@ -4,11 +4,15 @@
 # Instanz, die die echte Bibliothek schreibt. Deshalb mounten wir NUR das
 # Staging-Unterverzeichnis — die Bibliothek selbst bleibt für den Container
 # unsichtbar (Duplikat-/Qualitätshoheit liegt bei der musik-Pipeline).
-# Image ist multi-arch (amd64+arm64, Docker-Hub-Tags geprüft 2026-10-08)
-# und läuft unverändert auf dem Pi 5.
+# Image ist multi-arch (amd64+arm64) und läuft unverändert auf dem Pi 5.
+# Story 9.3 (ADR-0001): Image GEPINNT, Updates bewusst per Tag-Bump mit
+# Overlay-Verträglichkeitscheck (overlay/README.md). Die statischen UI-
+# Dateien werden aus dem Repo-Checkout überlagert (Import-Monitor-Tab,
+# EPIC 9) — das Upstream-Backend bleibt unangetastet.
 services:
   musicgrabber:
-    image: g33kphr33k/musicgrabber:latest   # latest = 4.3.0 (2026-10-02); bei Bedarf auf 4.3.0 pinnen
+    image: g33kphr33k/musicgrabber:4.3.1   # gepinnt; latest stand bei der
+        # Umstellung auf 4.3.0 (2026-10-02) — Bump nur mit Overlay-Check
     container_name: musicgrabber
     restart: unless-stopped
     ports:
@@ -30,3 +34,4 @@ services:
     volumes:
       - ./data:/data                                  # sqlite-Index + App-Daten (persistent!)
       - /mnt/music/_incoming/musicgrabber:/music      # Staging = MGs einziger Schreibbereich
+      - ./overlay/static:/app/static:ro               # Overlay-UI (ADR-0001): unsere statischen Dateien, read-only
