@@ -141,7 +141,10 @@ when ignored; taps on stale offers (bot restart) get an alert.
 4. Now send links: you get progress updates (`⬇️ download`, `📦 N tracks`,
    import) and a summary per album. Free-text track requests additionally
    get the **album offer** described above. `/status` shows queue and
-   history, including live `N/M tracks` counters for running album jobs.
+   history, including live `N/M tracks` counters for running album jobs —
+   plus the timer-ingest stand from `state.json` (unit counts, last
+   change, whether an ingest is running right now) and a review-backlog
+   callout when units are waiting on a decision (Story 9.2).
 
 This bot is **independent** of the ZCode desktop Telegram relay — it runs
 as its own service with its own token.

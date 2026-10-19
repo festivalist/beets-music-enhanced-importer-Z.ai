@@ -687,6 +687,80 @@ def _mg_import_progress(mg_import: dict) -> str:
         return ""
 
 
+def _ingest_busy(state_dir: str) -> bool | None:
+    """True, wenn ein anderer Prozess den ingest.lock hält (Ingest läuft).
+    None, wenn ohne fcntl (Windows-Dev) nicht prüfbar; False bei freiem
+    oder fehlendem Lock."""
+    try:
+        import fcntl
+    except ImportError:
+        return None
+    if not os.path.isdir(state_dir):
+        return False
+    try:
+        fh = open(os.path.join(state_dir, "ingest.lock"), "a+")
+    except OSError:
+        return False
+    try:
+        try:
+            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return True
+        fcntl.flock(fh, fcntl.LOCK_UN)
+        return False
+    finally:
+        fh.close()
+
+
+def _rel_age(ts: float, now: float | None = None) -> str:
+    now = now if now is not None else time.time()
+    d = max(0.0, now - ts)
+    if d < 90:
+        return "gerade eben"
+    if d < 5400:
+        return f"vor {int(d // 60)} min"
+    if d < 172800:
+        return f"vor {int(d // 3600)} h"
+    return f"vor {int(d // 86400)} d"
+
+
+def _ingest_state_lines(state_dir: str | None = None) -> str:
+    """Timer-Ingest-Stand für /status (Story 9.2): Unit-Counts, letzte
+    Änderung, Lock-Probe und Review-Stau aus state.json — derselben Datei,
+    die der Ingest schreibt. "" bei fehlender/leerer state.json."""
+    from .paths import state_dir as _state_dir
+
+    d = state_dir or _state_dir()
+    sf = os.path.join(d, "state.json")
+    if not os.path.isfile(sf):
+        return ""
+    try:
+        with open(sf, encoding="utf-8") as fh:
+            st = json.load(fh)
+    except (OSError, ValueError):
+        return ""
+    counts = state_mod.counts(st)
+    total = sum(counts.values())
+    if not total:
+        return ""
+    order = ("auto", "review", "error", "pending", "unmatched",
+             "network", "duplicate", "ignored")
+    parts = [f"{n} {name}" for name in order if (n := counts.get(name))]
+    updated = [u.get("updated") for u in state_mod.units(st).values()
+               if u.get("updated")]
+    age = _rel_age(max(updated)) if updated else "unbekannt"
+    busy = _ingest_busy(d)
+    busy_txt = (" · 🔄 Ingest läuft gerade" if busy
+                else " · Lock-Status unbekannt (Windows-Dev)"
+                if busy is None else "")
+    lines = [f"🗄 Ingest-Stand: {total} Unit(s) — {', '.join(parts)}"
+             f"{busy_txt} · letzte Änderung {age}"]
+    if counts.get("review"):
+        lines.append(f"⚠️ Review-Stau: {counts['review']} Unit(s) warten "
+                     "auf eine Entscheidung")
+    return "\n".join(lines)
+
+
 async def _cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _authorized(update):
         await _deny(update)
@@ -710,6 +784,9 @@ async def _cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 lines.append(prog)
     else:
         lines.append("💤 gerade läuft nichts")
+    ingest_state = await asyncio.to_thread(_ingest_state_lines)
+    if ingest_state:
+        lines.append(ingest_state)
     lines.append(f"⏳ in Warteschlange: {stats['queued']}")
     for j in stats["recent"]:
         icon = "✅" if j["status"] == "done" else "❌"
