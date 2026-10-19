@@ -152,7 +152,10 @@ when ignored; taps on stale offers (bot restart) get an alert.
    `_incoming` backlog), `POST /api/action` accepts `{action: asis |
    retry | ingest}` jobs into the same serial queue the Telegram bot
    uses. Config override: `musik: bot_http: {enabled, host, port}`.
-   This is the data source for the EPIC 9 web tab.
+   The **Monitor tab** in the MusicGrabber UI (`musicgrabber/overlay/`,
+   EPIC 9) renders this snapshot: ingest run state, filterable unit
+   list, review backlog, `_incoming` count — see
+   `musicgrabber/overlay/README.md`.
 
 This bot is **independent** of the ZCode desktop Telegram relay — it runs
 as its own service with its own token.

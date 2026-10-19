@@ -158,8 +158,24 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type",
                          "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        # CORS (Story 9.4): der Monitor-Tab läuft im Browser auf der
+        # MG-Origin (:38274) und liest hier cross-port. LAN-only ohne
+        # Credentials — "*" ist hier die richtige Postur (ADR-0001).
+        self._cors()
         self.end_headers()
         self.wfile.write(body)
+
+    def _cors(self) -> None:
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods",
+                         "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+
+    def do_OPTIONS(self) -> None:  # Preflight für POST mit JSON-Body
+        self.send_response(204)
+        self._cors()
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def do_GET(self) -> None:
         if self.path.split("?")[0] == "/api/status":

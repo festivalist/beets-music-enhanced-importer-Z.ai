@@ -515,7 +515,16 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       `musicgrabber/overlay/static`: Laufstatus (a), Statuszahlen +
       filterbare Unit-Liste (b), Review-Queue (c), `_incoming`-Stau (d);
       Poll ~5 s gegen den 9.1-Endpoint. Blockiert von 9.1, 9.3. Test:
-      Browser-Check gegen Mock-Endpoint + Pi.
+      Browser-Check gegen Mock-Endpoint + Pi. — **erledigt 2026-10-19
+      (Code + Mock-Abnahme)**: `monitor.js` (standalone, eigenes CSS,
+      XSS-escaping, 5-s-Poll mit Visibility-Pause), 3 markierte Blöcke in
+      index.html + 3 Zeilen in app.js (Sentinel `musik-monitor`), CORS +
+      OPTIONS-Preflight im Endpoint. Browser-Check gegen echte
+      bot_http-Instanz mit Test-Daten grün: Tab rendert (Kopf, Review-
+      Box, Jobs, Chips-Filter, Tabelle), Filter-State über Tab-Wechsel
+      stabil, Upstream-Tags unbeschädigt, Dark-Theme-Passung im
+      Screenshot geprüft. **Offen: Pi-Abnahme** (echte Daten, Hell/Dunkel-
+      Theme, Poll über mehrere Minuten gegen echten Ingest)
 - [ ] 9.5 Aktionen im Tab — Review annehmen/override, Retry, asis,
       Ingest-Trigger als Buttons → POST auf 9.1; Bestätigungsstufe für
       bibliotheksschreibende Aktionen; Fortschritt aus der Job-Queue.

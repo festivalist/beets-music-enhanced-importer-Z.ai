@@ -226,6 +226,9 @@
             <button class="tab" data-tab="artists" id="artistsTabBtn">Artists</button>
             <button class="tab" data-tab="watched">Watched</button>
             <button class="tab" data-tab="queue">Queue</button>
+            <!-- musik-monitor:begin (EPIC 9 — bei Upstream-Bump neu einsetzen, s. overlay/README.md) -->
+            <button class="tab" data-tab="monitor">Monitor</button>
+            <!-- musik-monitor:end -->
             <button class="tab peon-hide" data-tab="stats">Stats</button>
             <button class="tab peon-hide" data-tab="settings">Settings</button>
         </div>
@@ -848,6 +851,12 @@
                 <div id="trashList" class="results"></div>
             </div>
         </div>
+
+        <!-- musik-monitor:begin (EPIC 9 — bei Upstream-Bump neu einsetzen, s. overlay/README.md) -->
+        <div id="monitorTabContainer" class="tab-panel">
+            <div id="monitorContent"></div>
+        </div>
+        <!-- musik-monitor:end -->
 
         <div id="statsTabContainer" class="tab-panel">
             <div class="queue-header">
@@ -1886,5 +1895,8 @@
     <script src="__ROOT_PATH__/static/release-notes.js?v=__CACHE_BUST__"></script>
     <script src="__ROOT_PATH__/static/quips.js?v=__CACHE_BUST__"></script>
     <script src="__ROOT_PATH__/static/app.js?v=__CACHE_BUST__"></script>
+    <!-- musik-monitor:begin (EPIC 9 — bei Upstream-Bump neu einsetzen, s. overlay/README.md) -->
+    <script src="__ROOT_PATH__/static/monitor.js?v=__CACHE_BUST__"></script>
+    <!-- musik-monitor:end -->
 </body>
 </html>

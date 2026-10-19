@@ -463,6 +463,7 @@
         const statsTabContainer = document.getElementById('statsTabContainer');
         const statsContent = document.getElementById('statsContent');
         const settingsTabContainer = document.getElementById('settingsTabContainer');
+        const monitorTabContainer = document.getElementById('monitorTabContainer'); // musik-monitor (EPIC 9, ADR-0001)
         const createPlaylistCheckbox = document.getElementById('createPlaylistCheckbox');
         const playlistNameInput = document.getElementById('playlistNameInput');
         const convertAudioCheckbox = document.getElementById('convertAudio');
@@ -1516,7 +1517,7 @@
         }
 
         // Tab switching
-        const allTabPanels = [resultsTab, bulkTabContainer, artistsTabContainer, watchedTabContainer, queueTabContainer, statsTabContainer, settingsTabContainer];
+        const allTabPanels = [resultsTab, bulkTabContainer, artistsTabContainer, watchedTabContainer, queueTabContainer, statsTabContainer, settingsTabContainer, monitorTabContainer /* musik-monitor (EPIC 9, ADR-0001) */];
         tabs.forEach(tab => {
             tab.addEventListener('click', () => {
                 tabs.forEach(t => t.classList.remove('active'));
@@ -1533,7 +1534,8 @@
                     watched: watchedTabContainer,
                     queue: queueTabContainer,
                     stats: statsTabContainer,
-                    settings: settingsTabContainer
+                    settings: settingsTabContainer,
+                    monitor: monitorTabContainer // musik-monitor (EPIC 9, ADR-0001)
                 };
                 const target = panelMap[currentTab];
                 if (target) target.classList.add('tab-visible');

@@ -42,13 +42,16 @@ def _seed_state(sd: str) -> None:
     state_mod.save(st)
 
 
-def _get(port: str, path: str) -> tuple[int, dict]:
+def _get(port: str, path: str, method: str = "GET") -> tuple[int, dict, dict]:
+    req = urllib.request.Request(f"http://127.0.0.1:{port}{path}",
+                                 method=method)
     try:
-        with urllib.request.urlopen(
-                f"http://127.0.0.1:{port}{path}", timeout=5) as r:
-            return r.status, json.loads(r.read().decode("utf-8"))
+        with urllib.request.urlopen(req, timeout=5) as r:
+            body = r.read().decode("utf-8")
+            return r.status, (json.loads(body) if body.strip() else {}), \
+                dict(r.headers)
     except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read().decode("utf-8"))
+        return e.code, json.loads(e.read().decode("utf-8")), dict(e.headers)
 
 
 def _post(port: str, path: str, payload: dict) -> tuple[int, dict]:
@@ -89,8 +92,16 @@ def main() -> int:
             return fut.result(timeout=5)
 
         try:
+            # 0) CORS + Preflight (Story 9.4: Monitor-Tab liest cross-port)
+            code, _snap, hdr = _get(port, "/api/status")
+            assert hdr.get("Access-Control-Allow-Origin") == "*", hdr
+            code, _out, hdr = _get(port, "/api/status", method="OPTIONS")
+            assert code == 204, code
+            assert hdr.get("Access-Control-Allow-Methods") == \
+                "GET, POST, OPTIONS", hdr
+
             # 1) GET-Snapshot
-            code, snap = _get(port, "/api/status")
+            code, snap, _hdr = _get(port, "/api/status")
             assert code == 200, code
             assert snap["ingest"]["total"] == 3, snap["ingest"]
             assert snap["ingest"]["counts"].get("review") == 1, snap
@@ -144,7 +155,7 @@ def main() -> int:
             assert code == 400 and "9.5" in out["error"], (code, out)
             code, out = _post(port, "/api/action", {"action": "hokuspokus"})
             assert code == 400, (code, out)
-            code, _out = _get(port, "/api/nope")
+            code, _out, _hdr = _get(port, "/api/nope")
             assert code == 404, code
         finally:
             srv.shutdown()
