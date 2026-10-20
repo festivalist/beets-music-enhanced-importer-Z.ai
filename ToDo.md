@@ -582,7 +582,12 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       einen „Meine Aufträge“-Block, der jeden eigenen Auftrag bis zum
       echten Ausgang verfolgt. smoke_spool.py grün (Roundtrip, Race-
       Muster, flip_retry, Drain mit Job-Fortschreibung, Fehlerfall),
-      alle anderen Smokes + Harness unverändert grün
+      alle anderen Smokes + Harness unverändert grün. **Deploy 2026-10-20
+      auf dem Pi** (086676e, smoke_spool grün auf dem Pi, Bot-Restart,
+      jobs_all live) — der monitor-apply1-Waiter wartete zu dem Zeitpunkt
+      weiterhin (kein Lock-Fenster seit 09:13 = Dauerbetrieb-Bestätigung
+      in vivo); nächster Zyklusbeginn führt den Drain-Knob erstmals real
+      aus. Offen: erste Spool-Echtausführung beobachten
 
 Bewusst später (eigene Story, kein Teil dieses EPICs): generelles
 Versions-Pinning für alle Import-Abhängigkeiten (Nutzer-Strategie
