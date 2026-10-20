@@ -607,13 +607,44 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       101 unregistrierte 7.7-Kollektionen (bewusst auf „los"). Test:
       smoke_enrich_gate.py; Wirkungscheck: Zyklen ohne Importe schrumpfen
       von >1 h auf Sekunden → Lock-Fenster entstehen → Waiter/
-      Monitor-Aktionen kommen dran. **Deploy 2026-10-20** (fde282c+
+      Monitor-Aktionen kommen dran
+- [ ] 9.8 Forced-Apply verträgt int-Jahre nicht + Waiter-Hygiene —
+      **Befund 2026-10-20 (Waiter-Lauf)**: Traffic + Kinks schlugen im
+      review-apply fehl: „expected string or bytes-like object, got
+      'int'" — MB-Kandidaten tragen `year` als INT, irgendwo in der
+      Forced-Apply-Kette (engine.build_decider/run_unit_real) läuft ein
+      regex/str-Vergleich darüber. Fix: year tolerant zu str koerzieren
+      (an der Stelle, die der Traceback nennt — reproduzierbar über
+      apply_decisions_rows mit den beiden Units). Dazu: der monitor-
+      apply1-Waiter lief in ZWEI Instanzen (Doppeltstart via
+      Hänger-Bash) — Log sah wie Doppel-Apply aus, beet-Check: keine
+      Dubletten. Künftig: Skripte dieser Art mit Lockfile/pid-Check
+      starten. Testmatrix: die zwei ERROR-Units über apply_decisions_rows
+      Echtlauf rüberholen nach dem Fix. **Deploy 2026-10-20** (fde282c+
       26ab8f4 auf dem Pi; Gate-Smoke grün auf dem Pi — erster Lauf
       flog auf Windows-Backslash-Seed-Paths, Test jetzt os.sep-
       neutral; Bot-Restart, backlog.by_root live: windows 299).
       Der aktuell laufende Zyklus (seit 08:38) ist der LETZTE im
       Alt-Code — nach seinem Ende: Waiter-Fenster + neue Zyklen in
-      Sekunden; Activity-Phase ab dem ersten Neu-Code-Zyklus sichtbar
+      Sekunden; Activity-Phase ab dem ersten Neu-Code-Zyklus sichtbar.
+      **Hotfix cf91391 (2026-10-20, Nutzer: „Monitor-Tab zeigt gar
+      nichts"):** Der 9.7-Stau-Loop rief `incoming_dir()` pro Datei auf
+      (≈600 YAML-Parses je Snapshot — paths parste config.yaml bei JEDEM
+      Aufruf) → Bot-HTTP-Threads in CPU-Sättigung (15 min CPU/18 min
+      Wall, py-spy: alle Spinner in yaml.safe_load) → Endpoint-
+      Timeouts → leere Tab-Fläche (render nie gelaufen, setError
+      no-op, da #monitorErr fehlt). **Fix: mtime-gegate Prozess-Cache
+      in paths (`_config_data`, Kopie-Semantik via deepcopy) +
+      Loop-Hoisting**; smoke_config_cache.py (1 Parse für viele
+      Aufrufe, mtime-Bump → Re-Parse, Copy-Semantik); Deploy + Browser-
+      Abnahme: Tab rendert, Endpoint 200 in ~1,1–1,5 s, „💤 Ingest
+      idle" live, Zyklus 10:38 in **9 Sekunden** (Gate wirkt).
+      **Waiter-Ergebnis 10:38:** Coral-Tags normalisiert → asis
+      importiert; Mingus + Byrds applied (review-apply); **Traffic +
+      Kinks ERROR „expected string or bytes-like object, got int"**
+      (int-Jahr aus MB-Kandidaten vs. String-Erwartung im Forced-Apply)
+      → Story 9.8; Review 9→4 (Beatles, Mothers, Willie Nelson,
+      Tribute bleiben); Stau 299→246; keine Dubletten (beet-Check).
 
 Bewusst später (eigene Story, kein Teil dieses EPICs): generelles
 Versions-Pinning für alle Import-Abhängigkeiten (Nutzer-Strategie
