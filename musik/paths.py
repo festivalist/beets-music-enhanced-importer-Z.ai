@@ -42,17 +42,41 @@ def bootstrap() -> None:
     socket.setdefaulttimeout(30)
 
 
-def _musik_config() -> dict:
-    """Read the `musik:` section of config.yaml (plain yaml, no beets)."""
+_YAML_CACHE: dict = {"mtime": None, "data": None}
+
+
+def _config_data() -> dict:
+    """Komplette config.yaml geparst, pro Prozess gecacht (mtime-gate):
+    Endpoint-/Monitor-Pfade rufen das pro Anfrage hunderte Male auf —
+    yaml.safe_load je Aufruf trieb den HTTP-Handler in CPU-Sättigung
+    (Befund 2026-10-20, Story 9.7: Monitor-Tab leer, Endpoint-Timeouts).
+    Ein Config-Edit greift trotzdem sofort weiter (mtime-Vergleich vor
+    jedem Zugriff)."""
     import yaml
 
-    with open(CONFIG_FILE, encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
-    return data.get("musik") or {}
+    try:
+        mt = os.path.getmtime(CONFIG_FILE)
+    except OSError:
+        mt = None
+    if _YAML_CACHE["data"] is None or mt != _YAML_CACHE["mtime"]:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        _YAML_CACHE["data"] = data
+        _YAML_CACHE["mtime"] = mt
+    return _YAML_CACHE["data"]
+
+
+def _musik_config() -> dict:
+    """Read the `musik:` section of config.yaml (plain yaml, no beets)."""
+    return _config_data().get("musik") or {}
 
 
 def musik_config() -> dict:
-    cfg = _musik_config()
+    import copy
+
+    # Kopie: die setdefaults unten (und Aufrufer) dürfen den Prozess-
+    # Cache nicht mutieren.
+    cfg = copy.deepcopy(_musik_config())
     cfg.setdefault(
         "trash_dir", os.path.join(cfg_dir_default_trash(), "_trash")
     )
@@ -88,11 +112,8 @@ def trash_dir() -> str:
 
 def library_root() -> str:
     """The beets `directory:` from config.yaml (plain yaml, no beets)."""
-    import yaml
-
-    with open(CONFIG_FILE, encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
-    return data.get("directory") or os.path.join(os.path.expanduser("~"), "Music")
+    return _config_data().get("directory") or os.path.join(
+        os.path.expanduser("~"), "Music")
 
 
 def incoming_dir() -> str:

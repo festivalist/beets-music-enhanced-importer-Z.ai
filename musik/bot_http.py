@@ -104,11 +104,12 @@ def snapshot() -> dict:
         busy = None
         current = None
     try:
-        inc_files = collect_audio_tree(incoming_dir())
+        inc_base = incoming_dir()
+        inc_files = collect_audio_tree(inc_base)
         backlog = len(inc_files)
         by_root: dict = {}
         for f in inc_files:
-            r = os.path.relpath(f, incoming_dir()).split(os.sep)[0]
+            r = os.path.relpath(f, inc_base).split(os.sep)[0]
             by_root[r] = by_root.get(r, 0) + 1
     except OSError:
         backlog = None
