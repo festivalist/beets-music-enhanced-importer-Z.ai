@@ -17,10 +17,14 @@ with the emptied folders.
 """
 
 import os
+import time
 
 
-def _outcome(root: str) -> tuple[dict, list[tuple[str, str]]]:
-    """Status counts + (artist, album) pairs of imported albums under root."""
+def _outcome(root: str,
+             only_new_vs: set | None = None) -> tuple[dict, list[tuple[str, str]]]:
+    """Status counts + (artist, album) pairs of imported albums under root.
+    only_new_vs: normcased Unit-Keys, die VOR diesem Lauf schon entschieden
+    waren — deren Alben zählen nicht (Enrich-Gate, Story 9.7-Befund)."""
     from . import state as state_mod
 
     rk = os.path.normcase(os.path.normpath(root))
@@ -31,7 +35,8 @@ def _outcome(root: str) -> tuple[dict, list[tuple[str, str]]]:
         if k != rk and not k.startswith(rk + os.sep):
             continue
         counts[u.get("status", "?")] = counts.get(u.get("status", "?"), 0) + 1
-        if u.get("status") in ("auto", "asis") and not u.get("singleton"):
+        if u.get("status") in ("auto", "asis") and not u.get("singleton") \
+                and (only_new_vs is None or k not in only_new_vs):
             # as-is units carry identity in `guessed`/`candidates`; auto
             # album units in file_results->chosen (same logic as the
             # fetch chain's _import_job).
@@ -68,6 +73,27 @@ def _configured_roots() -> list[str]:
     return [os.path.normpath(str(r).strip()) for r in roots if str(r).strip()]
 
 
+def _activity(phase: str, detail: str = "") -> None:
+    """Herzschlag für den Import-Monitor (Story 9.7): die aktuelle
+    Phase atomar nach state/ingest-current.json schreiben — der Tab
+    zeigt damit, womit der Ingest gerade beschäftigt ist. Best-Effort:
+    ein fehlgeschlagenes Schreiben darf den Lauf nie brechen."""
+    import json as _json
+
+    from .paths import state_dir
+
+    try:
+        d = state_dir()
+        os.makedirs(d, exist_ok=True)
+        tmp = os.path.join(d, "ingest-current.tmp")
+        with open(tmp, "w", encoding="utf-8") as fh:
+            _json.dump({"phase": phase, "detail": detail,
+                        "updated": time.time()}, fh, ensure_ascii=False)
+        os.replace(tmp, os.path.join(d, "ingest-current.json"))
+    except OSError:
+        pass
+
+
 def cmd_ingest(root: str | None = None) -> int:
     # Spooled Monitor-Aktionen zuerst (Story 9.6): hier läuft der ingest.lock
     # bereits (systemd-flock oder Bot-Executor) — der Ingest bleibt die
@@ -76,6 +102,7 @@ def cmd_ingest(root: str | None = None) -> int:
     from . import spool as spool_mod
 
     spool_mod.drain_and_execute(log=print)
+    _activity("start")
     if root:
         # ad-hoc single root: explicit path, never auto-created
         roots = [os.path.normpath(root)]
@@ -108,6 +135,7 @@ def cmd_ingest(root: str | None = None) -> int:
     # incident 2026-10-09); no-op for roots that are not MG staging
     from .musicgrabber import ensure_staging_layout
     ensure_staging_layout()
+    _activity("idle")
     return rc
 
 
@@ -125,6 +153,7 @@ def _ingest_one(root: str) -> int:
         return 0
 
     print(f"ingest: processing {root}")
+    _activity("scan", root)
     scan_mod.cmd_scan(root)
 
     # The staging root persists (keep_root) and MusicGrabber reuses
@@ -161,12 +190,27 @@ def _ingest_one(root: str) -> int:
     for note in fetch_mod._prepare_units(root):
         print(f"ingest: {note}")
 
+    # Enrich-Gate (Befund 2026-10-20): _outcome listete historisch ALLE
+    # auto/asis-Units des Roots — bei 1000+ Alben lief der Enrich (~1000
+    # beets-Subprozess-Paare) jeden Zyklus über 1 h, OHNE dass dieser Lauf
+    # etwas importiert hatte (Dauerbetrieb; der Lock blockierte Bot,
+    # Monitor-Aktionen und Waiter). Nur Units, die DIESEN Lauf entscheiden,
+    # werden angereichert.
+    pre_decided = {
+        os.path.normcase(os.path.normpath(k))
+        for k, u in state_mod.units(state_mod.load()).items()
+        if u.get("status") in ("auto", "asis")
+        and (k == rk or k.startswith(rk + os.sep))
+    }
+
     print("ingest: running import (musicbrainz chain)")
+    _activity("import", root)
     engine.cmd_import(only=root)
 
     # include_pending: staging must never linger — everything decidable
     # gets decided, tag-complete rest import on their own tags.
     print("ingest: asis fallback for review/unmatched/pending units")
+    _activity("asis", root)
     asis_mod.cmd_asis(only=root, include_pending=True)
 
     if os.path.isdir(root):
@@ -194,9 +238,10 @@ def _ingest_one(root: str) -> int:
                               detail='scene packaging (ingest sweep)')
         print(f"ingest: archived {len(junk)} packaging file(s) from staging")
 
-    counts, albums = _outcome(root)
+    counts, albums = _outcome(root, only_new_vs=pre_decided)
     if albums:
         print("ingest: enriching art/genre for imported albums")
+        _activity("enrich", f"{len(albums)} Album/-e")
         fetch_mod._enrich_albums(albums)
 
     print("ingest outcome:", ", ".join(f"{k}={v}" for k, v in sorted(counts.items())))

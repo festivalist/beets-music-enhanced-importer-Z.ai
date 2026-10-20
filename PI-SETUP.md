@@ -656,6 +656,11 @@ zuverlässig getagggt und nach config.yaml einsortiert in der Bibliothek
 (MG-`Playlists/*.m3u` folgen mit Story 2.2). Hinweis: Der Timer kollidiert
 selten mit einem laufenden Bot-Import (beide schreiben die beets-DB) — dann
 errors einer Seite, der nächste Timer-Lauf holt nach.
+**Seit 2026-10-20 (Enrich-Gate):** Der art/genre-Backfill fasst nur noch
+Alben des jeweiligen Laufs an — Zyklen ohne Importe dauern Sekunden statt
+>1 h (Dauerbetrieb behoben, der Lock ist wieder frei für Bot/Monitor-
+Aktionen). Der Monitor-Tab zeigt die aktuelle Ingest-Phase live
+(Herzschlag `state/ingest-current.json`).
 
 **9.7 Betrieb:**
 

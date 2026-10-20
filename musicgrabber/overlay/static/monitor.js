@@ -81,20 +81,30 @@
         document.head.appendChild(st);
     }
 
-    function headHtml(ing, backlog) {
-        const busy = ing.busy === true ? "🔄 Ingest <b>läuft</b>"
-            : ing.busy === false ? "💤 Ingest idle"
-                : "❓ Ingest-Status unbekannt (Windows-Dev oder kein Lock)";
-        const bl = (backlog && backlog.audio_files != null)
-            ? `📥 Stau: <b>${backlog.audio_files}</b> Datei(en)`
+    function headHtml(snap) {
+        const ing = snap.ingest || {};
+        const backlog = snap.backlog || {};
+        const cur = snap.current;
+        const act = (cur && cur.phase && cur.phase !== "idle")
+            ? `🔄 Ingest: <b>${esc(cur.phase)}</b>${cur.detail ? " · " + esc(String(cur.detail).slice(0, 60)) : ""} · ${esc(relAge(cur.updated))}`
+            : ing.busy === true ? "🔄 Ingest <b>läuft</b>"
+                : ing.busy === false ? "💤 Ingest idle"
+                    : "❓ Ingest-Status unbekannt (Windows-Dev oder kein Lock)";
+        const br = backlog.by_root;
+        const blStr = (backlog.audio_files != null)
+            ? `📥 Stau: <b>${backlog.audio_files}</b> Datei(en)` +
+              (br && Object.keys(br).length
+                  ? " (" + Object.entries(br)
+                      .map(([r, n]) => `${esc(r)} ${n}`).join(" · ") + ")"
+                  : "")
             : "📥 Stau: ?";
         const retry = (ing.counts || {}).network
             ? `<button class="mon-act" id="monRetry">🔁 ${ing.counts.network} Netz-Unit(s) erneut versuchen</button>`
             : "";
-        return `<div class="mon-head"><span>${busy}</span>` +
+        return `<div class="mon-head"><span>${act}</span>` +
             `<span>🗄 <b>${ing.total ?? 0}</b> Unit(s)</span>` +
             `<span>⏱ letzte Änderung ${esc(relAge(ing.last_change))}</span>` +
-            `<span>${bl}</span>` +
+            `<span>${blStr}</span>` +
             `<span><button class="mon-act" id="monIngest">🔄 Ingest jetzt</button> ${retry}</span></div>`;
     }
 
@@ -262,7 +272,7 @@
             `<div id="monitorErr" class="mon-err" style="display:none"></div>` +
             `<div id="monitorMsg" class="mon-msg" style="display:${msgText ? "" : "none"}">${esc(msgText || "")}</div>` +
             myJobsHtml(snap.jobs_all) +
-            headHtml(snap.ingest || {}, snap.backlog) +
+            headHtml(snap) +
             reviewHtml(snap.review) +
             jobsHtml(snap.jobs) +
             unitsHtml(snap.ingest || {}) +

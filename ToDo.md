@@ -588,6 +588,26 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       weiterhin (kein Lock-Fenster seit 09:13 = Dauerbetrieb-Bestätigung
       in vivo); nächster Zyklusbeginn führt den Drain-Knob erstmals real
       aus. Offen: erste Spool-Echtausführung beobachten
+- [ ] 9.7 Monitor zeigt Ingest-Aktivität + Enrich-Gate (Dauerbetrieb-
+      Fix) — **Befund 2026-10-20 (Nutzer: „es hängt, Stau 299, nichts
+      geht voran")**: (a) **Enrich-Bug**: `_outcome` listete historisch
+      ALLE auto/asis-Units des Roots als Enrich-Kandidaten (~1000 Paare
+      im windows-Root) → jeder Ingest-Zyklus lief >1 h durch beets-
+      Subprozess-Paare, selbst bei 0 Importen im Lauf (Journal 08:38:
+      „nothing to import" → trotzdem 1 h+ „enriching") → Dauerbetrieb,
+      der Lock blockierte Bot, Monitor-Aktionen und Waiter. **Fix:
+      Enrich-Gate** — `_outcome(only_new_vs=pre_decided)`: nur Units,
+      die DIESEN Lauf entscheiden, werden angereichert (counts bleiben
+      whole-root). (b) Activity-Heartbeat: `state/ingest-current.json`
+      (Phase/Detail/ts, atomar, best-effort) an jeder Phase; Snapshot-
+      Feld `ingest.current`; Tab-Kopf zeigt „🔄 Ingest: <phase> ·
+      <detail> · vor X min". (c) Stau-Aufschlüsselung: `backlog.by_root`
+      + Klammern im Tab — Antwort auf „was IST der Stau": 198 Dateien in
+      den 9 Review-Units (Nutzer-Entscheidungen stehen aus bzw. Waiter),
+      101 unregistrierte 7.7-Kollektionen (bewusst auf „los"). Test:
+      smoke_enrich_gate.py; Wirkungscheck: Zyklen ohne Importe schrumpfen
+      von >1 h auf Sekunden → Lock-Fenster entstehen → Waiter/
+      Monitor-Aktionen kommen dran
 
 Bewusst später (eigene Story, kein Teil dieses EPICs): generelles
 Versions-Pinning für alle Import-Abhängigkeiten (Nutzer-Strategie

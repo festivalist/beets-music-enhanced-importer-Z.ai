@@ -93,12 +93,26 @@ def snapshot() -> dict:
         from .bot import _ingest_busy  # lazy: kein Import-Zirkel
 
         busy = _ingest_busy(sd)
+        current = None
+        try:
+            with open(os.path.join(sd, "ingest-current.json"),
+                      encoding="utf-8") as fh:
+                current = json.load(fh)
+        except (OSError, ValueError):
+            current = None
     else:
         busy = None
+        current = None
     try:
-        backlog = len(collect_audio_tree(incoming_dir()))
+        inc_files = collect_audio_tree(incoming_dir())
+        backlog = len(inc_files)
+        by_root: dict = {}
+        for f in inc_files:
+            r = os.path.relpath(f, incoming_dir()).split(os.sep)[0]
+            by_root[r] = by_root.get(r, 0) + 1
     except OSError:
         backlog = None
+        by_root = None
     all_jobs = [
         {"id": j.get("id"), "status": j.get("status"),
          "kind": j.get("kind"),
@@ -117,12 +131,13 @@ def snapshot() -> dict:
             "total": sum(counts.values()),
             "counts": counts,
             "busy": busy,
+            "current": current,
             "last_change": max((u["updated"] or 0 for u in units),
                                default=None),
             "units": units,
         },
         "review": review,
-        "backlog": {"audio_files": backlog},
+        "backlog": {"audio_files": backlog, "by_root": by_root},
     }
 
 
