@@ -266,5 +266,8 @@ def apply_decisions_rows(rows: list[dict]) -> tuple[int, list[str]]:
 def _cand_id(unit: dict, n: int) -> str:
     cands = unit.get("candidates") or []
     if len(cands) >= n:
-        return cands[n - 1].get("id", "") or ""
+        # Discogs-Kandidaten tragen int-Ids (Story 9.8) — der Forced-Pfad
+        # und die Kandidatenvergleiche erwarten Strings.
+        val = cands[n - 1].get("id")
+        return str(val) if val is not None else ""
     return ""

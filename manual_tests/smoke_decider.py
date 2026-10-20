@@ -95,4 +95,22 @@ assert elapsed < 30, f"deadline not enforced (elapsed {elapsed:.1f}s)"
 assert "time budget" in (job.errors[-1] if job.errors else "")
 print(f"3) silent child killed at deadline OK (rc={rc}, {elapsed:.1f}s, EPIC 6.1c)")
 
+# 4) int ids (Story 9.8): Discogs-Kandidaten tragen int album/track ids —
+#    der Forced-Pfad muss koerzieren statt im UUID-Regex zu crashen
+#    ("expected string or bytes-like object, got 'int'", 2026-10-20).
+from musik import review as R  # noqa: E402
+
+dec_int = Decider(netrec, auto_accept_distance=0.25, forced_album_id=2516185)
+assert dec_int._normalize_id(2516185) == "2516185"
+cand_int = fake_match("Traffic", "Traffic", 2516185)
+action4, record4 = dec_int.decide_album(fake_task([cand_int]))
+assert action4 == "apply" and record4["status"] == "review-apply", \
+    (action4, record4)
+
+u_int = {"candidates": [{"id": 2516185}, {"id": None}, {"album": "no id"}]}
+assert R._cand_id(u_int, 1) == "2516185", R._cand_id(u_int, 1)
+assert R._cand_id(u_int, 2) == ""
+assert R._cand_id(u_int, 3) == ""
+print("4) int candidate ids tolerated end-to-end OK (Story 9.8)")
+
 print("smoke_decider: all assertions passed")

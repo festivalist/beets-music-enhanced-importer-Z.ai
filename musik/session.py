@@ -205,10 +205,12 @@ class Decider:
     )
 
     @classmethod
-    def _normalize_id(cls, value: str) -> str:
-        """Accept a bare MBID or a full release/recording URL."""
-        m = cls._UUID_RE.search(value or "")
-        return m.group(0).lower() if m else (value or "").strip()
+    def _normalize_id(cls, value) -> str:
+        """Accept a bare MBID or a full release/recording URL. Non-string
+        ids (Discogs candidates carry int ids) arrive via the review-apply
+        forced path — coerce before the regex (Story 9.8)."""
+        m = cls._UUID_RE.search(str(value or ""))
+        return m.group(0).lower() if m else str(value or "").strip()
 
     def _year_ok(self, info) -> bool:
         """True unless the candidate looks like a *different recording*
@@ -453,8 +455,11 @@ class Decider:
 
         if self.forced_album_id:
             forced_id = self._normalize_id(self.forced_album_id)
+            # Typ-tolerant vergleichen: Discogs-Kandidaten tragen int-Ids
+            # (Story 9.8), MB-Kandidaten UUID-Strings.
             match = next(
-                (c for c in candidates if c.info.album_id == forced_id),
+                (c for c in candidates
+                 if str(c.info.album_id) == str(forced_id)),
                 None,
             )
             if match is None:
@@ -573,7 +578,8 @@ class Decider:
 
         if self.forced_track_id:
             match = next(
-                (c for c in candidates if c.info.track_id == self.forced_track_id),
+                (c for c in candidates
+                 if str(c.info.track_id) == str(self.forced_track_id)),
                 None,
             )
             if match is not None:
