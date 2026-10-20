@@ -607,7 +607,13 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       101 unregistrierte 7.7-Kollektionen (bewusst auf „los"). Test:
       smoke_enrich_gate.py; Wirkungscheck: Zyklen ohne Importe schrumpfen
       von >1 h auf Sekunden → Lock-Fenster entstehen → Waiter/
-      Monitor-Aktionen kommen dran
+      Monitor-Aktionen kommen dran. **Deploy 2026-10-20** (fde282c+
+      26ab8f4 auf dem Pi; Gate-Smoke grün auf dem Pi — erster Lauf
+      flog auf Windows-Backslash-Seed-Paths, Test jetzt os.sep-
+      neutral; Bot-Restart, backlog.by_root live: windows 299).
+      Der aktuell laufende Zyklus (seit 08:38) ist der LETZTE im
+      Alt-Code — nach seinem Ende: Waiter-Fenster + neue Zyklen in
+      Sekunden; Activity-Phase ab dem ersten Neu-Code-Zyklus sichtbar
 
 Bewusst später (eigene Story, kein Teil dieses EPICs): generelles
 Versions-Pinning für alle Import-Abhängigkeiten (Nutzer-Strategie
