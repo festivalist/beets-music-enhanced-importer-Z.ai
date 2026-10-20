@@ -613,14 +613,20 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       review-apply fehl: „expected string or bytes-like object, got
       'int'" — MB-Kandidaten tragen `year` als INT, irgendwo in der
       Forced-Apply-Kette (engine.build_decider/run_unit_real) läuft ein
-      regex/str-Vergleich darüber. Fix: year tolerant zu str koerzieren
-      (an der Stelle, die der Traceback nennt — reproduzierbar über
-      apply_decisions_rows mit den beiden Units). Dazu: der monitor-
-      apply1-Waiter lief in ZWEI Instanzen (Doppeltstart via
-      Hänger-Bash) — Log sah wie Doppel-Apply aus, beet-Check: keine
-      Dubletten. Künftig: Skripte dieser Art mit Lockfile/pid-Check
-      starten. Testmatrix: die zwei ERROR-Units über apply_decisions_rows
-      Echtlauf rüberholen nach dem Fix. **Deploy 2026-10-20** (fde282c+
+      regex/str-Vergleich darüber. Fix: `_normalize_id` + beide
+      Kandidatenvergleiche str()-tolerant, `_cand_id` koerziert an der
+      Grenze (int durchgeleitet → str); smoke_decider Abschnitt 4
+      (int-Id end-to-end durch decide_album + _cand_id-Grenze); alle
+      anderen Smokes grün. Deploy 89230fe + **Echtlauf über den Spool
+      (erste echte 9.6-Ausführung)**: Traffic + Kinks auf review
+      gesetzt, als review-Decisions gespoolt (Job a7855215) → Zyklus
+      11:30 drainete → **beide applied [review-apply] 11:33/11:38**,
+      Job done mit echtem Ergebnis. Outcome: review-apply=4 (Mingus/
+      Byrds/Traffic/Kinks), review=4 (Beatles/Mothers/Willie Nelson/
+      Tribute), error=1 (alter 6.9er-Fall), asis=124 (Coral).
+      Waiter-Doppelinstanz: Log sah wie Doppel-Apply aus, beet-Check:
+      keine Dubletten. Künftig: Skripte dieser Art mit Lockfile/pid-
+      Check starten (Gotcha im Memory). **Deploy 2026-10-20** (fde282c+
       26ab8f4 auf dem Pi; Gate-Smoke grün auf dem Pi — erster Lauf
       flog auf Windows-Backslash-Seed-Paths, Test jetzt os.sep-
       neutral; Bot-Restart, backlog.by_root live: windows 299).
