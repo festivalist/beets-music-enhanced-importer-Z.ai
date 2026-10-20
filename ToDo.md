@@ -551,6 +551,26 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       **Offen (Nutzer-Taps):** Review-Entscheidungen zu den 9 echten
       Units (Tribute bleibt bewusst in Review!), Telegram-/status-Tap
       (Story 9.2), Hell-Theme-Blick, Override-prompt-Fluss
+- [ ] 9.6 Entscheidungen verfallen nicht + ehrliches Job-Feedback —
+      **Befund 2026-10-20 (erste echte Nutzertaps)**: (a) Lock-Deferral
+      verwirft Entscheidungen still: 4 K1-Taps (Mingus/Byrds/Traffic/
+      Kinks) liefen in „⏳ Ein Ingest läuft gerade" und galten im UI als
+      „✅ eingereiht" mit Job-Status done — der Pi-Ingest steht durch die
+      Timer-Kette (>1-h-Zyklen, Enrich dominiert) faktisch im
+      Dauerbetrieb, patience=120 ist strukturell wirkungslos. Fix-
+      Richtung: Aktionsspool unter `state/` (decisions-pending.json),
+      den `cmd_ingest` bei ZYKLUSBEGINN selbst abarbeitet — der Ingest
+      hält den Lock ohnehin; der Monitor-Job wird dann erst nach realer
+      Ausführung „done" und trägt das echte Ergebnis. (b) Tab-Feedback:
+      Job-ID nach POST verfolgen und den Ausgang (done/error/
+      Deferral-Text) sichtbar machen statt nur „eingereiht". (c) Alt-
+      Last: `_execute_asis` (Telegram-/asis, Sept.) läuft OHNE
+      ingest.lock — concurrent-writer-Restrisiko, denselben Spool-/
+      Lock-Weg geben. Nacharbeit 2026-10-20: Waiter `state/monitor-
+      apply1.py` zieht die 4 Taps + Coral-Asis nach Lock-Freigabe
+      (Coral-Befund: 9/11 Dateien trugen Coldplay-Junk-Tags →
+      Normalisierung auf Ordner-Identität vor dem Asis-Lauf;
+      tags_complete hat den Fehlimport verhindert)
 
 Bewusst später (eigene Story, kein Teil dieses EPICs): generelles
 Versions-Pinning für alle Import-Abhängigkeiten (Nutzer-Strategie
