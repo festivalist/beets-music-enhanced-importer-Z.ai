@@ -570,7 +570,19 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       apply1.py` zieht die 4 Taps + Coral-Asis nach Lock-Freigabe
       (Coral-Befund: 9/11 Dateien trugen Coldplay-Junk-Tags →
       Normalisierung auf Ordner-Identität vor dem Asis-Lauf;
-      tags_complete hat den Fehlimport verhindert)
+      tags_complete hat den Fehlimport verhindert). — **Code erledigt
+      2026-10-20**: `musik/spool.py` (add/take atomar, Clobber-fest;
+      `flip_retry` als gemeinsamer Kern; `drain_and_execute`), Ingest-
+      Hook am Anfang von `cmd_ingest` (führt Spool unter dem Lock aus,
+      Job-Records bekommen das echte Ergebnis), `_execute_asis` läuft
+      JETZT unter dem ingest.lock (Alt-Last gefixt) mit
+      `asis.import_units` als gemeinsamem Kern, review/retry/asis-
+      Executor spoolen bei Dauerbelegung statt zu verwerfen (Job bleibt
+      ehrlich „queued"), Snapshot trägt `jobs_all` (slim) und der Tab
+      einen „Meine Aufträge“-Block, der jeden eigenen Auftrag bis zum
+      echten Ausgang verfolgt. smoke_spool.py grün (Roundtrip, Race-
+      Muster, flip_retry, Drain mit Job-Fortschreibung, Fehlerfall),
+      alle anderen Smokes + Harness unverändert grün
 
 Bewusst später (eigene Story, kein Teil dieses EPICs): generelles
 Versions-Pinning für alle Import-Abhängigkeiten (Nutzer-Strategie

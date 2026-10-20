@@ -185,12 +185,50 @@
             });
             const out = await r.json().catch(() => ({}));
             if (!r.ok) throw new Error(out.error || "HTTP " + r.status);
+            rememberJob(out.queued);
             setMsg("✅ Auftrag " + (out.queued || "") +
-                " eingereiht — Fortschritt unten bei Bot-Jobs.");
+                " angenommen — Ergebnis unten bei „Meine Aufträge“.");
             tick();
         } catch (e) {
             setError("Aktion fehlgeschlagen: " + e.message);
         }
+    }
+
+    function myJobs() {
+        try {
+            return JSON.parse(sessionStorage.getItem("monJobs") || "[]");
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function rememberJob(id) {
+        if (!id) return;
+        const jobs = myJobs().filter(j => j !== id);
+        jobs.unshift(id);
+        sessionStorage.setItem("monJobs", JSON.stringify(jobs.slice(0, 8)));
+    }
+
+    function myJobsHtml(jobsAll) {
+        const ids = myJobs();
+        if (!ids.length) return "";
+        const byId = {};
+        for (const j of (jobsAll || [])) byId[j.id] = j;
+        const rows = ids.map(id => {
+            const j = byId[id];
+            if (!j) {
+                return `<div class="mon-item mon-mut">⏳ ${esc(id)} ` +
+                    "(wartet auf Ausführung…)</div>";
+            }
+            const icon = j.status === "done" ? "✅"
+                : j.status === "error" ? "❌"
+                    : j.status === "running" ? "🔄" : "⏳";
+            const head = String(j.summary || j.text || "")
+                .split("\n")[0].slice(0, 120);
+            const age = j.created ? ` · ${esc(relAge(j.created))}` : "";
+            return `<div class="mon-item">${icon} ${esc(head)}${age}</div>`;
+        }).join("");
+        return `<div class="mon-box"><h3>Meine Aufträge (diese Sitzung)</h3>${rows}</div>`;
     }
 
     function doReview(u, dec) {
@@ -223,6 +261,7 @@
             `<div class="mon-wrap">` +
             `<div id="monitorErr" class="mon-err" style="display:none"></div>` +
             `<div id="monitorMsg" class="mon-msg" style="display:${msgText ? "" : "none"}">${esc(msgText || "")}</div>` +
+            myJobsHtml(snap.jobs_all) +
             headHtml(snap.ingest || {}, snap.backlog) +
             reviewHtml(snap.review) +
             jobsHtml(snap.jobs) +

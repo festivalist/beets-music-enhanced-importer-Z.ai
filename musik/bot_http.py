@@ -99,8 +99,20 @@ def snapshot() -> dict:
         backlog = len(collect_audio_tree(incoming_dir()))
     except OSError:
         backlog = None
+    all_jobs = [
+        {"id": j.get("id"), "status": j.get("status"),
+         "kind": j.get("kind"),
+         "text": (j.get("text") or "")[:80],
+         "summary": (j.get("summary") or "")[:200],
+         "created": j.get("created"), "finished": j.get("finished")}
+        for j in jobs_mod.load_jobs()[-30:]
+    ]
     return {
         "jobs": jobs_mod.queue_stats(),
+        # komplette Historie (slim) — das Tab verfolgt damit die eigenen
+        # Aufträge bis zum ECHTEN Ergebnis (Story 9.6, kein stilles
+        # Verfallen mehr)
+        "jobs_all": list(reversed(all_jobs)),
         "ingest": {
             "total": sum(counts.values()),
             "counts": counts,

@@ -69,6 +69,13 @@ def _configured_roots() -> list[str]:
 
 
 def cmd_ingest(root: str | None = None) -> int:
+    # Spooled Monitor-Aktionen zuerst (Story 9.6): hier läuft der ingest.lock
+    # bereits (systemd-flock oder Bot-Executor) — der Ingest bleibt die
+    # einzige schreibende Instanz und liefert die echten Ergebnisse in die
+    # Job-Records, statt dass Aktionen an Dauerbetrieb abprallen.
+    from . import spool as spool_mod
+
+    spool_mod.drain_and_execute(log=print)
     if root:
         # ad-hoc single root: explicit path, never auto-created
         roots = [os.path.normpath(root)]

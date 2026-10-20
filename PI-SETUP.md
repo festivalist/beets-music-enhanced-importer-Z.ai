@@ -615,7 +615,12 @@ alle 5 s gegen den Bot-Endpoint :8283) **plus Aktionen**: Review-Units
 direkt im Tab entscheiden (K1/K2-Kandidat, As-is, Override, Ignorieren),
 Ingest-Lauf anstoßen, Netzwerk-Units zurücksetzen — alles mit
 Bestätigungsdialog, ausgeführt vom Bot unter dem ingest.lock, Fortschritt
-im Bot-Jobs-Block. Das Upstream-Backend bleibt unangetastet; unsere
+im Bot-Jobs-Block. **Aktionen laufen nie ins Leere (Story 9.6):** Ist der
+ingest.lock durch den Dauerbetrieb des Ingest-Timers belegt, landet die
+Aktion im Spool (`state/action-spool.json`) und der Ingest führt sie
+beim **nächsten Zyklusbeginn** selbst aus — der Job-Record bekommt das
+echte Ergebnis, das Tab zeigt es unter „Meine Aufträge". Das
+Upstream-Backend bleibt unangetastet; unsere
 UI-Stellen sind mit `musik-monitor`-Markern geflaggt. Bump-Prozedur mit
 Overlay-Verträglichkeitscheck: `musicgrabber/overlay/README.md`. Der
 Installer (70-musicgrabber) prüft Overlay-Datei und

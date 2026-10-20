@@ -287,63 +287,66 @@ def _execute_job(job: dict, send) -> None:
         print(f"bot: job {job['id']} error")
 
 
+def _spool_or_note(kind: str, job: dict, payload: dict, send) -> None:
+    """Lock dauerhaft belegt (Ingest-Dauerbetrieb): Aktion in den Spool
+    — der nächste Ingest-Zyklusstart führt sie aus und setzt das echte
+    Ergebnis in den Job-Record. Der Job bleibt absichtlich 'queued'."""
+    from . import spool as spool_mod
+
+    spool_mod.add(kind, job["id"], payload)
+    summary = ("📋 Ingest beschäftigt — Aktion ist eingeplant und wird "
+               "beim nächsten Import-Zyklus ausgeführt.")
+    jobs_mod.update_job(job["id"], status="queued", summary=summary)
+    send(summary)
+
+
 def _execute_asis(job: dict, send) -> None:
-    """Import the job's units as-is (own tags); report per-unit outcomes."""
+    """Import the job's units as-is (own tags); report per-unit outcomes.
+    Läuft unter dem ingest.lock; bei Dauerbelegung geht die Aktion in
+    den Spool (Story 9.6) statt ohne Koordination zu schreiben."""
     paths = job.get("unit_paths") or []
-    lines = []
-    for p in paths:
-        label = os.path.basename(p) or p
-        send(f"📦 as-is-Import läuft:\n{label}")
-        try:
-            asis_mod.cmd_asis(only=p, include_pending=True)
-        except Exception as e:
-            traceback.print_exc()
-            lines.append(f"❌ {label}: {type(e).__name__}: {str(e)[:200]}")
-            continue
-        fresh = state_mod.get_unit(state_mod.load(), p)
-        status = (fresh or {}).get("status")
-        if status == "asis":
-            lines.append(f"✅ {os.path.basename(p) or p} — importiert")
-        else:
-            why = ((fresh or {}).get("reason") or "")[:120]
-            lines.append(f"⚠️ {os.path.basename(p) or p} — Status jetzt "
-                         f"„{status}“ {('('+why+')') if why else ''}")
-    ok, note = plex_mod.refresh_library()
-    if ok:
-        lines.append(f"🎧 {note}")
-    elif note:
-        lines.append(f"⚠️ {note}")
-    # tracks that just arrived fill their playlist entries -> re-upload
-    for msg in playlists_mod.upload(playlists_mod.rebuild(paths)):
-        lines.append(msg)
-    summary = "\n".join(lines)[:1500]
-    failed = any(l.startswith("❌") for l in lines)
-    jobs_mod.update_job(job["id"],
-                        status="error" if failed else "done",
-                        finished=time.time(), summary=summary)
-    send(summary or "fertig")
+    box: list = []
+
+    def run() -> None:
+        box.append(asis_mod.import_units(paths, progress=send))
+
+    try:
+        locked = _run_exclusive(run, patience=120)
+    except Exception as e:
+        traceback.print_exc()
+        msg = f"❌ as-is fehlgeschlagen: {type(e).__name__}: {str(e)[:200]}"
+        jobs_mod.update_job(job["id"], status="error",
+                            finished=time.time(), summary=msg)
+        send(msg)
+        return
+    if locked and box:
+        lines, failed = box[0]
+        summary = "\n".join(lines)[:1500]
+        jobs_mod.update_job(job["id"],
+                            status="error" if failed else "done",
+                            finished=time.time(),
+                            summary=summary or "fertig")
+        send(summary or "fertig")
+    elif locked:
+        jobs_mod.update_job(job["id"], status="done",
+                            finished=time.time(), summary="nichts zu tun")
+        send("nichts zu tun")
+    else:
+        _spool_or_note("asis", job, {"unit_paths": paths}, send)
 
 
 def _execute_retry(job: dict, send) -> None:
     """Network/unmatched-Units zurück auf pending setzen — der nächste
     Ingest-Lauf versucht sie erneut. Dasselbe Koordinationsmuster wie
-    überall im Bot: state.json nur unter dem ingest.lock schreiben."""
+    überall im Bot: state.json nur unter dem ingest.lock schreiben;
+    bei Dauerbelegung geht die Aktion in den Spool (Story 9.6)."""
+    from . import spool as spool_mod
+
     paths = job.get("unit_paths") or []
-    targets = {os.path.normcase(os.path.normpath(p)) for p in paths}
-    box: list[int] = []
+    box: list = []
 
     def flip() -> None:
-        st = state_mod.load()
-        n = 0
-        for u in state_mod.units(st).values():
-            up = os.path.normcase(os.path.normpath(u.get("path") or ""))
-            if targets and up not in targets:
-                continue
-            if u.get("status") in ("network", "unmatched"):
-                state_mod.set_status(u, "pending", "")
-                n += 1
-        state_mod.save(st)
-        box.append(n)
+        box.append(spool_mod.flip_retry(paths))
 
     try:
         locked = _run_exclusive(flip, patience=120)
@@ -357,12 +360,11 @@ def _execute_retry(job: dict, send) -> None:
     if locked:
         summary = (f"🔁 {box[0] if box else 0} Unit(s) auf pending — "
                    "der nächste Ingest versucht sie erneut.")
+        jobs_mod.update_job(job["id"], status="done",
+                            finished=time.time(), summary=summary)
+        send(summary)
     else:
-        summary = ("⏳ Ein Ingest läuft gerade — der Retry wirkt beim "
-                   "nächsten Lauf mit.")
-    jobs_mod.update_job(job["id"], status="done", finished=time.time(),
-                        summary=summary)
-    send(summary)
+        _spool_or_note("retry", job, {"unit_paths": paths}, send)
 
 
 def _execute_ingest(job: dict, send) -> None:
@@ -416,14 +418,16 @@ def _execute_review(job: dict, send) -> None:
         applied, messages = box[0]
         summary = (f"📋 Review: {applied} Entscheidung(en) angewandt\n"
                    + "\n".join(messages[:10]))
+        jobs_mod.update_job(job["id"], status="done", finished=time.time(),
+                            summary=summary[:1500])
+        send(summary)
     elif locked:
         summary = "📋 Review: 0 Entscheidungen angewandt."
+        jobs_mod.update_job(job["id"], status="done", finished=time.time(),
+                            summary=summary)
+        send(summary)
     else:
-        summary = ("⏳ Ein Ingest läuft gerade — Entscheidungen beim "
-                   "nächsten Lauf erneut senden.")
-    jobs_mod.update_job(job["id"], status="done", finished=time.time(),
-                        summary=summary[:1500])
-    send(summary)
+        _spool_or_note("review", job, {"decisions": rows}, send)
 
 
 def _asis_candidates() -> list[dict]:

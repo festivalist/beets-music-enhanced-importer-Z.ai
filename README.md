@@ -152,7 +152,12 @@ when ignored; taps on stale offers (bot restart) get an alert.
    `_incoming` backlog), `POST /api/action` accepts `{action: asis |
    retry | ingest | review}` jobs into the same serial queue the
    Telegram bot uses (`review` carries `decisions` in the review.csv
-   vocabulary: accept/accept2/override/unmatched/ignore). Config
+   vocabulary: accept/accept2/override/unmatched/ignore). Write-actions
+   are never lost: when the ingest lock is occupied (the timer chain
+   runs quasi-continuously), the action is **spooled**
+   (`state/action-spool.json`) and the **ingest executes it at the
+   start of its next cycle**, writing the real outcome back into the
+   job record. Config
    override: `musik: bot_http: {enabled, host, port}`. The **Monitor
    tab** in the MusicGrabber UI (`musicgrabber/overlay/`, EPIC 9)
    renders the snapshot AND drives the actions: per review unit the

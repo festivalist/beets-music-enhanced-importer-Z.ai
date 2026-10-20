@@ -175,6 +175,50 @@ def _fill_empty_original_years(lib) -> int:
     return fixed
 
 
+def import_units(paths: list[str], progress=None) -> tuple[list[str], bool]:
+    """Mehrere Units as-is importieren — gemeinsamer Kern der Telegram-
+    /asis-Aktion und der Monitor-Aktion (Story 9.6). Pro Unit cmd_asis +
+    Statusverifikation, danach Plex-Refresh und Playlist-Rebuild.
+    Liefert (meldungszeilen, fehlgeschlagen?); Aufrufer koordiniert den
+    ingest.lock."""
+    from . import plex as plex_mod
+    from . import playlists as playlists_mod
+    from . import state as state_mod
+
+    def say(m):
+        if progress:
+            progress(m)
+
+    lines: list[str] = []
+    for p in paths:
+        label = os.path.basename(p) or p
+        say(f"📦 as-is-Import läuft:\n{label}")
+        try:
+            cmd_asis(only=p, include_pending=True)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            lines.append(f"❌ {label}: {type(e).__name__}: {str(e)[:200]}")
+            continue
+        fresh = state_mod.get_unit(state_mod.load(), p)
+        status = (fresh or {}).get("status")
+        if status == "asis":
+            lines.append(f"✅ {os.path.basename(p) or p} — importiert")
+        else:
+            why = ((fresh or {}).get("reason") or "")[:120]
+            lines.append(f"⚠️ {os.path.basename(p) or p} — Status jetzt "
+                         f"„{status}“ {('('+why+')') if why else ''}")
+    ok, note = plex_mod.refresh_library()
+    if ok:
+        lines.append(f"🎧 {note}")
+    elif note:
+        lines.append(f"⚠️ {note}")
+    # tracks that just arrived fill their playlist entries -> re-upload
+    for msg in playlists_mod.upload(playlists_mod.rebuild(paths)):
+        lines.append(msg)
+    return lines, any(l.startswith("❌") for l in lines)
+
+
 def cmd_asis(only: str | None = None, dry_run: bool = False,
              include_pending: bool = False) -> int:
     from . import state as state_mod
