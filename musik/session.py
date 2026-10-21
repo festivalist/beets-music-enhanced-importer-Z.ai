@@ -17,11 +17,12 @@ import os
 import re
 import threading
 
-from beets.autotag import Recommendation, tag_album, tag_item
+from beets.autotag import Recommendation, tag_item
 from beets.importer.actions import Action, DuplicateAction
 from beets.importer.session import ImportSession
 
 from . import quality
+from .beetscompat import tag_album_compat
 
 _PLUGIN_ERROR_RE = re.compile(r"Error in '([^']+)'")
 # beatport4 catches its own API errors inside candidates()/item_candidates()
@@ -465,7 +466,7 @@ class Decider:
             if match is None:
                 # The ID didn't come back from the text search: look it
                 # up directly by ID (covers obscure/renamed releases).
-                _artist, _album, prop = tag_album(
+                prop = tag_album_compat(
                     task.items, search_ids=[forced_id]
                 )
                 if prop.candidates:
@@ -484,7 +485,7 @@ class Decider:
             }
 
         if self.override_artist or self.override_album:
-            _artist, _album, prop = tag_album(
+            prop = tag_album_compat(
                 task.items,
                 search_artist=self.override_artist or None,
                 search_name=self.override_album or None,

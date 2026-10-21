@@ -84,18 +84,22 @@ def take() -> list:
 
 def flip_retry(paths: list[str]) -> int:
     """network/unmatched-Units zurück auf pending setzen (Kern der
-    Retry-Aktion; ohne Pfadfilter = alle network-Units). Aufrufer
-    koordiniert den ingest.lock."""
+    Retry-Aktion; ohne Pfadfilter = alle network/unmatched-Units). Mit
+    expliziten Pfaden sind auch error-Units retrybar (Story 9.11: nach
+    einem Fix den Lauf wiederholen — die Sammel-Aktion bleibt
+    konservativ). Aufrufer koordiniert den ingest.lock."""
     from . import state as state_mod
 
     targets = {os.path.normcase(os.path.normpath(p)) for p in paths}
+    retryable = ("network", "unmatched", "error") if targets \
+        else ("network", "unmatched")
     st = state_mod.load()
     n = 0
     for u in state_mod.units(st).values():
         up = os.path.normcase(os.path.normpath(u.get("path") or ""))
         if targets and up not in targets:
             continue
-        if u.get("status") in ("network", "unmatched"):
+        if u.get("status") in retryable:
             state_mod.set_status(u, "pending", "")
             n += 1
     state_mod.save(st)

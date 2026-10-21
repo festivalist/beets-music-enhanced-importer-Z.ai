@@ -56,8 +56,8 @@ import musik.session as S  # noqa: E402
 rejected = fake_match("Wrong Artist", "Wrong Album", "id-rejected")
 override = fake_match("Real Artist", "Real Album", "id-override", 0.01)
 task = fake_task([rejected])
-S.tag_album = lambda items, **kw: (
-    "Real Artist", "Real Album", types.SimpleNamespace(candidates=[override]))
+S.tag_album_compat = lambda items, **kw: types.SimpleNamespace(
+    candidates=[override])
 dec = Decider(netrec, auto_accept_distance=0.25,
               override_artist="Real Artist", override_album="Real Album")
 action, record = dec.decide_album(task)

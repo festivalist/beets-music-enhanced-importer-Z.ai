@@ -41,7 +41,8 @@ def cmd_retag(limit: int | None = None, max_distance: float = 0.10) -> int:
     setup_beets()
     from beets import config as beets_config
     from beets.library import Library
-    from beets.autotag import tag_album
+
+    from .beetscompat import tag_album_compat
 
     lib = Library(
         beets_config["library"].as_filename(),
@@ -65,8 +66,8 @@ def cmd_retag(limit: int | None = None, max_distance: float = 0.10) -> int:
         own_year = items[0].year or 0
         try:
             # Search from the album's own tags. (Never pass the folder path —
-            # tag_album's second positional parameter is search_artist.)
-            _artist, _album, proposal = tag_album(
+            # search_artist is the artist to look up, not a path.)
+            proposal = tag_album_compat(
                 items,
                 search_artist=own_artist if own_artist != "?" else None,
                 search_name=own_album if own_album != "?" else None,

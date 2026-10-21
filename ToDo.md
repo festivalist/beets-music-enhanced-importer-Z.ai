@@ -739,15 +739,27 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       (retag v1 — report-only, betrifft dieselbe Bruchstelle).
       Betroffen ist nur der Fallback — normaler accept mit getroffener
       Kandidaten-Id (Mingus/Byrds/Traffic/Kinks 9.8) läuft an der
-      Stelle nicht rein. **Fix:** `Source.from_items(task.items)`
-      übergeben (Import aus beets.autotag.source; Signaturen
-      sonst unverändert), Smoke gegen echte Mini-Items + Retry der
-      beiden Error-Units als Echtlauf (nach Deploy: Monitor-Retry →
-      Ingest; mit 9.9 live rennen sie ggf. über die Ordner-Reparatur
-      ins asis — K1-Intent des Nutzers wäre dann überholt;
-      Entscheidung beim Echtlauf dokumentieren). Zielcheck: behebt
-      die Sackgasse „Review-Tap → error“ für alle Vinyl-/Defekt-Tag-
-      Fälle mit fehlender Kandidaten-Id.
+      Stelle nicht rein. **Fix:** neuer Modul `musik/beetscompat.py`
+      mit `tag_album_compat(items, …)` — wählt je nach beets die
+      2.13-Form (Item-Liste, 3-Tupel-Rückgabe) oder 2.14-Form
+      (`Source.from_items`, reine Proposal) und liefert immer die
+      Proposal; zweite Bruchstelle entdeckt: 2.14 änderte AUCH den
+      Rückgabe-Typ. Call-Sites session.py (2×), retag.py (1×)
+      umgestellt; smoke_decider mockt jetzt `S.tag_album_compat`.
+      **Retry-Regel erweitert:** `spool.flip_retry` nimmt mit
+      expliziten Pfaden auch error-Units zurück auf pending
+      (Sammel-Retry ohne Pfade bleibt network/unmatched-only) —
+      künftig ist „Monitor-Retry → Ingest“ der Weg für Error-Fälle
+      (der parallele 9.9-Abschluss holte die zwei Error-Units am
+      2026-10-21 12:00-Zyklus noch per Hand-Reset rein: MB-Kette
+      crash-frei, Asis-Fallback importierte beide aus Ordner-
+      Identität — K1-Intent damit überholt, siehe 9.9-Ergebnis).
+      Test: smoke_beetscompat (2.13-/2.14-Simulation gegen Fakes +
+      auf dem Pi gegen ECHTE beets-2.14-Source-Objekte),
+      smoke_bot_http 4b (error-Retry explizit ✓ / Sammel-Retry lässt
+      error in Ruhe), smoke_decider 1–4 grün, tier3/quality/
+      review_apply_rows/repair_folder grün.
+      **Ergebnis: (offen — Deploy + Pi-Verifikation)**
 
 Bewusst später (eigene Story, kein Teil dieses EPICs): generelles
 Versions-Pinning für alle Import-Abhängigkeiten (Nutzer-Strategie

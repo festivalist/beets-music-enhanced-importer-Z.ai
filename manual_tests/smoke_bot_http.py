@@ -34,7 +34,9 @@ def _seed_state(sd: str) -> None:
     for path, status, reason, n_files in (
             (r"C:\lib\auto-album", "auto", "", 1),
             (r"C:\lib\review-album", "review", "low conf", 2),
-            (r"C:\lib\network-album", "network", "rate limit", 1)):
+            (r"C:\lib\network-album", "network", "rate limit", 1),
+            (r"C:\lib\error-album", "error", "AttributeError: x", 1),
+            (r"C:\lib\error2-album", "error", "boom", 1)):
         state_mod.put_unit(st, {
             "path": path, "status": status, "reason": reason,
             "updated": now - n_files * 30,
@@ -114,7 +116,7 @@ def main() -> int:
             # 1) GET-Snapshot
             code, snap, _hdr = _get(port, "/api/status")
             assert code == 200, code
-            assert snap["ingest"]["total"] == 3, snap["ingest"]
+            assert snap["ingest"]["total"] == 5, snap["ingest"]
             assert snap["ingest"]["counts"].get("review") == 1, snap
             assert snap["ingest"]["busy"] in (True, False, None)
             assert len(snap["review"]) == 1, snap["review"]
@@ -160,6 +162,27 @@ def main() -> int:
                                        r"C:\lib\network-album")
             assert fresh["status"] == "pending", fresh
             assert any("auf pending" in s for s in sent), sent
+
+            # 4b) Retry mit EXPLIZITEM Pfad nimmt error-Units mit (Story
+            #     9.11: nach einem Fix den Lauf wiederholen); Sammel-Retry
+            #     ohne Pfade bleibt network/unmatched-only
+            code, out = _post(port, "/api/action", {
+                "action": "retry", "unit_paths": [r"C:\lib\error-album"]})
+            assert code == 200, (code, out)
+            ejob = qget()
+            assert ejob["kind"] == "retry", ejob
+            B._execute_retry(ejob, sent.append)
+            fresh = state_mod.get_unit(state_mod.load(),
+                                       r"C:\lib\error-album")
+            assert fresh["status"] == "pending", fresh
+            assert fresh["reason"] == "", fresh
+            code, out = _post(port, "/api/action", {"action": "retry"})
+            assert code == 200, (code, out)
+            bjob = qget()
+            B._execute_retry(bjob, sent.append)
+            fresh = state_mod.get_unit(state_mod.load(),
+                                       r"C:\lib\error2-album")
+            assert fresh["status"] == "error", fresh
 
             # 5) ingest-Trigger nur enqueue (kein Echtlauf im Test)
             code, out = _post(port, "/api/action", {"action": "ingest"})
