@@ -836,12 +836,42 @@ Ingest-Kette; alle 7 Wrapper-Endpunkte in musik/musicgrabber.py sind in
     unverändert), Overlay-Checks (16 Dateien vollständig, Sentinel-Marker
     je 3/3, byte-identische 12 gegen Upstream-Tag), compose-Parameter.
     Danach Story 10.2.
-- [ ] 10.2 [ready-for-human] Flip aufs Pi: Branch nach Testmatrix mergen,
-  `docker compose pull && up -d`, Gegenprüfung (UI lädt, Suche/Queue/
-  Settings arbeiten, Monitor-Tab zeigt Daten, `/static/monitor.js` 200,
-  nächster MG-Download landet komplett in `_incoming`, Ingest-zyklus
-  grün). Rollback bleibt offen: compose-Tag zurück auf 4.3.1 + Overlay-
-  Revert (DB-Downgrade laut Upstream-Changelog harmlos).
+- [x] 10.2 [ready-for-human] Flip aufs Pi — **ERLEDIGT 2026-10-21, main `8600fbd` live auf dem Pi (192.168.50.43):**
+  git pull → compose pull/up → Image 4.4.0 healthy, Mount
+  `/opt/musicgrabber/static:ro` korrekt; Probes `/`, `/static/app.js`,
+  **`/static/monitor.js`** (Mount-Beweis, nur ours), `/api/settings`
+  alle 200; Bot-Restart auf 8600fbd, bot_http :8283 live verifiziert.
+  **Echtlauf:** Single „Wet Leg – Chaise Longue" (Job completed;
+  **`.mg_staging/<job>` während des Downloads sichtbar, danach von MG
+  komplett entfernt** — Staging-Workshop live bestätigt) + Album
+  „Fontaines D.C. – Romance" (resolve-release-group → 14 Tracks
+  queued → 12 completed, 2 MG-Dauer-Mismatch-Fails; Import-Status-API
+  OK) → Ingest: Romance unter Auto-Accept-Doctrine importiert (Review
+  wegen missing_tracks d=0.098 → Asis-Fallback mit eigenen Tags),
+  korrekt in beets (12 Items, Opus, Plex-Scan angestoßen). Staging
+  danach leer. **Nicht-Ursache:** ein verdächtiger 404 auf
+  `/api/bulk-import/{id}/status` war mein Testscript (Wrapper
+  `download_album` liefert Dict, Bot nutzt `d["import_id"]` korrekt) —
+  KEIN Upstream-/Wrapper-Bruch. **Aufgeräumt:** 2 jiosaavn-Junk-Items
+  des Tests entfernt (falscher Track „mangetout"/moisturizer-Tagging
+  per Fallback-MP3 + AAC mit leerem Artist-Tag → „Unknown" importiert).
+  Rollback bliebe: compose-Tag 4.3.1 + Overlay-Revert.
+  **Befunde aus 10.2 (eigene Stories, kein Teil dieses Flips):**
+  - [ ] 10.3 [ready-for-agent] Decider-Guard: Units mit leerem/„Unknown"-
+    Artist oder offensichtlicher Quellen-Junk-Metadaten niemals auto
+    importieren (10.2-Echtlauf: jiosaavn lieferte AAC ohne Artist-Tag →
+    als-own-tags mit artist=Unknown importiert; + Fallback-MP3 mit
+    konsistent FALSCHEN Tags (mangetout/moisturizer statt Chaise
+    Longue) flog durch Auto-Match — Dauer kam aus demselben Junk-Result,
+    daher selbstkonsistent). Global-Regel, keine jiosaavn-Sonderlocke;
+    Qualitäts-Badge-Verifikation nach Import (behauptete 320-AAC vs.
+    gelieferte 128-MP3) mitprüfen.
+  - [ ] 10.4 [wontfix-Kandidat→prüfen] smoke_ingest_roots schlägt auf dem
+    Pi fehl (beets-2.14-confit: `del beets_config[...]` entfernt den
+    Key nicht → Config-Roots leaken in den Default-Case). Vor-devist
+    seit ≥144fecf (nicht durch 10.x), Test-Harness-Problem, kein
+    Produktionscode. Entweder Harness fixen (dict-Kopie testen) oder
+    als Umgebungabhängig markieren.
 
 ## Beim Nutzer anfragen (bei nächster Gelegenheit)
 
