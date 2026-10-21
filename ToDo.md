@@ -912,7 +912,7 @@ Ingest-Kette; alle 7 Wrapper-Endpunkte in musik/musicgrabber.py sind in
   Latin Lounge, Clubhouse Summer 2015 [3CD, 14/60 — Alt-Import wurde
   vom Duplicate-Vergleich aufgelöst]), Bibliothek 19.269 Items.
   Rest-Review 13 Units = Single-Artist-Junk-Ordner-Klasse → 10.7.
-- [ ] 10.7 [needs-triage] Single-Artist-Essentials mit Junk-Ordnerartist:
+- [x] 10.7 [needs-triage] Single-Artist-Essentials mit Junk-Ordnerartist:
   windows-Units wie „2015 - Essential Albums - Lynyrd Skynyrd • Essential
   Lynyrd Skynyrd" scheitern NUR am Ordner-Guess (Artist „Essential
   Albums"), obwohl der MB-Kandidat perfekt ist (Distanz 0.000–0.032) —
@@ -923,13 +923,22 @@ Ingest-Kette; alle 7 Wrapper-Endpunkte in musik/musicgrabber.py sind in
   Single-Artist-Units (Greatest-Hits eines bereits vorhandenen Artists
   → ignored), erst nach (a). Befund aus dem 10.5/10.6-Echtlauf
   2026-10-21 (Units 5/10/11 von 28).
-  **Implementiert 2026-10-21:** (a) `_names_ok`-Ordnerzweig fällt auf
-  Raw-Folder-Korroboration zurück (Artist UND Album als kontinuierliche
-  Tokenfolgen im Ordnernamen — Distanz/Track/Jahr-Checks liefen schon);
-  (b) `_release_redundancy` prüft JEDE perfekte Auto-Match-Kandidaten-
-  tracklist gegen die Bibliothek (≥ Schwelle → ignored+Archiv; Release
-  SELBST in der Bibliothek → Guard verzichtet, beets-Duplicate-Maschinerie
-  qualitätsvergleicht weiter). smoke_va_guard 14/14. Pi-Echtlauf offen.
+  **ERLEDIGT 2026-10-21 (e6eab52, live):** (a) `_names_ok`-Ordnerzweig
+  fällt auf Raw-Folder-Korroboration zurück (Artist UND Album als
+  kontinuierliche Tokenfolgen im Ordnernamen — Distanz/Track/Jahr-Checks
+  liefen schon); (b) `_release_redundancy` prüft JEDE perfekte Auto-
+  Match-Kandidaten-tracklist gegen die Bibliothek (≥ Schwelle →
+  ignored+Archiv; Release SELBST in der Bibliothek → Guard verzichtet,
+  beets-Duplicate-Maschinerie qualitätsvergleicht weiter). smoke 14/14
+  (Win+Pi). **Echtlauf:** 5 Units auto (R. Kelly, Rainbow, Billy Joe
+  Shaver, David Allan Coe #2, James Taylor — letzterer korrekt import,
+  da erst 1 Taylor-Album in der Bibliothek liegt, Überlappung <60 %);
+  Skynyrd war zwischenzeitlich korrekt via asis-Fallback+9.9-Reparatur
+  gelandet („Lynyrd Skynyrd - Essential"); Joe Stump bleibt review
+  (Jahresveto, mögliche andere Aufnahme — korrekt); Pat Metheny:
+  beets-Plugin-Stage-Reload-Race nach Duplicate-Skip → status error,
+  retrybar (Vorher-existing-Klasse, kein 10.7-Code betroffen). Review
+  13 → 5.
 - [ ] 10.8 [needs-triage] Datenfix Junk-Credits in der Bibliothek:
   140 Rows mit albumartist='Essential Albums' (4 Alben: Michael
   Jackson, Ray Charles, Sparks, David Allan Coe — als tier3-asis mit
