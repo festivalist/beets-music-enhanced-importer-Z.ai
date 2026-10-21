@@ -923,6 +923,13 @@ Ingest-Kette; alle 7 Wrapper-Endpunkte in musik/musicgrabber.py sind in
   Single-Artist-Units (Greatest-Hits eines bereits vorhandenen Artists
   → ignored), erst nach (a). Befund aus dem 10.5/10.6-Echtlauf
   2026-10-21 (Units 5/10/11 von 28).
+  **Implementiert 2026-10-21:** (a) `_names_ok`-Ordnerzweig fällt auf
+  Raw-Folder-Korroboration zurück (Artist UND Album als kontinuierliche
+  Tokenfolgen im Ordnernamen — Distanz/Track/Jahr-Checks liefen schon);
+  (b) `_release_redundancy` prüft JEDE perfekte Auto-Match-Kandidaten-
+  tracklist gegen die Bibliothek (≥ Schwelle → ignored+Archiv; Release
+  SELBST in der Bibliothek → Guard verzichtet, beets-Duplicate-Maschinerie
+  qualitätsvergleicht weiter). smoke_va_guard 14/14. Pi-Echtlauf offen.
 - [ ] 10.8 [needs-triage] Datenfix Junk-Credits in der Bibliothek:
   140 Rows mit albumartist='Essential Albums' (4 Alben: Michael
   Jackson, Ray Charles, Sparks, David Allan Coe — als tier3-asis mit

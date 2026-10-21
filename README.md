@@ -441,6 +441,15 @@ unit wins:
    neither tagged nor filename-parseable does the unit fall through to
    review. The guard never fires in dry runs or after a network failure;
    forced review decisions (accept/override) always win.
+   Story 10.7 generalizes the redundancy idea to *any* release: a
+   perfect MusicBrainz match whose tracklist is ≥60 % already owned
+   under OTHER albums (a Greatest Hits of an artist whose discography
+   you hold) is archived too — a release that is itself already in the
+   library skips the guard so beets' duplicate machinery can
+   quality-compare. Series-style folder names ("2015 - Essential Albums
+   - Lynyrd Skynyrd • …" parsing artist "Essential Albums") no longer
+   block a perfect match: when the raw folder names both the candidate
+   artist and album as contiguous token runs, the folder corroborates.
 5. **review queue** — everything else: contradictory tags/folder names,
    middle-band candidates (distance 0.25–0.35, where MusicBrainz might
    still know the release), untagged files.

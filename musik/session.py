@@ -123,6 +123,7 @@ class Decider:
         # None in dry runs — the guard never fires without it.
         self.lib = lib
         self._pair_cache: set[tuple[str, str]] | None = None
+        self._album_cache: set[tuple[str, str]] | None = None
         self._va_cache: tuple[dict | None,
                               tuple[bool, int, int] | None] | None = None
 
@@ -207,6 +208,16 @@ class Decider:
         return {
             t for t in re.split(r"[^a-z0-9]+", (text or "").lower()) if t
         }
+
+    @staticmethod
+    def _token_seq(text: str) -> list[str]:
+        """Ordered token variant of _tokens (contiguous-subsequence
+        checks need the order a set throws away)."""
+        import re
+
+        return [
+            t for t in re.split(r"[^a-z0-9]+", (text or "").lower()) if t
+        ]
 
     _UUID_RE = re.compile(
         r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I
@@ -329,6 +340,15 @@ class Decider:
             if da > self.FOLDER_NAME_TOLERANCE or db > self.FOLDER_NAME_TOLERANCE:
                 ok_artist, _ = self._artist_ok(g["artist"], info)
                 if not ok_artist:
+                    # Story 10.7: the parse may have picked the wrong
+                    # segment of a series-style folder ("2015 - Essential
+                    # Albums - James Taylor, The Essential James Taylor"
+                    # parses artist "Essential Albums"). The folder still
+                    # corroborates the candidate when BOTH the artist and
+                    # the album appear in it as contiguous token runs —
+                    # the distance/track/year checks already passed.
+                    if self._folder_names_candidate(info):
+                        return True, ""
                     return False, (
                         f"folder name '{g['artist']} - {g['album']}' does not match"
                         f" candidate '{info.artist} - {info.album}'"
@@ -460,6 +480,101 @@ class Decider:
         }
 
     # -- VA redundancy guard (Story 10.5) -----------------------------------
+
+    def _folder_names_candidate(self, info) -> bool:
+        """True when the raw folder name contains BOTH the candidate
+        artist and the candidate album as contiguous token runs
+        (Story 10.7 series-folder corroboration)."""
+        folder = self.unit.get("import_path") or self.unit.get("path") or ""
+        hay = self._token_seq(os.path.basename(folder))
+        if not hay:
+            return False
+
+        def seq_in(needle: str) -> bool:
+            n = self._token_seq(needle)
+            if not n or len(n) > len(hay):
+                return False
+            return any(
+                hay[i:i + len(n)] == n
+                for i in range(len(hay) - len(n) + 1)
+            )
+
+        return (
+            seq_in(getattr(info, "artist", "") or "")
+            and seq_in(getattr(info, "album", "") or "")
+        )
+
+    def _library_albums(self) -> set[tuple[str, str]] | None:
+        """Normalized (albumartist, album) pairs of the live library,
+        cached. None without a library handle."""
+        if self.lib is None:
+            return None
+        if getattr(self, "_album_cache", None) is None:
+            from .scan import norm_name
+
+            self._album_cache = {
+                (norm_name(getattr(a, "albumartist", "")),
+                 norm_name(getattr(a, "album", "")))
+                for a in self.lib.albums()
+            }
+        return self._album_cache
+
+    def _release_redundancy(self, cand) -> tuple[bool, int, int] | None:
+        """Story 10.7: how much of the candidate's OWN tracklist the
+        library already holds (works for untagged units too — the match
+        supplies artist/title). Returns (redundant, hits, total), or
+        None when the guard cannot decide (no library, too few mapped
+        tracks, or the release itself is already in the library — then
+        beets' duplicate machinery quality-compares instead)."""
+        from .scan import norm_name
+
+        pairs = self._library_pairs()
+        albums = self._library_albums()
+        if pairs is None or albums is None:
+            return None
+        info = cand.info
+        if (norm_name(getattr(info, "artist", "")),
+                norm_name(getattr(info, "album", ""))) in albums:
+            return None
+        total = hits = 0
+        for _item, ti in (getattr(cand, "mapping", None) or {}).items():
+            artist = getattr(ti, "artist", None) or ""
+            title = getattr(ti, "title", None) or ""
+            if not artist or not title:
+                continue
+            total += 1
+            if (norm_name(artist), norm_name(title)) in pairs:
+                hits += 1
+        from .paths import musik_config
+
+        min_tracks = int(
+            musik_config().get("va_redundant_min_tracks", 5)
+        )
+        if total < min_tracks:
+            return None
+        threshold = float(
+            musik_config().get("va_redundant_threshold", 0.6)
+        )
+        return hits / total >= threshold, hits, total
+
+    def _redundant_release_record(self, verdict: tuple[bool, int, int],
+                                  guessed: dict | None) -> dict:
+        from .paths import musik_config
+
+        threshold = float(
+            musik_config().get("va_redundant_threshold", 0.6)
+        )
+        _, hits, total = verdict
+        return {
+            "status": "ignored",
+            "reason": (
+                f"Release redundant: {hits}/{total} tracks already in "
+                f"the library (threshold {threshold:.0%}) — files "
+                "archived to _trash (Story 10.7)"
+            ),
+            "candidates": [],
+            "guessed": guessed or {},
+        }
 
     def _library_pairs(self) -> set[tuple[str, str]] | None:
         """Normalized (artist, title) pairs of the live library, cached
@@ -653,6 +768,16 @@ class Decider:
         # top-ranked candidate often differs only by release year/remaster.
         for cand in candidates[: self.CANDIDATE_SCAN]:
             if self._passes_all(task, cand):
+                # Story 10.7: a perfect match for a release whose tracks
+                # are largely already in the library under OTHER albums
+                # (e.g. a Greatest Hits of an owned artist) is archived;
+                # a release already IN the library skips the guard so
+                # beets' duplicate machinery can quality-compare.
+                verdict = self._release_redundancy(cand)
+                if verdict is not None and verdict[0]:
+                    return "skip", self._redundant_release_record(
+                        verdict, guessed
+                    )
                 return "apply", self._apply_record(cand, "auto", "", guessed)
 
         # VA guard + survivor (Stories 10.5/10.6): no candidate passed —

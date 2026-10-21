@@ -46,12 +46,22 @@ class FakeItem:
         self.title = title
 
 
+class FakeAlbum:
+    def __init__(self, albumartist, album):
+        self.albumartist = albumartist
+        self.album = album
+
+
 class FakeLib:
-    def __init__(self, pairs):
+    def __init__(self, pairs, albums=None):
         self._items = [FakeItem(a, t) for a, t in pairs]
+        self._albums = [FakeAlbum(a, t) for a, t in (albums or [])]
 
     def items(self):
         return list(self._items)
+
+    def albums(self):
+        return list(self._albums)
 
 
 class FakeDist(dict):
@@ -108,6 +118,28 @@ def essential_tracks(n=10, album="Essential 80's Black Funky", aa=""):
              "albumartist": aa},
         ))
     return out
+
+
+def matched_candidate(artist, album, tracks, distance=0.02):
+    """Story-10.7 candidate: perfect distance, full mapping of
+    (track_artist, track_title) pairs."""
+    info = types.SimpleNamespace(
+        data_source="MusicBrainz", artist=artist, artists=[artist],
+        album=album, album_id="id-m", track_id="id-m", year=2015,
+        tracks=[], title=album,
+    )
+
+    class _Item:
+        pass
+
+    mapping = {
+        _Item(): types.SimpleNamespace(artist=a, title=t)
+        for a, t in tracks
+    }
+    return types.SimpleNamespace(
+        info=info, distance=FakeDist({"album": distance}),
+        mapping=mapping, extra_items=[],
+    )
 
 
 netrec = NetworkErrorRecorder()
@@ -265,5 +297,51 @@ task = types.SimpleNamespace(imported_items=lambda: [item])
 asis_mod.apply_va_plan(task, record["normalize_va"])
 assert item.albumartist == "Various Artists", item.albumartist
 print("11) junk albumartist: va_like + replaced before tier 3 OK")
+
+# 12) Story 10.7a: series folder parses artist "Essential Albums", but
+#     the raw folder names BOTH the candidate artist and album -> auto
+skynyrd_tracks = [("Lynyrd Skynyrd", f"Skynyrd Song {i:02d}") for i in range(1, 17)]
+u = make_va_unit(
+    "2015 - Essential Albums - Lynyrd Skynyrd • Essential Lynyrd Skynyrd",
+    essential_tracks(4),
+)
+dec = Decider(netrec, auto_accept_distance=0.25, unit=u, lib=FakeLib([]))
+action, record = dec.decide_album(
+    fake_task([matched_candidate("Lynyrd Skynyrd", "Essential", skynyrd_tracks)],
+              artist="", album=""))
+assert action == "apply" and record["status"] == "auto", (action, record)
+print("12) series folder: segment corroboration -> auto OK (Story 10.7a)")
+
+# 13) Story 10.7b: the matched release is a Greatest Hits whose tracks
+#     are 10/16 already in the library (under other albums) -> ignored
+lib13 = skynyrd_tracks[:10]
+u = make_va_unit(
+    "2014 - Essential Albums - Lynyrd Skynyrd • Essential Lynyrd Skynyrd",
+    essential_tracks(4),
+)
+u["hints"] = []
+dec = Decider(netrec, auto_accept_distance=0.25, unit=u,
+              lib=FakeLib(lib13))
+action, record = dec.decide_album(
+    fake_task([matched_candidate("Lynyrd Skynyrd", "Essential", skynyrd_tracks)],
+              artist="", album=""))
+assert action == "skip" and record["status"] == "ignored", (action, record)
+assert "Release redundant" in record["reason"] and "10/16" in record["reason"], record
+print("13) owned-artist Greatest Hits: overlap via match -> ignored OK")
+
+# 14) the SAME release already in the library: guard abstains, beets'
+#     duplicate machinery quality-compares -> apply
+u = make_va_unit(
+    "2016 - Essential Albums - Lynyrd Skynyrd • Essential Lynyrd Skynyrd",
+    essential_tracks(4),
+)
+u["hints"] = []
+dec = Decider(netrec, auto_accept_distance=0.25, unit=u,
+              lib=FakeLib(lib13, albums=[("Lynyrd Skynyrd", "Essential")]))
+action, record = dec.decide_album(
+    fake_task([matched_candidate("Lynyrd Skynyrd", "Essential", skynyrd_tracks)],
+              artist="", album=""))
+assert action == "apply" and record["status"] == "auto", (action, record)
+print("14) re-download of a held release: duplicate machinery decides OK")
 
 print("smoke_va_guard: all assertions passed")
