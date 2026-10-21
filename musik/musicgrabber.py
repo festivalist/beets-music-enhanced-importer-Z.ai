@@ -282,3 +282,48 @@ def wait_for_import(import_id, timeout: float | None = None,
                 f"{int(timeout or mg_config()['album_job_timeout'])}s "
                 f"(status: {status})")
         time.sleep(10)
+
+
+def verify_delivered_quality(pick: dict, since_ts: float) -> str | None:
+    """Story 10.3: MG sources carry a quality badge ('320 kbps'), but the
+    delivered file is sometimes far worse (live: a '320 kbps AAC' claim
+    that arrived as 128 kbps MP3). Compares the actual bitrate of the
+    newest staging file written since `since_ts` against the claim.
+    Returns a warning line, or None when fine / unverifiable (no badge,
+    no new file, unreadable) — advisory only, the import proceeds."""
+    m = re.search(r"(\d{2,4})\s*kbps", (pick.get("quality") or ""), re.I)
+    if not m:
+        return None
+    claimed = int(m.group(1))
+    from .paths import incoming_dir
+    from .scan import is_audio
+
+    root = os.path.join(incoming_dir(), "musicgrabber")
+    if not os.path.isdir(root):
+        return None
+    best = None
+    for dirpath, _dirnames, filenames in os.walk(root):
+        for name in filenames:
+            if not is_audio(name):
+                continue
+            p = os.path.join(dirpath, name)
+            try:
+                st = os.stat(p)
+            except OSError:
+                continue
+            if st.st_mtime < since_ts:
+                continue
+            if best is None or st.st_mtime > best[1]:
+                best = (p, st.st_mtime)
+    if best is None:
+        return None
+    from . import quality as quality_mod
+
+    _tier, _bits, _rate, bitrate = quality_mod.score(best[0])
+    if not bitrate:
+        return None
+    actual = int(bitrate / 1000)
+    if actual >= claimed * 0.8:
+        return None
+    return (f"⚠️ Qualität weicht ab: {pick.get('source')} behauptet "
+            f"{claimed} kbps, geliefert wurden {actual} kbps")

@@ -857,7 +857,7 @@ Ingest-Kette; alle 7 Wrapper-Endpunkte in musik/musicgrabber.py sind in
   per Fallback-MP3 + AAC mit leerem Artist-Tag → „Unknown" importiert).
   Rollback bliebe: compose-Tag 4.3.1 + Overlay-Revert.
   **Befunde aus 10.2 (eigene Stories, kein Teil dieses Flips):**
-  - [ ] 10.3 [ready-for-agent] Decider-Guard: Units mit leerem/„Unknown"-
+  - [x] 10.3 [ready-for-agent] Decider-Guard: Units mit leerem/„Unknown"-
     Artist oder offensichtlicher Quellen-Junk-Metadaten niemals auto
     importieren (10.2-Echtlauf: jiosaavn lieferte AAC ohne Artist-Tag →
     als-own-tags mit artist=Unknown importiert; + Fallback-MP3 mit
@@ -866,6 +866,22 @@ Ingest-Kette; alle 7 Wrapper-Endpunkte in musik/musicgrabber.py sind in
     daher selbstkonsistent). Global-Regel, keine jiosaavn-Sonderlocke;
     Qualitäts-Badge-Verifikation nach Import (behauptete 320-AAC vs.
     gelieferte 128-MP3) mitprüfen.
+    **ERLEDIGT 2026-10-21:** (1) `asis.artist_present()` —
+    leer/„Unknown"/„Unknown Artist" gilt NICHT als Identität:
+    tags_complete verweigert den Own-Tags-Pfad, plan_va_normalize
+    behandelt Unknown als fehlend (Dateinamen-Füllung greift, sonst
+    Review) und Unknown-Credits zählen als AA-Bedarf. Unit mit
+    artist=Unknown rutscht also nie mehr als eigenes Tags-Import
+    durch → Review. smoke_tier3 Fall 7. (2) Qualitäts-Badge:
+    `musicgrabber.verify_delivered_quality()` misst nach dem Download
+    die reale Bitrate der neuesten Staging-Datei gegen den behaupteten
+    kbps-Wert; Abweichung >20 % → ⚠️ in Chat + Job-Summary (advisory,
+    Import läuft weiter). (3) Selbstkonsistent FALSCHE Tags
+    (mangetout/moisturizer): ohne Audio-Fingerprinting lokal
+    unerkennbar — die Datei IST der falsche Song; Dauer/Tags stimmen
+    mit der (falschen) Quelle überein. Erkannt werden kann das nur per
+    AcoustID-Vorabprüfung → als spätere Story-Option notiert, hier
+    bewusst nicht umgesetzt (kein Pseudo-Guard).
   - [ ] 10.4 [wontfix-Kandidat→prüfen] smoke_ingest_roots schlägt auf dem
     Pi fehl (beets-2.14-confit: `del beets_config[...]` entfernt den
     Key nicht → Config-Roots leaken in den Default-Case). Vor-devist

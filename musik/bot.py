@@ -171,6 +171,7 @@ def _try_musicgrabber(job: dict, query: str, send) -> bool:
         # often delivers instead of falling back to lossy YouTube
         pick = None
         last_err = ""
+        t0 = time.time()
         for cand in ranked[:3]:
             job_id = mg.download(cand, token)
             try:
@@ -187,6 +188,14 @@ def _try_musicgrabber(job: dict, query: str, send) -> bool:
         quality = f" | {pick['quality']}" if pick["quality"] else ""
         send(f"⬇️ via MusicGrabber [{pick['source']}{quality}]:\n"
              f"{pick['artist'][:60]} - {pick['title'][:80]}")
+        # Story 10.3: the claimed quality badge vs. the delivered file
+        try:
+            quality_note = mg.verify_delivered_quality(pick, since_ts=t0 - 60)
+        except Exception as e:
+            print(f"bot: quality verify failed (ignored): {e}")
+            quality_note = None
+        if quality_note:
+            send(quality_note)
         # file is in the MG staging area -> import now, no 15-min-timer wait
         from . import ingest as ingest_mod
         from .paths import state_dir
@@ -205,6 +214,8 @@ def _try_musicgrabber(job: dict, query: str, send) -> bool:
                   else "📦 via MusicGrabber (Import über Timer)")
         summary = (f"{prefix} [{pick['source']}{quality}]:\n"
                    f"{pick['artist'][:50]} - {pick['title'][:70]}")
+        if quality_note:
+            summary = f"{quality_note}\n{summary}"
         send(summary)
         jobs_mod.update_job(job["id"], status="done", finished=time.time(),
                             summary=summary)

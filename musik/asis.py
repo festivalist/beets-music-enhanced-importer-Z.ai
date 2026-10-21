@@ -47,6 +47,17 @@ def from_fetch(unit: dict) -> bool:
     return "musicgrabber" in parts
 
 
+# Story 10.3: an artist tag holding one of these is NOT an identity —
+# units whose per-track artists all resolve to this never import on own
+# tags (they went through the auto path as artist=Unknown in the 10.2
+# live run) and fall through to review instead.
+_UNKNOWN_ARTISTS = {"", "unknown", "unknown artist"}
+
+
+def artist_present(value: str) -> bool:
+    return (value or "").strip().lower() not in _UNKNOWN_ARTISTS
+
+
 def tags_complete(unit: dict) -> tuple[bool, str]:
     """Every file needs artist/album/title; album must be consistent.
 
@@ -68,7 +79,7 @@ def tags_complete(unit: dict) -> tuple[bool, str]:
         artist = _tag(f, "albumartist") or _tag(f, "artist")
         title = _tag(f, "title")
         fa = _tag(f, "album")
-        if not artist or not title or (not fa and not per_track):
+        if not artist_present(artist) or not title or (not fa and not per_track):
             return False, (
                 f"incomplete tags in {os.path.basename(f)} "
                 f"(artist={artist!r}, album={fa!r}, title={title!r})"
@@ -108,6 +119,8 @@ def plan_va_normalize(files: list, seen: list[str] | None = None) -> dict | None
         if not os.path.isfile(openable(f)):
             return None
         artist = tag_of(f, "artist")
+        if not artist_present(artist):
+            artist = ""
         title = tag_of(f, "title")
         parsed = parse_track_filename(os.fsdecode(f))
         if artist and title and parsed:
@@ -130,11 +143,11 @@ def plan_va_normalize(files: list, seen: list[str] | None = None) -> dict | None
     aa = aa_overwrite = 0
     for f, artist, title, parsed in entries:
         credit = tag_of(f, "albumartist")
-        if not credit:
+        if not artist_present(credit) \
+                or credit.strip().lower() in ("various artists", "various",
+                                              "va", "v.a."):
             aa += 1
-        elif seen and len(seen) >= 3 and credit.strip().lower() not in seen \
-                and credit.strip().lower() not in (
-                    "various artists", "various", "va", "v.a."):
+        elif seen and len(seen) >= 3 and credit.strip().lower() not in seen:
             aa_overwrite += 1
         if artist and title:
             continue

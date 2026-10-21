@@ -118,4 +118,13 @@ assert r is not None and r["status"] == "asis", r
 assert "fetch staging" in r["reason"] or "downloader" in r["reason"], r
 print("6) MusicGrabber staging unit -> asis OK (EPIC 2.1)")
 
+# 7) Story 10.3: an artist tag of "Unknown" is NOT an identity — the
+#    unit must not slip through the own-tags gate as artist=Unknown
+u = make_unit("unknown-artist", [
+    ("01.mp3", {"artist": "Unknown", "albumartist": "Unknown",
+                "album": "Some Album", "title": "T1"}),
+], {"artist": "Some Artist", "album": "Some Album"})
+assert decide(u) is None
+print("7) unknown artist -> stays review OK (Story 10.3)")
+
 print("smoke_tier3: all assertions passed")
