@@ -82,7 +82,7 @@ def tags_complete(unit: dict) -> tuple[bool, str]:
 
 # --- VA-Survivor-Normalisierung (Story 10.6) -----------------------------
 
-def plan_va_normalize(files: list) -> dict | None:
+def plan_va_normalize(files: list, seen: list[str] | None = None) -> dict | None:
     """Decide whether a va_like album unit can import as a clean
     Various-Artists album on its own metadata (Story 10.6), and how.
 
@@ -90,14 +90,18 @@ def plan_va_normalize(files: list) -> dict | None:
     carries CORRECT tags where the filename has the typo. A filename
     ('NN. Part A - Part B.ext') only FILLS missing artist/title tags;
     its orientation (artist first vs. title first) is majority-voted
-    per unit against the fully tagged files.
+    per unit against the fully tagged files. A junk release credit
+    (albumartist matching none of `seen`, the >=3 real track artists)
+    is REPLACED by Various Artists; an empty one is filled.
 
     Returns None (stay in review) when a file has neither complete tags
     nor a filename that can fill its gaps. Otherwise:
-    {"fill": {path: (artist, title)}, "aa": bool} — "aa" says whether
-    albumartist needs the Various Artists normalization."""
+    {"fill": {path: (artist, title)}, "aa": bool, "aa_overwrite": bool}
+    — "aa" says some file lacks albumartist, "aa_overwrite" says some
+    file carries a junk credit that must be replaced."""
     from .scan import norm_name, openable, parse_track_filename, tag_of
 
+    seen = {s.strip().lower() for s in (seen or [])}
     entries = []
     votes_artist = votes_title = 0
     for f in files:
@@ -123,10 +127,15 @@ def plan_va_normalize(files: list) -> dict | None:
         )
 
     fill: dict[str, tuple[str, str]] = {}
-    aa = 0
+    aa = aa_overwrite = 0
     for f, artist, title, parsed in entries:
-        if not tag_of(f, "albumartist"):
+        credit = tag_of(f, "albumartist")
+        if not credit:
             aa += 1
+        elif seen and len(seen) >= 3 and credit.strip().lower() not in seen \
+                and credit.strip().lower() not in (
+                    "various artists", "various", "va", "v.a."):
+            aa_overwrite += 1
         if artist and title:
             continue
         if parsed is None or orientation is None:
@@ -138,7 +147,7 @@ def plan_va_normalize(files: list) -> dict | None:
         fill[os.fsdecode(f)] = (
             fa if not artist else "", ft if not title else ""
         )
-    return {"fill": fill, "aa": aa > 0}
+    return {"fill": fill, "aa": aa > 0, "aa_overwrite": aa_overwrite > 0}
 
 
 def apply_va_plan(task, plan: dict) -> int:
@@ -157,6 +166,10 @@ def apply_va_plan(task, plan: dict) -> int:
             item.title = title
             touched += 1
         if plan.get("aa") and not (item.albumartist or "").strip():
+            item.albumartist = "Various Artists"
+            touched += 1
+        elif plan.get("aa_overwrite") and (item.albumartist or "").strip() \
+                and item.albumartist.strip().lower() != "various artists":
             item.albumartist = "Various Artists"
             touched += 1
     return touched
@@ -188,7 +201,12 @@ def apply_va_normalize_files(unit: dict, plan: dict) -> bool:
         if title and not (m.get("title") or [""])[0].strip():
             m["title"] = title
             changed = True
-        if plan.get("aa") and not (m.get("albumartist") or [""])[0].strip():
+        credit = (m.get("albumartist") or [""])[0].strip()
+        if plan.get("aa") and not credit:
+            m["albumartist"] = "Various Artists"
+            changed = True
+        elif plan.get("aa_overwrite") and credit \
+                and credit.lower() != "various artists":
             m["albumartist"] = "Various Artists"
             changed = True
         if changed:

@@ -243,4 +243,27 @@ assert action == "skip" and record["status"] == "ignored", (action, record)
 assert "5/6" in record["reason"], record
 print("10) thin tags: resolved-identity overlap -> survivor / ignored OK")
 
+# 11) junk release credit ("Essential Albums" on a 6-artist comp): the
+#     unit counts as va_like, the VA block wins BEFORE tier 3 (whose
+#     folder check would be fooled by folder+tags agreeing on the junk)
+#     and the plan replaces the junk credit with Various Artists
+tracks11 = essential_tracks(6)
+u = make_va_unit("junk-aa", tracks11)
+for p in u["files"]:
+    TAGS[os.path.normcase(p)]["albumartist"] = "Essential Albums"
+u["artists_seen"] = [f"artist {i:02d}" for i in range(1, 7)]
+u["hints"] = []
+dec = Decider(netrec, auto_accept_distance=0.25, unit=u, lib=FakeLib([]))
+assert dec._va_like() is True
+action, record = dec.decide_album(fake_task([weak_candidate()]))
+assert action == "apply-asis" and record["status"] == "asis", (action, record)
+assert record["normalize_va"]["aa_overwrite"] is True, record
+item = types.SimpleNamespace(
+    path=os.fsencode(u["files"][0]), artist="Artist 01",
+    title="Track 01", albumartist="Essential Albums")
+task = types.SimpleNamespace(imported_items=lambda: [item])
+asis_mod.apply_va_plan(task, record["normalize_va"])
+assert item.albumartist == "Various Artists", item.albumartist
+print("11) junk albumartist: va_like + replaced before tier 3 OK")
+
 print("smoke_va_guard: all assertions passed")

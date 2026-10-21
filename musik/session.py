@@ -284,7 +284,13 @@ class Decider:
         seen = u.get("artists_seen") or []
         if len(seen) < 3:
             return False
-        return first is not None and (not aa)
+        if not aa:
+            return True
+        # Series/junk albumartist that matches none of the >=3 real
+        # track artists ("Essential Albums" stamped onto a 20-artist
+        # compilation): the release credit is meaningless — it is a
+        # compilation for every practical purpose.
+        return aa.strip().lower() not in seen
 
     # Album-title looseness for va_like units: the tags often carry the
     # full retail title ("…Volume 1 Compiled By X (catalog#)") while the
@@ -519,7 +525,10 @@ class Decider:
         if self._va_cache is None:
             from .asis import plan_va_normalize
 
-            plan = plan_va_normalize(list(self.unit.get("files") or []))
+            plan = plan_va_normalize(
+                list(self.unit.get("files") or []),
+                seen=list(self.unit.get("artists_seen") or []),
+            )
             self._va_cache = (plan, self._va_redundancy(plan))
         return self._va_cache
 
@@ -646,14 +655,21 @@ class Decider:
             if self._passes_all(task, cand):
                 return "apply", self._apply_record(cand, "auto", "", guessed)
 
-        # VA redundancy guard (Story 10.5): no candidate passed — before
-        # any own-tags fallback, a compilation that is largely already in
-        # the library is archived instead of imported. User decisions
-        # (forced ids, overrides) are handled above and never get here.
+        # VA guard + survivor (Stories 10.5/10.6): no candidate passed —
+        # a compilation largely already in the library is archived, a
+        # mostly-unique one imports as a clean Various-Artists album on
+        # its own metadata. This runs BEFORE the tier-3 attempts: a junk
+        # release credit ("Essential Albums") corroborated by the junk
+        # folder name must not win the plain tier-3 asis path. User
+        # decisions (forced ids, overrides) never get here.
         if self._va_like():
-            _plan, verdict = self._va_assess()
+            plan, verdict = self._va_assess()
             if verdict is not None and verdict[0]:
                 return "skip", self._va_ignored_record(verdict, guessed)
+            if plan is not None and verdict is not None:
+                return "apply-asis", self._va_survivor_record(
+                    verdict, guessed, plan
+                )
 
         best = candidates[0]
         dist = float(best.distance)
@@ -694,18 +710,6 @@ class Decider:
                     "(artist/title level) — imported as-is by user rule"
                 )
                 return "apply-asis", tier3
-        # VA survivor (Story 10.6): not redundant, but every own-tags
-        # fallback above declined (typically: junk folder name vetoed the
-        # tier-3 folder corroboration). If the files still carry a
-        # resolvable identity AND the overlap measurement is valid
-        # (>= va_redundant_min_tracks), import as a clean
-        # Various-Artists album.
-        if self._va_like():
-            plan, verdict = self._va_assess()
-            if plan is not None and verdict is not None and not verdict[0]:
-                return "apply-asis", self._va_survivor_record(
-                    verdict, guessed, plan
-                )
         return "skip", {
             "status": "review",
             "reason": "below auto-accept confidence: " + "; ".join(reasons),
