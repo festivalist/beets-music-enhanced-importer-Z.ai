@@ -496,6 +496,7 @@ Nach kurzer Zeit muss das Album in **Plexamp** auftauchen.
 | Komplett-Reinstall nach Repo-Update | `bash install.sh --library /mnt/music` (idempotent, hält config.yaml) |
 | Cookies neu (nach Logout/Passwortwechsel) | Phase 3 wiederholen (nur Schritt 4-5 + scp) |
 | Review-Einheiten auf eigene Tags importieren | Handy: Bot-`/asis` (Knöpfe antippen) · Terminal: `musik.py asis --pending` |
+| Defekte Tags (Vinyl-Rips, Tribute, Junk-Artists) | automatisch: Reparatur aus Ordner-Identität vor jedem As-is (Story 9.9, Default an; aus: `musik: asis_folder_repair: no`) — kein Handeingreifen nötig |
 | Windows-Bestand nachträglich übernehmen | Phase 5b (SMB + scan + `asis --pending --unit …`) |
 | Plex-Scan manuell anstoßen | `.venv/bin/python musik.py plex` (meldet die konkrete Ursache, falls es hakt) |
 | Plex-Playlist neu hochladen | `.venv/bin/python musik.py plex --playlist "Name"` (oder `all`) |

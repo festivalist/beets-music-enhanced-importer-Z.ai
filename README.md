@@ -455,6 +455,20 @@ units the automatic rule rejects (contradictory tags, middle-band
 candidates), `musik.bat asis --unit <folder>` remains the explicit escape
 hatch, and `review` / `review.csv` + `apply` the deliberate routes.
 
+**Defective tags get repaired from the folder name before the asis gate
+decides** (scope change 2026-10-21): vinyl rips with empty tag blocks,
+per-LP/CD album-tag variants ("…(LP1)/(LP2)", "…CD1/CD2") and junk artist
+tags (the ripper wrote the wrong band into every file) would otherwise sit
+in review forever — the folder name is the ripper's authoritative
+metadata. The repair derives album/artist from the folder name; ≥2
+distinct genuine per-file artists that don't corroborate the folder artist
+become a Various Artists import with per-file artists kept (tributes,
+samplers); missing titles/track numbers come from the file names, the year
+from tags else the folder, discs from CD/LP suffixes. It runs in every
+asis path (ingest fallback, monitor tap, bot `/asis`) and is gated by
+`musik: asis_folder_repair` (default on); dry-runs write nothing;
+singletons and fetch-staging stay excluded.
+
 ### Mixed batches: the import playbook
 
 Large mixed drops (albums + chart dumps + label compilations + vintage

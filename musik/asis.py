@@ -2,9 +2,11 @@
 
 For review/unmatched units whose files carry complete, consistent tags
 (scene rips usually do), this imports them "as-is" into the configured
-layout. It is an explicit, user-invoked action — never part of the
-automatic pipeline. Duplicates are still resolved by quality, cover art
-and genres are still fetched, and everything is logged.
+layout. Via the ingest's asis fallback it also runs in the automatic
+pipeline (Story 9.6), and since Story 9.9 it repairs defective tags from
+the folder identity before giving up on a unit. Duplicates are still
+resolved by quality, cover art and genres are still fetched, and
+everything is logged.
 """
 
 import os
@@ -158,6 +160,214 @@ def enrich_from_meta_files(unit: dict) -> int:
     return touched
 
 
+# --- Tag-Reparatur aus Ordner-Identität (Story 9.9) --------------------
+
+_BULLET = " • "
+_PREFIX_RE = re.compile(r"^\s*\d{3,4}\s*[.\-_]\s+")
+_ANY_YEAR_RE = re.compile(r"(?<!\d)((?:19|20)\d{2})(?!\d)")
+_BRACKET_TAIL_RE = re.compile(r"\s*[\[\(][^\]\)]*[\]\)]\s*$")
+# Nur echte Datenträger-Suffixe; "Vol. 2" ist ein echter Albumnamenbestandteil
+_DISC_SUFFIX_RE = re.compile(
+    r"[\s.\-_]*[\(\[]?\s*(?:cd|lp|disc)\s*0?\d{1,2}\s*[\)\].]*\s*$", re.I)
+_TRACK_PREFIX_RE = re.compile(r"^\s*[\(\[]?[A-Da-d]?\d{1,3}[\)\].]?[\s._\-:]*")
+_BROWSER_DUP_RE = re.compile(r"\s*\(\d+\)\s*$")
+
+
+def _folder_identity(name: str) -> dict:
+    """Artist/Album/Jahr aus dem Unit-Ordnernamen ableiten.
+
+    Unterstützt die real vorkommenden Konventionen:
+    '2017 - GREATEST HITS • Artist - Album [US Vinyl LP] [2CD]',
+    '0134. Artist - Album [1968]' und schlicht 'Artist - Album'.
+    """
+    ident: dict = {}
+    m = re.match(r"^\s*((?:19|20)\d{2})\s*(?:[-–_.]|\b)", name)
+    if m:
+        ident["year"] = m.group(1)
+    else:
+        m = _ANY_YEAR_RE.search(name)
+        if m:
+            ident["year"] = m.group(1)
+    rest = name
+    if _BULLET in rest:
+        rest = rest.rsplit(_BULLET, 1)[1]
+    else:
+        rest = _PREFIX_RE.sub("", rest)
+    while True:
+        stripped = _BRACKET_TAIL_RE.sub("", rest).strip()
+        if stripped == rest.strip() or not stripped:
+            break
+        rest = stripped
+    rest = rest.strip(" \t-_.")
+    artist, album = "", rest
+    for pat in (r"\s+[-–]\s+", r"\s*[-–]\s+"):
+        parts = re.split(pat, rest, maxsplit=1)
+        if len(parts) == 2 and parts[0].strip() and parts[1].strip():
+            artist, album = parts[0].strip(), parts[1].strip()
+            break
+    if artist:
+        ident["artist"] = artist
+    if album:
+        ident["album"] = album
+    return ident
+
+
+def _split_disc_suffix(album: str) -> tuple[str, int | None]:
+    """'…Greatest Hits CD1' → (Basis, 1); '…(LP2).' → (Basis, 2)."""
+    m = _DISC_SUFFIX_RE.search(album)
+    if not m:
+        return album.rstrip(" ."), None
+    base = album[: m.start()].rstrip(" \t-_.")
+    digits = re.search(r"\d{1,2}", m.group(0))
+    disc = int(digits.group(0)) if digits else None
+    return (base or album.rstrip(" .")), disc
+
+
+def _natural_key(fname: str):
+    base = os.path.basename(fname).lower()
+    m = re.match(r"^\s*[\(\[]?([A-Da-d])?0*(\d{1,3})", base)
+    if m:
+        side = ord(m.group(1).lower()) - ord("a") if m.group(1) else 0
+        return (0, side, int(m.group(2)), base)
+    return (1, 0, 0, base)
+
+
+def _title_from_filename(fname: str) -> str:
+    base = os.path.splitext(os.path.basename(fname))[0].replace("_", " ")
+    base = _TRACK_PREFIX_RE.sub("", base).strip(" .-")
+    base = _BROWSER_DUP_RE.sub("", base).strip()
+    base = re.sub(r"\s{2,}", " ", base.replace(".", " ")).strip()
+    if not base:
+        return ""
+    titled = base.title()
+    return re.sub(r"(['’])([A-Z])",
+                  lambda m: m.group(1) + m.group(2).lower(), titled)
+
+
+def repair_from_folder(unit: dict, dry_run: bool = False) -> tuple[bool, str]:
+    """Defekte Tags einer Album-Unit aus der Ordner-Identität reparieren
+    (Story 9.9) — die automatisierte Form der Hand-Waiter monitor-apply1/2.
+
+    Gilt nur für Units, die am tags_complete-Gate scheitern: Vinyl-Rips
+    mit leeren Tags, Album-Tag-Varianten je LP/CD („…(LP1)/(LP2)“,
+    „…CD1/CD2“), fehlende Titel. Singletons und Fetch-Staging (per-track
+    Autorität) sind bewusst ausgenommen. Identität: Album/Artist aus dem
+    Ordnernamen (der Ripper-Namenskonvention folgt; Junk-Tags werden
+    überschrieben — Beweisstand Coral/Willie Nelson); ≥2 verschiedene
+    echte Datei-Artists ohne Treffer auf den Ordner-Artist → Various
+    Artists (Tribute-/Sampler-Fall, Datei-Artists bleiben erhalten).
+    Fehlende Titel/Tracknummern kommen aus dem Dateinamen bzw. werden
+    fortlaufend nummeriert; Discs aus CD/LP-Suffixen. Ein Trockenlauf
+    plant nur und schreibt nichts. Liefert (erfolg, hinweis).
+    """
+    if not unit.get("files"):
+        return False, "no files"
+    if (unit.get("singleton") or unit.get("split_into_singletons")
+            or from_fetch(unit)):
+        return False, "singleton/fetch-staging — Reparatur nicht anwendbar"
+    files = [f for f in unit["files"] if os.path.isfile(openable(f))]
+    if not files:
+        return False, "no files on disk"
+
+    infos = []
+    for f in files:
+        try:
+            m = mutagen.File(openable(f), easy=True)
+        except Exception:
+            m = None
+        if m is None:
+            return False, f"unlesbar: {os.path.basename(f)}"
+
+        def g(key, _m=m):
+            vals = _m.get(key) or []
+            return str(vals[0]).strip() if vals else ""
+
+        infos.append({
+            "path": f, "mg": m,
+            "artist": g("artist"), "aartist": g("albumartist"),
+            "album": g("album"), "title": g("title"),
+            "year": g("date") or g("year"), "track": g("tracknumber"),
+        })
+
+    ident = _folder_identity(
+        os.path.basename((unit.get("path") or "").rstrip("\\/")))
+    folder_artist = ident.get("artist", "")
+    album = ident.get("album", "")
+    if not album:
+        return False, "keine Album-Identität im Ordnernamen"
+
+    # Disc-Zuordnung nur aus VARIANTEN der Datei-Album-Tags (CD1/LP2 …);
+    # einheitliche Tags bleiben unangetastet (echte Albumnamen mit
+    # solchen Bestandteilen nicht zerstören).
+    file_albums = {i["album"] for i in infos if i["album"]}
+    discs: dict[str, int] = {}
+    if len(file_albums) > 1:
+        for i in infos:
+            if i["album"]:
+                _, disc = _split_disc_suffix(i["album"])
+                if disc:
+                    discs[i["path"]] = disc
+
+    # Artist: Ordner-Identität gewinnt; nur wenn ≥2 verschiedene echte
+    # Datei-Artists vorliegen und KEINER den Ordner-Artist bestätigt,
+    # ist es ein Sampler/Tribute → Various Artists (Datei-Artists keep).
+    file_artists = {(i["artist"] or i["aartist"]) for i in infos} - {""}
+    va = (len(file_artists) >= 2
+          and not any(a.lower() == folder_artist.lower()
+                      for a in file_artists))
+    albumartist = "Various Artists" if va else folder_artist
+    if not albumartist:
+        return False, "keine Artist-Identität im Ordnernamen"
+
+    year = ""
+    if all(i["year"] for i in infos):
+        year = infos[0]["year"]
+    else:
+        year = ident.get("year", "")
+
+    plan = []
+    changed = False
+    order = sorted(range(len(infos)), key=lambda ix: _natural_key(infos[ix]["path"]))
+    for seq, ix in enumerate(order, 1):
+        i = infos[ix]
+        tags: dict[str, str] = {}
+        if not va:
+            if i["artist"] != folder_artist:
+                tags["artist"] = folder_artist
+            if i["aartist"] != folder_artist:
+                tags["albumartist"] = folder_artist
+        elif i["aartist"].lower() != "various artists":
+            tags["albumartist"] = "Various Artists"
+        if i["album"] != album:
+            tags["album"] = album
+        if not i["title"]:
+            t = _title_from_filename(i["path"])
+            if t:
+                tags["title"] = t
+        if year and not i["year"]:
+            tags["date"] = year
+        if not i["track"] or not i["track"].split("/")[0].strip().isdigit():
+            tags["tracknumber"] = str(seq)
+        disc = discs.get(i["path"])
+        if disc:
+            tags["discnumber"] = str(disc)
+        if tags:
+            changed = True
+        plan.append((i["path"], i["mg"], tags))
+
+    if not changed:
+        return False, "Reparatur hätte nichts zu korrigieren"
+
+    label = f"{albumartist} – {album}" + (f" [{year}]" if year else "")
+    if dry_run:
+        return True, f"würde reparieren ({len(plan)} Dateien): {label}"
+    for path, mg, tags in plan:
+        for key, val in tags.items():
+            mg[key] = val
+        mg.save()
+    return True, f"Tags repariert aus Ordner-Identität: {label}"
+
+
 def _fill_empty_original_years(lib) -> int:
     """As-is imports have no MB data: derive original_year from year so
     the `$original_year` path templates work. Only fills empty fields."""
@@ -219,6 +429,12 @@ def import_units(paths: list[str], progress=None) -> tuple[list[str], bool]:
     return lines, any(l.startswith("❌") for l in lines)
 
 
+def _folder_repair_enabled() -> bool:
+    from .paths import musik_config
+
+    return bool(musik_config().get("asis_folder_repair", True))
+
+
 def cmd_asis(only: str | None = None, dry_run: bool = False,
              include_pending: bool = False) -> int:
     from . import state as state_mod
@@ -238,6 +454,7 @@ def cmd_asis(only: str | None = None, dry_run: bool = False,
         statuses += ("pending",)
 
     selected = []
+    repaired: dict[str, str] = {}
     for u in state_mod.units(st).values():
         if u.get("status") not in statuses:
             continue
@@ -252,10 +469,19 @@ def cmd_asis(only: str | None = None, dry_run: bool = False,
             u["files"] = present
             u["n_files"] = len(present)
         ok, _why = tags_complete(u)
+        if not ok and _folder_repair_enabled():
+            rok, rnote = repair_from_folder(u, dry_run=dry_run)
+            if rok:
+                repaired[u["path"]] = rnote
+                # Trockenlauf vertraut dem Reparaturplan; Echtlauf
+                # verifiziert unabhängig über den Gate-Lauf.
+                ok = True if dry_run else tags_complete(u)[0]
         if ok:
             selected.append(u)
     selected.sort(key=lambda u: u["path"])
     print(f"asis: {len(selected)} tag-complete unit(s) eligible"
+          + (f" ({len(repaired)} aus Ordner-Identität repariert)"
+             if repaired else "")
           + (" (DRY RUN — nothing done)" if dry_run else ""))
     if not selected:
         return 0
@@ -325,7 +551,11 @@ def cmd_asis(only: str | None = None, dry_run: bool = False,
 
             unit["decision_kind"] = _engine._release_kind(unit)
             unit["decision_type"] = "own-tags"
-            state_mod.set_status(unit, "asis", "imported as-is (user-invoked, tags complete)")
+            rnote = repaired.get(unit["path"])
+            state_mod.set_status(
+                unit, "asis",
+                "imported as-is (user-invoked, tags complete)"
+                + (f"; {rnote}" if rnote else ""))
             state_mod.save(st)
             done += 1
             print(f"[{i}/{len(selected)}] asis     {label}")

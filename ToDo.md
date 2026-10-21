@@ -651,6 +651,28 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       (int-Jahr aus MB-Kandidaten vs. String-Erwartung im Forced-Apply)
       → Story 9.8; Review 9→4 (Beatles, Mothers, Willie Nelson,
       Tribute bleiben); Stau 299→246; keine Dubletten (beet-Check).
+- [ ] 9.9 Asis-Tag-Reparatur aus Ordner-Identität (Auto-Regel) —
+      **Auslöser 2026-10-21 (Nutzer: „los“ + „das muss zukünftig
+      automatisch passieren“):** Die 13 GREATEST-HITS-Rips (Vinyl-LPs +
+      JP-Tribute, windows-Root) fallen wegen defekter Tags durchs
+      tags_complete-Gate und hängen deshalb in Review — drei Asis-Taps
+      auf den JP-Tribute liefen jeweils wieder zurück („Status jetzt
+      review"). Bisher per Hand-Waiter repariert (monitor-apply1/2:
+      Tags auf Ordner-Identität normalisieren → asis). **Neue Regel:**
+      cmd_asis versucht bei tag-unvollständigen Album-Units (keine
+      Singletons/Fetch-Staging) eine Reparatur aus der Ordner-Identität:
+      Album-Konsens aus den Datei-Tags nach CD/LP-Suffix-Strip
+      („…CD1/CD2“, „…(LP1)/(LP2)“), sonst Ordner-Parse („•“-Marker,
+      Präfix-Jahr, Klammer-Suffixe); Artist einheitlich→aus Tags/Ordner,
+      ≥2 verschiedene→Various Artists (Albumartist), fehlende
+      Titel/Tracknummern aus Dateinamen bzw. fortlaufend, Jahr aus Tags
+      sonst Ordner. Config-Gate `musik: asis_folder_repair` (Default
+      an), Dry-Run schreibt nichts. Zielcheck: Beschaffung mit weniger
+      Interaktion — die Sackgasse „Review-Tap → nix passiert“
+      verschwindet; Vinyl-Rips ohne MB-Treffer landen ohne Zutun in der
+      Bibliothek. Test: smoke_repair_folder.py
+      (5 Defektklassen gegen echte Mini-MP3s) + Echtlauf gegen die 13
+      Pi-Units. **Ergebnis: (offen)**
 
 Bewusst später (eigene Story, kein Teil dieses EPICs): generelles
 Versions-Pinning für alle Import-Abhängigkeiten (Nutzer-Strategie
