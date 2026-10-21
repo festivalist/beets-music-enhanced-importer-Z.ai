@@ -3,11 +3,16 @@
 Der Import-Monitor (Weboberfläche für Import-Status, EPIC 9) lebt als Tab
 in der MusicGrabber-UI. Statt eines Voll-Forks oder einer eigenen
 Neben-Anwendung (Sidecar) überlagern Bind-Mounts aus diesem Repo nur die
-statischen Dateien des gepinnten Upstream-Images (4.3.1; Upstream-Lizenz
+statischen Dateien des gepinnten Upstream-Images (seit Story 10.1:
+4.4.0, zuvor 4.3.1; Upstream-Lizenz
 The Unlicense). Das Upstream-Backend bleibt unangetastet — alle Aktionen
 laufen über den Bot-Executor (ADR-0002) —, ein eigener multi-arch-
 Image-Build (Chromium-Stack) entfällt, und Updates sind bewusste
 Tag-Bumps mit Overlay-Verträglichkeitscheck statt stiller latest-Züge.
+Lehre aus dem 4.4.0-Bump (2026-10-21): das Image wohnt seit 4.4 in
+`/opt/musicgrabber` statt `/app` — der statische Overlay-Mount ist Teil
+des Bump-Checks, und der Installer probiert `/static/monitor.js` (nur
+ours), damit ein falscher Mount-Pfad nicht still durchrutscht.
 
 ## Considered Options
 

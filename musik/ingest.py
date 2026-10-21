@@ -94,6 +94,43 @@ def _activity(phase: str, detail: str = "") -> None:
         pass
 
 
+def _prune_empty_children(root: str, keep: set[str] = ()) -> None:
+    """Remove empty child dirs below root, deepest first so emptied
+    husks cascade away in one pass. The root itself and every path in
+    `keep` (the other configured roots — nested roots stay anchored,
+    as in the pre-10.1 pruner) are never removed. Hidden dirs are
+    neither entered nor removed: MusicGrabber 4.4 creates its
+    .mg_staging job dir before the first file lands, and deleting one
+    mid-job would fail the download (Story 10.1)."""
+    from .scan import walk_visible
+
+    protected = {os.path.normcase(os.path.abspath(root))}
+    protected.update(os.path.normcase(os.path.abspath(k)) for k in keep)
+    candidates = []
+    for dirpath, _dirs, _filenames in walk_visible(root):
+        if os.path.normcase(os.path.abspath(dirpath)) not in protected:
+            candidates.append(dirpath)
+    for dirpath in sorted(candidates, key=len, reverse=True):
+        try:
+            os.rmdir(dirpath)  # succeeds only when empty
+        except OSError:
+            pass
+
+
+def _scene_packaging_junk(root: str) -> list[str]:
+    """Scene-packaging files (.nfo/.sfv/.log/.m3u/.txt) below root,
+    outside hidden directories — inside .mg_staging they belong to a
+    running MusicGrabber job and must stay (Story 10.1)."""
+    from .scan import is_audio, walk_visible
+
+    junk = []
+    for dirpath, _dirs, filenames in walk_visible(root):
+        junk += [os.path.join(dirpath, f) for f in filenames
+                 if not is_audio(f)
+                 and f.lower().endswith(('.nfo', '.sfv', '.log', '.m3u', '.txt'))]
+    return junk
+
+
 def cmd_ingest(root: str | None = None) -> int:
     # Spooled Monitor-Aktionen zuerst (Story 9.6): hier läuft der ingest.lock
     # bereits (systemd-flock oder Bot-Executor) — der Ingest bleibt die
@@ -124,13 +161,7 @@ def cmd_ingest(root: str | None = None) -> int:
     # (Albums/Playlists/Singles).
     root_set = {os.path.normcase(os.path.abspath(r)) for r in roots}
     for r in roots:
-        for dirpath, dirnames, filenames in os.walk(r, topdown=False):
-            if os.path.normcase(os.path.abspath(dirpath)) in root_set:
-                continue
-            try:
-                os.rmdir(dirpath)  # succeeds only when empty
-            except OSError:
-                pass
+        _prune_empty_children(r, keep=root_set)
     # MG's downloader expects its layout anchors host-side (ENOENT
     # incident 2026-10-09); no-op for roots that are not MG staging
     from .musicgrabber import ensure_staging_layout
@@ -226,12 +257,7 @@ def _ingest_one(root: str) -> int:
     # would linger forever and block the husk prune (live 2026-10-11:
     # 32 nfo husks after a 454-file drop). Cover images stay — they can
     # still serve as art sources.
-    from .scan import is_audio
-    junk = []
-    for dirpath, _dn, filenames in os.walk(root):
-        junk += [os.path.join(dirpath, f) for f in filenames
-                 if not is_audio(f)
-                 and f.lower().endswith(('.nfo', '.sfv', '.log', '.m3u', '.txt'))]
+    junk = _scene_packaging_junk(root)
     if junk:
         from . import trash as trash_mod
         trash_mod.trash_files(junk, 'source-cleanup',

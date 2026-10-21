@@ -142,6 +142,8 @@
 
         // Which Watched tab pill is showing (playlists, upgrades, audit or m3u).
         let watchedMode = 'playlists';
+        // And the Queue tab's (queue, downloadable or trash).
+        let queueMode = 'queue';
 
         const missingTrackVersionsState = {
             mode: 'watched',
@@ -248,7 +250,9 @@
 
             if (response.status === 429) {
                 const data = await response.json().catch(() => ({}));
-                throw new Error(data.detail || 'Rate limit exceeded');
+                const err = new Error(data.detail || 'Rate limit exceeded');
+                err.status = 429;
+                throw err;
             }
 
             return response;
@@ -436,8 +440,6 @@
         const fileUpload = document.getElementById('fileUpload');
         const fileName = document.getElementById('fileName');
         const spotifyUrlInput = document.getElementById('spotifyUrlInput');
-        const playlistServicesHint = document.getElementById('playlistServicesHint');
-        const playlistServicesTooltip = document.getElementById('playlistServicesTooltip');
         const fetchSpotifyBtn = document.getElementById('fetchSpotifyBtn');
         const spotifyError = document.getElementById('spotifyError');
         const albumMatchPanel = document.getElementById('albumMatchPanel');
@@ -588,7 +590,10 @@
             } else {
                 trackNum = idx + 1;
             }
-            return { ...base, mode: 'manual', track_title: track.title, track_number: trackNum };
+            return {
+                ...base, mode: 'manual', track_title: track.title, track_number: trackNum,
+                disc_number: track.disc_number || null, disc_total: track.disc_total || null,
+            };
         }
 
         function _resetDestination() {
@@ -1008,20 +1013,6 @@
         }
 
         const versionLabel = document.getElementById('versionLabel');
-        const PLAYLIST_SERVICES = ["Spotify", "YouTube", "Apple Music", "Amazon Music", "SoundCloud", "ListenBrainz"];
-
-        function renderPlaylistServicesText() {
-            const text = PLAYLIST_SERVICES.join(", ");
-            if (playlistServicesHint) {
-                playlistServicesHint.textContent = `Supported services: ${text}`;
-            }
-            if (playlistServicesTooltip) {
-                playlistServicesTooltip.title = `Supported services: ${text}`;
-            }
-        }
-
-        renderPlaylistServicesText();
-
         // Dismiss the pure-HTML boot panel from index.html. Called from initApp's
         // finally block, so it goes whether we land on the app, the login screen,
         // or a config fetch that fell over.
@@ -1034,7 +1025,15 @@
           try {
             let config = null;
             try {
-                const resp = await fetch(withRootPath('/api/config'));
+                // Before login (or with no session) the server sends only what the
+                // login screen needs; a session token gets the full payload. Plain
+                // fetch rather than apiFetch, so a stale token can never bounce
+                // anyone to the login screen from here.
+                const sessionToken = getSessionToken();
+                const resp = await fetch(
+                    withRootPath('/api/config'),
+                    sessionToken ? { headers: { 'Authorization': `Bearer ${sessionToken}` } } : undefined,
+                );
                 if (resp.ok) config = await resp.json();
             } catch {}
 
@@ -1372,10 +1371,12 @@
                     // Build preview URL with source params
                     const previewSource = (result && result.source) || 'youtube';
                     const params = new URLSearchParams({ source: previewSource });
-                    if ((previewSource === 'soundcloud' || previewSource === 'zvu4no' || previewSource === 'freemp3cloud' || previewSource === 'jiosaavn' || previewSource === 'monochrome') && result.source_url) {
+                    // Hand over everything the result knows; each source takes what it
+                    // needs (Monochrome resolves by artist and title, YouTube by ID alone).
+                    if (result && result.source_url) {
                         params.set('url', result.source_url);
                     }
-                    if (previewSource === 'monochrome' && result) {
+                    if (result) {
                         params.set('artist', result.channel || result.artist || '');
                         params.set('title', result.title || '');
                     }
@@ -1571,11 +1572,8 @@
                 }
 
                 if (currentTab === 'queue') {
-                    stopQueuePolling();
-                    loadJobs().finally(scheduleQueuePoll);
-                    queueElapsedInterval = setInterval(updateLiveQueueTimes, 1000);
-                    loadDownloadable();
-                    loadTrash();
+                    initPillGroup(document.getElementById('queueModePills'));
+                    loadQueueMode();
                 } else {
                     stopQueuePolling();
                     stopLibraryPlayback();
@@ -1606,10 +1604,12 @@
                 }
 
                 if (currentTab === 'stats') {
+                    initPillGroup(document.getElementById('statsModePills'));
                     loadStats();
                 }
 
                 if (currentTab === 'settings') {
+                    initPillGroup(document.getElementById('settingsModePills'));
                     loadSettings();
                     loadBlacklist();
                     if (isAdmin()) loadUsers();
@@ -2591,6 +2591,7 @@
                 // Switch to the Queue tab so they can watch progress
                 setTimeout(() => {
                     document.querySelector('[data-tab="queue"]')?.click();
+                    document.querySelector('#queueModePills .pill[data-value="queue"]')?.click();
                 }, 800);
             } catch (e) {
                 if (dlAllBtn) { dlAllBtn.disabled = false; dlAllBtn.textContent = 'Download All'; }
@@ -2618,9 +2619,14 @@
 
             function moveIndicator() {
                 const active = group.querySelector('.pill.active');
-                if (!active || !indicator) return;
+                // Zero width means the tab is hidden; keep the last good size
+                // rather than shrinking to nothing and growing back every visit.
+                if (!active || !indicator || !active.offsetWidth) return;
                 indicator.style.width = `${active.offsetWidth}px`;
-                indicator.style.transform = `translateX(${active.offsetLeft}px)`;
+                indicator.style.height = `${active.offsetHeight}px`;
+                indicator.style.transform = `translate(${active.offsetLeft}px, ${active.offsetTop}px)`;
+                const shown = pills.filter(p => p.offsetWidth);
+                group.classList.toggle('pill-group-wrapped', shown.some(p => p.offsetTop !== shown[0].offsetTop));
             }
 
             pills.forEach(pill => {
@@ -2633,10 +2639,20 @@
                 });
             });
 
-            // Pills can reflow at narrow widths, so keep the indicator honest.
+            // Pills can reflow at narrow widths, or grow when a label picks up a
+            // count, so keep the indicator honest either way.
             window.addEventListener('resize', moveIndicator);
+            const pillSizes = new ResizeObserver(moveIndicator);
+            pills.forEach(pill => pillSizes.observe(pill));
             // Defer so layout has actually settled before we measure it.
             requestAnimationFrame(moveIndicator);
+        }
+
+        // Shows the panels and header buttons marked data-mode="<mode>" inside a
+        // tab, and hides the rest of them. The pill bar says which mode you are in.
+        function showPillMode(container, mode) {
+            container.querySelectorAll('.mode-panel, .mode-actions')
+                .forEach(el => el.classList.toggle('mode-hidden', el.dataset.mode !== mode));
         }
 
         // -----------------------------------------------------------------------
@@ -2979,10 +2995,12 @@
                     source: top.source || 'youtube'
                 };
                 if (top.artist || top.channel) payload.artist = top.artist || top.channel;
-                if ((top.source === 'soundcloud' || top.source === 'zvu4no' || top.source === 'freemp3cloud' || top.source === 'jiosaavn' || top.source === 'monochrome') && top.source_url) {
+                // The server checks the URL belongs to the source and ignores it
+                // where the source identifies results another way.
+                if (top.source_url) {
                     payload.source_url = top.source_url;
                 }
-                if (top.source === 'soulseek') {
+                if (top.slskd_username) {
                     payload.slskd_username = top.slskd_username;
                     payload.slskd_filename = top.slskd_filename;
                     payload.slskd_size = top.slskd_size || top.size || null;
@@ -3173,6 +3191,38 @@
         }
         document.getElementById('watchedModePills')
             ?.addEventListener('pillchange', (e) => setWatchedMode(e.detail.value));
+        document.getElementById('queueModePills')
+            ?.addEventListener('pillchange', (e) => setQueueMode(e.detail.value));
+        // Stats and Mismatches both load when the tab opens, so switching
+        // between them is just a matter of which one you are looking at.
+        document.getElementById('statsModePills')
+            ?.addEventListener('pillchange', (e) => showPillMode(statsTabContainer, e.detail.value));
+
+        // Settings pills. Every group stays in the page, so Save still saves the
+        // lot; the pill only decides what you have to scroll past. Remembered in
+        // this browser, since whoever was in Connections yesterday is usually
+        // back for Connections today.
+        const SETTINGS_MODE_KEY = 'mg_settings_mode';
+        document.getElementById('settingsModePills')
+            ?.addEventListener('pillchange', (e) => {
+                showPillMode(settingsTabContainer, e.detail.value);
+                try { localStorage.setItem(SETTINGS_MODE_KEY, e.detail.value); } catch {}
+                // The pills stick to the top of the screen, so a switch from
+                // halfway down Downloads would land halfway down Connections.
+                // Start the new group from its top instead; the pills stay put.
+                const tabTop = settingsTabContainer.getBoundingClientRect().top;
+                if (tabTop < 0) window.scrollBy(0, tabTop);
+            });
+        try {
+            const savedSettingsMode = localStorage.getItem(SETTINGS_MODE_KEY);
+            const savedPill = savedSettingsMode
+                && document.querySelector(`#settingsModePills .pill[data-value="${CSS.escape(savedSettingsMode)}"]`);
+            if (savedPill) {
+                document.querySelectorAll('#settingsModePills .pill')
+                    .forEach(p => p.classList.toggle('active', p === savedPill));
+                showPillMode(settingsTabContainer, savedSettingsMode);
+            }
+        } catch {}
 
         document.getElementById('discoverSimilarBtn')?.addEventListener('click', discoverManualSearch);
         document.getElementById('discoverSimilarInput')?.addEventListener('keydown', (e) => {
@@ -3230,11 +3280,14 @@
             }
         }
 
-        // Sources with no preview endpoint (mirrors has_preview in search.py's SOURCE_REGISTRY).
-        // Soulseek is the only holdout: there is no streamable URL until the file has
-        // already been downloaded, at which point previewing it is rather beside the point.
-        const NO_PREVIEW_SOURCES = new Set(['soulseek']);
-        const sourceHasPreview = source => !NO_PREVIEW_SOURCES.has(source);
+        // Each source says whether it can preview (has_preview from /api/sources, loaded
+        // at start-up). Soulseek is the holdout: there is no streamable URL until the
+        // file has already been downloaded, at which point previewing it is rather
+        // beside the point. Unknown until the list lands means "try it".
+        const sourceHasPreview = source => {
+            const meta = (_cachedSources || []).find(s => s.id === source);
+            return meta ? meta.has_preview : true;
+        };
 
         // Render a single result card as an HTML string (mirrors the main renderResults template)
         function _renderOneResult(r, index) {
@@ -3754,13 +3807,15 @@
                     payload.artist = result.artist || result.channel;
                 }
 
-                // URL-based sources need the full URL for downloading
-                if ((result.source === 'soundcloud' || result.source === 'zvu4no' || result.source === 'freemp3cloud' || result.source === 'jiosaavn' || result.source === 'monochrome') && result.source_url) {
+                // URL-identified sources need the full URL for downloading. The server
+                // checks it belongs to the source, and ignores it where the source
+                // identifies results another way (YouTube by video ID).
+                if (result.source_url) {
                     payload.source_url = result.source_url;
                 }
 
-                // Add slskd-specific fields if this is a Soulseek result
-                if (result.source === 'soulseek') {
+                // Add slskd-specific fields if this is a Soulseek peer's file
+                if (result.slskd_username) {
                     payload.slskd_username = result.slskd_username;
                     payload.slskd_filename = result.slskd_filename;
                     payload.slskd_size = result.slskd_size || result.size || null;
@@ -3786,6 +3841,8 @@
                                 track_title: albumRoute.track_title,
                                 track_number: albumRoute.track_number,
                                 track_total: albumRoute.track_total,
+                                disc_number: albumRoute.disc_number,
+                                disc_total: albumRoute.disc_total,
                             };
                         } else {
                             const matchResp = await apiFetch(`/api/albums/release/${encodeURIComponent(albumRoute.release_mbid)}/match-track`, {
@@ -3812,6 +3869,11 @@
                         payload.album_track_title = matchedTrack.track_title || queuedTitle;
                         payload.album_track_number = matchedTrack.track_number || null;
                         payload.album_track_total = matchedTrack.track_total || albumRoute.track_total || null;
+                        // Only a multi-disc release needs the disc said; one disc is the default.
+                        if ((matchedTrack.disc_total || 1) > 1) {
+                            payload.album_disc_number = matchedTrack.disc_number || null;
+                            payload.album_disc_total = matchedTrack.disc_total;
+                        }
                     }
                 }
 
@@ -3889,8 +3951,30 @@
             }
         }
 
+        function setQueueMode(mode) {
+            queueMode = mode;
+            showPillMode(queueTabContainer, mode);
+            loadQueueMode();
+        }
+
+        // Loads whichever Queue pill is showing. Only the Download Queue polls;
+        // the other two hold still until you come back to them.
+        function loadQueueMode() {
+            stopQueuePolling();
+            if (queueMode === 'queue') {
+                loadJobs().finally(scheduleQueuePoll);
+                queueElapsedInterval = setInterval(updateLiveQueueTimes, 1000);
+            } else if (queueMode === 'downloadable') {
+                loadDownloadable();
+            } else if (queueMode === 'trash') {
+                loadTrash();
+            }
+        }
+
         function scheduleQueuePoll() {
-            if (currentTab !== 'queue') return;
+            // An in-flight poll lands after you have switched pill, so check
+            // both, or it re-arms itself behind your back.
+            if (currentTab !== 'queue' || queueMode !== 'queue') return;
             if (queuePollInterval) clearTimeout(queuePollInterval);
             const activeTotal = activeCountFromTotals();
             const hasActiveJobs = activeTotal !== null
@@ -3924,6 +4008,8 @@
                 let url = `/api/jobs?limit=${QUEUE_SEARCH_LIMIT}`;
                 if (requestedTerm) url += `&q=${encodeURIComponent(requestedTerm)}`;
                 if (requestedStatus) url += `&status=${encodeURIComponent(requestedStatus)}`;
+                // Background polls drop the columns this tab never reads.
+                if (!showLoading) url += '&slim=1';
                 const response = await apiFetch(url);
                 if (!response.ok) throw new Error('Failed to load jobs');
 
@@ -3942,7 +4028,9 @@
                     queueTab.innerHTML = `
                         <div class="empty-state">
                             <div class="empty-state-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
-                            <p>Failed to load queue</p>
+                            <p>${error && error.status === 429
+                                ? 'Too many requests, so the queue is being rate limited. Give it a moment and try again.'
+                                : 'Failed to load queue'}</p>
                         </div>
                     `;
                 }
@@ -4115,6 +4203,8 @@
             queueStatsFailedCount = Number.isFinite(statsCount) ? statsCount : null;
             queuePage = 1;
             document.querySelector('[data-tab="queue"]')?.click();
+            // The failures are on the Download Queue pill, whichever pill was last left up.
+            document.querySelector('#queueModePills .pill[data-value="queue"]')?.click();
         }
 
         function clearQueueStatusFilter() {
@@ -4164,6 +4254,42 @@
             renderQueuePage();
         }
 
+        // Last rendered card per job id, per container: { html, el }.
+        const jobCardCache = new WeakMap();
+
+        function wireJobCard(card) {
+            card.querySelectorAll('.delete-file-btn').forEach((btn) => {
+                btn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    deleteJobFile(btn.dataset.jobId || '', btn.dataset.trackName || '');
+                });
+            });
+
+            card.querySelectorAll('.report-btn').forEach((btn) => {
+                btn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    openReportDialog(
+                        btn.dataset.jobId || '',
+                        btn.dataset.videoId || '',
+                        btn.dataset.uploader || '',
+                        btn.dataset.source || 'youtube'
+                    );
+                });
+            });
+
+            card.querySelectorAll('.edit-tags-btn').forEach((btn) => {
+                btn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    openTagEditor({
+                        jobId: btn.dataset.jobId || '',
+                        artist: btn.dataset.artist || '',
+                        title: btn.dataset.title || '',
+                        album: btn.dataset.album || '',
+                    });
+                });
+            });
+        }
+
         function renderJobs(jobs, container = queueTab) {
             if (!jobs.length) {
                 if (container === queueTab) expandedJobIds.clear();
@@ -4209,19 +4335,19 @@
                 }
             }
 
-            container.innerHTML = jobs.map(job => {
+            const renderCard = job => {
                 const hasDetails = job.status === 'completed' || job.status === 'completed_with_errors' || job.status === 'failed';
-                const isExpanded = hasDetails && expandedJobIds.has(job.id);
                 const sourceLabel = getSourceLabel(job.source || 'youtube');
                 const sourceUrl = job.source_url || '';
                 const isClickableUrl = sourceUrl.startsWith('https://');
                 const fileDeleted = Number(job.file_deleted || 0) === 1;
                 const isActive = job.status === 'queued' || job.status === 'downloading';
+                const alreadyInLibrary = (job.error || '').startsWith('Already exists');
                 const activeStage = job.status === 'queued'
                     ? 'Waiting its turn'
                     : (job.progress_stage || 'Getting organised');
                 const elapsedHtml = isActive
-                    ? `<span class="job-elapsed-wrap">for <span class="job-elapsed" data-start="${escapeAttr(job.created_at || '')}">${formatElapsedSeconds(secondsSince(job.created_at))}</span></span>`
+                    ? `<span class="job-elapsed-wrap">for <span class="job-elapsed" data-start="${escapeAttr(job.created_at || '')}"></span></span>`
                     : '';
                 const acquisitionAttempts = Array.isArray(job.acquisition_attempts)
                     ? job.acquisition_attempts.filter(a => a && a.source)
@@ -4243,20 +4369,24 @@
                         </div>`).join('')
                     : '';
                 return `
-                <div class="job-item ${hasDetails ? 'has-details' : ''} ${isExpanded ? 'expanded' : ''}" data-job-id="${escapeHtml(job.id || '')}" ${hasDetails ? 'onclick="toggleJobDetails(this)"' : ''}>
+                <div class="job-item ${hasDetails ? 'has-details' : ''}" data-job-id="${escapeHtml(job.id || '')}" ${hasDetails ? 'onclick="toggleJobDetails(this)"' : ''}>
                     <div class="job-status ${job.status}"></div>
                     <div class="job-info">
-                        <div class="job-title">${escapeHtml(job.artist ? `${job.artist} - ${job.title}` : job.title)}${job.status === 'completed_with_errors' ? '<span class="job-warning-badge">ISSUES</span>' : ''}${job.download_type === 'upgrade' ? '<span class="job-upgrade-badge">UPGRADE</span>' : ''}</div>
-                        <div class="job-meta">
-                            <span class="job-status-label">${escapeHtml(formatJobStatus(job.status))}</span>
-                            ${isActive ? `<span class="job-progress-stage">${escapeHtml(activeStage)}</span>${elapsedHtml}` : ''}
-                            <span class="job-date">· ${formatTime(job.created_at)}</span>
+                        <div class="job-head">
+                            <div class="job-title">${escapeHtml(job.artist ? `${job.artist} - ${job.title}` : job.title)}${job.status === 'completed_with_errors' ? '<span class="job-warning-badge">ISSUES</span>' : ''}${job.download_type === 'upgrade' ? '<span class="job-upgrade-badge">UPGRADE</span>' : ''}</div>
+                            <div class="job-meta">
+                                <span class="job-status-label">${escapeHtml(formatJobStatus(job.status))}</span>
+                                ${isActive ? `<span class="job-progress-stage">${escapeHtml(activeStage)}</span>${elapsedHtml}` : ''}
+                                <span class="job-date">· ${formatTime(job.created_at)}</span>
+                            </div>
+                            ${alreadyInLibrary ? '<div class="job-error job-note">Already in library</div>' : ''}
+                            <span class="source-badge job-source-badge ${job.source || 'youtube'}">${getSourceBadge(job.source || 'youtube')}</span>
                         </div>
-                        ${job.error ? (job.error.startsWith('Already exists') ? '<div class="job-error job-note">Already in library</div>' : `<div class="job-error">${escapeHtml(job.error)}</div>`) : ''}
+                        ${job.error && !alreadyInLibrary ? `<div class="job-error">${escapeHtml(job.error)}</div>` : ''}
                         ${hasDetails ? `
-                        <div class="job-details" style="display:${isExpanded ? 'block' : 'none'};">
+                        <div class="job-details" style="display:none;">
                             ${qualityDetailRows(job.audio_quality)}
-                            ${job.error && job.error.startsWith('Already exists') ? `<div class="job-details-row"><span class="job-details-label">Path:</span> <span class="job-details-url">${escapeHtml(job.error.replace(/^Already exists(?: in [^:]+)?:\s*/, '').replace(/ \(added to playlist\)$/, ''))}</span></div>` : ''}
+                            ${alreadyInLibrary ? `<div class="job-details-row"><span class="job-details-label">Path:</span> <span class="job-details-url">${escapeHtml(job.error.replace(/^Already exists(?: in [^:]+)?:\s*/, '').replace(/ \(added to playlist\)$/, ''))}</span></div>` : ''}
                             <div class="job-details-row"><span class="job-details-label">Source:</span> ${escapeHtml(sourceLabel)}</div>
                             ${journeyHtml ? `<div class="job-details-row job-journey"><span class="job-details-label">Journey:</span> ${journeyHtml}</div>` : ''}
                             ${job.acquisition_attempt_count ? `<div class="job-details-row"><span class="job-details-label">Acquisition:</span> ${escapeHtml(String(job.acquisition_cycle_count || 0))} cycle${Number(job.acquisition_cycle_count || 0) === 1 ? '' : 's'} · ${escapeHtml(String(job.acquisition_attempt_count))} source attempt${Number(job.acquisition_attempt_count) === 1 ? '' : 's'}${job.acquisition_last_attempt_at ? ` · last ${formatTime(job.acquisition_last_attempt_at)}` : ''}</div>` : ''}
@@ -4282,7 +4412,6 @@
                                        <button onclick="event.stopPropagation(); openJobRescueVersions('${escapeJsAttr(job.id || '')}')" style="padding: 6px 12px; font-size: 11px; font-family: inherit; font-weight: 600; background: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border); border-radius: 6px; cursor: pointer;">Choose version</button>`
                                     : (job.download_type === 'upgrade' ? '' : `<button onclick="event.stopPropagation(); redownloadJob('${escapeJsAttr(job.id || '')}')" style="padding: 6px 12px; font-size: 11px; font-family: inherit; font-weight: 600; background: var(--bg-tertiary); color: var(--accent); border: 1px solid var(--border); border-radius: 6px; cursor: pointer;">Re-download</button>`)}
                                 <button class="report-btn" data-job-id="${escapeHtml(job.id || '')}" data-video-id="${escapeHtml(job.video_id || '')}" data-uploader="${escapeHtml(job.uploader || '')}" data-source="${escapeHtml(job.source || 'youtube')}" onclick="event.stopPropagation()" style="padding: 6px 12px; font-size: 11px; font-family: inherit; font-weight: 600; background: var(--bg-tertiary); color: var(--warning); border: 1px solid var(--border); border-radius: 6px; cursor: pointer;">Report</button>
-                                ${(job.error || '').includes('mismatch') ? `<button class="force-accept-btn" data-job-id="${escapeHtml(job.id || '')}" onclick="event.stopPropagation()" style="padding: 6px 12px; font-size: 11px; font-family: inherit; font-weight: 600; background: var(--bg-tertiary); color: var(--accent); border: 1px solid var(--border); border-radius: 6px; cursor: pointer;">Force Download</button>` : ''}
                                 ${(job.status === 'completed' || job.status === 'completed_with_errors') && !fileDeleted ? `<button class="edit-tags-btn" data-job-id="${escapeHtml(job.id || '')}" data-artist="${escapeAttr(job.artist || '')}" data-title="${escapeAttr(job.title || '')}" data-album="${escapeAttr(job.album_name || '')}" onclick="event.stopPropagation()" style="padding: 6px 12px; font-size: 11px; font-family: inherit; font-weight: 600; background: var(--bg-tertiary); color: var(--accent); border: 1px solid var(--border); border-radius: 6px; cursor: pointer;">Edit Tags</button>` : ''}
                                 ${job.status !== 'failed' ? (fileDeleted
                                     ? `<button disabled style="padding: 6px 12px; font-size: 11px; font-family: inherit; font-weight: 600; background: var(--bg-secondary); color: var(--text-muted); border: 1px solid var(--border); border-radius: 6px; cursor: not-allowed; opacity: 0.8;">Trashed</button>`
@@ -4291,61 +4420,60 @@
                             </div>
                         </div>` : ''}
                     </div>
-                    <span class="source-badge job-source-badge ${job.source || 'youtube'}">${getSourceBadge(job.source || 'youtube')}</span>
                 </div>`;
-            }).join('');
+            };
 
-            container.querySelectorAll('.delete-file-btn').forEach((btn) => {
-                btn.addEventListener('click', (event) => {
-                    event.stopPropagation();
-                    deleteJobFile(btn.dataset.jobId || '', btn.dataset.trackName || '');
-                });
+            // Swap only the cards whose markup changed. Rebuilding the whole list
+            // every poll cost you text selection, keyboard focus, and any click
+            // whose press and release straddled a refresh. The elapsed clock is
+            // left empty in the markup (updateLiveQueueTimes fills it), so a
+            // ticking second is not a reason to replace a card.
+            let cards = jobCardCache.get(container);
+            const cachedNodes = cards ? Array.from(cards.values()) : [];
+            if (!cards || container.children.length !== cards.size
+                || cachedNodes.some(c => c.el.parentNode !== container)) {
+                // Something else wrote to the container (spinner, empty state), so
+                // start again from a clean slate rather than trust the cache.
+                container.innerHTML = '';
+                cards = new Map();
+            }
+            const next = new Map();
+            const template = document.createElement('template');
+            jobs.forEach((job, index) => {
+                let key = String(job.id);
+                if (next.has(key)) key += `#${index}`;
+                const html = renderCard(job).trim();
+                const previous = cards.get(key);
+                if (previous && previous.html === html) {
+                    next.set(key, previous);
+                } else {
+                    template.innerHTML = html;
+                    const el = template.content.firstElementChild;
+                    wireJobCard(el);
+                    next.set(key, { html, el });
+                }
+                // Expansion lives in expandedJobIds and the DOM, not in the markup,
+                // so clicking a card open does not make it look "changed".
+                const card = next.get(key).el;
+                const details = card.querySelector('.job-details');
+                if (details) {
+                    const open = expandedJobIds.has(job.id);
+                    details.style.display = open ? 'block' : 'none';
+                    card.classList.toggle('expanded', open);
+                }
             });
-
-            container.querySelectorAll('.report-btn').forEach((btn) => {
-                btn.addEventListener('click', (event) => {
-                    event.stopPropagation();
-                    openReportDialog(
-                        btn.dataset.jobId || '',
-                        btn.dataset.videoId || '',
-                        btn.dataset.uploader || '',
-                        btn.dataset.source || 'youtube'
-                    );
-                });
-            });
-
-            container.querySelectorAll('.force-accept-btn').forEach((btn) => {
-                btn.addEventListener('click', async (event) => {
-                    event.stopPropagation();
-                    btn.disabled = true;
-                    btn.textContent = 'Queued...';
-                    try {
-                        const res = await apiFetch(`/api/jobs/${btn.dataset.jobId}/force-accept`, { method: 'POST' });
-                        if (!res.ok) {
-                            const err = await res.json().catch(() => ({}));
-                            throw new Error(err.detail || 'Failed');
-                        }
-                        showToast('Re-queued with mismatch check disabled');
-                        loadJobs();
-                    } catch (e) {
-                        showToast(`Force download failed: ${e.message}`, true);
-                        btn.disabled = false;
-                        btn.textContent = 'Force Download';
-                    }
-                });
-            });
-
-            container.querySelectorAll('.edit-tags-btn').forEach((btn) => {
-                btn.addEventListener('click', (event) => {
-                    event.stopPropagation();
-                    openTagEditor({
-                        jobId: btn.dataset.jobId || '',
-                        artist: btn.dataset.artist || '',
-                        title: btn.dataset.title || '',
-                        album: btn.dataset.album || '',
-                    });
-                });
-            });
+            // Clear out what is gone or replaced first, then slot everything into
+            // order; cards that are already in the right place are never touched.
+            const keep = new Set(Array.from(next.values(), c => c.el));
+            for (const c of cachedNodes) {
+                if (!keep.has(c.el) && c.el.parentNode === container) c.el.remove();
+            }
+            let cursor = container.firstElementChild;
+            for (const { el } of next.values()) {
+                if (el === cursor) cursor = cursor.nextElementSibling;
+                else container.insertBefore(el, cursor);
+            }
+            jobCardCache.set(container, next);
 
             updateLiveQueueTimes();
         }
@@ -4874,7 +5002,9 @@
             try {
                 const response = await apiFetch(`/api/jobs/${jobId}/file`, { method: 'DELETE' });
                 if (!response.ok) {
-                    const data = await response.json();
+                    // 409 (left alone, it no longer vets) and 500 (the bin refused)
+                    // both explain themselves in detail; pass that on as it is.
+                    const data = await response.json().catch(() => ({}));
                     throw new Error(data.detail || 'Delete failed');
                 }
                 const data = await response.json();
@@ -4883,7 +5013,7 @@
                 } else if (data.deleted.length > 0) {
                     showToast(`Deleted ${data.deleted.length} file(s)`);
                 } else {
-                    showToast('File was already missing, marked as deleted');
+                    showToast(data.message || 'File was already missing, marked as deleted');
                 }
                 loadJobs();
                 loadTrash();
@@ -4898,8 +5028,8 @@
         // =============================================================================
 
         async function loadTrash() {
-            const section = document.getElementById('trashSection');
             const list = document.getElementById('trashList');
+            const emptyBtn = document.getElementById('emptyTrashBtn');
             try {
                 const response = await apiFetch('/api/trash');
                 const data = await response.json();
@@ -4907,13 +5037,12 @@
                     throw new Error(data.detail || 'Failed to load trash');
                 }
 
+                emptyBtn.disabled = !data.files.length;
                 if (!data.files.length) {
-                    section.style.display = 'none';
-                    list.innerHTML = '';
+                    list.innerHTML = '<div class="empty-state"><p>The bin is empty. Anything you delete waits here first, in case you change your mind.</p></div>';
                     return;
                 }
 
-                section.style.display = 'block';
                 const sizeLabel = formatFileSize(data.total_size);
 
                 list.innerHTML = `
@@ -4937,7 +5066,6 @@
                 `;
             } catch (e) {
                 console.error('Failed to load trash', e);
-                section.style.display = 'block';
                 list.innerHTML = `
                     <div class="job-item" style="cursor: default;">
                         <div class="job-info">
@@ -4960,7 +5088,8 @@
             try {
                 const response = await apiFetch(`/api/trash/restore?path=${encodeURIComponent(path)}`, { method: 'POST' });
                 if (!response.ok) {
-                    const data = await response.json();
+                    // 409 means something already sits at the original path.
+                    const data = await response.json().catch(() => ({}));
                     throw new Error(data.detail || 'Restore failed');
                 }
                 const data = await response.json();
@@ -6561,14 +6690,6 @@
             return escapeAttr(String(text).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
         }
 
-        // WARNING: jsStr is NOT safe inside double-quoted onclick attributes!
-        // &quot; decoded by the HTML parser terminates the attribute boundary.
-        // For onclick handlers, use escapeJsAttr with single-quoted JS strings:
-        //   onclick="fn('${escapeJsAttr(val)}')"
-        function jsStr(text) {
-            return escapeHtml(JSON.stringify(String(text)));
-        }
-
         // Line counter (no limit)
         function updateLineCounter() {
             const lines = bulkInput.value.split('\n').filter(line => line.trim());
@@ -7885,6 +8006,26 @@
         // Watched Playlists
         // =============================================================================
 
+        // A re-render replaces the list's innerHTML, which would slam every open
+        // Missing/Tracks panel shut and put "Loading..." back. Lift the open ones out
+        // first and drop the same DOM nodes back over their fresh placeholders, so
+        // content, button states, and any fetch still in flight (it holds the node)
+        // all carry on as if nothing happened.
+        function liftOpenPanels(listEl) {
+            const open = [];
+            listEl.querySelectorAll('.watched-card-expanded, .watched-singles-start').forEach(el => {
+                if (el.id && el.style.display !== 'none') open.push(el);
+            });
+            return open;
+        }
+
+        function dropOpenPanelsBack(open) {
+            for (const el of open) {
+                const fresh = document.getElementById(el.id);
+                if (fresh && fresh !== el) fresh.replaceWith(el);
+            }
+        }
+
         async function loadWatchedPlaylists(showLoading = true) {
             if (watchedLoadInFlight) return;
             watchedLoadInFlight = true;
@@ -7948,6 +8089,8 @@
                 return;
             }
 
+            const openPanels = liftOpenPanels(watchedList);
+            const scrollY = window.scrollY;
             watchedList.innerHTML = playlists.map(p => {
                 const refreshState = p.refresh_state || 'idle';
                 const localRefresh = watchedRefreshPending.get(p.id);
@@ -8101,6 +8244,8 @@
                     </div>
                 `;
             }).join('');
+            dropOpenPanelsBack(openPanels);
+            if (window.scrollY !== scrollY) window.scrollTo(0, scrollY);
 
             const anyRunning = playlists.some(p => p.refresh_state === 'running') || watchedRefreshPending.size > 0;
             if (currentTab === 'watched' && anyRunning && !watchedRefreshPollInterval) {
@@ -8834,7 +8979,11 @@
                 }
                 const data = await resp.json();
 
-                showToast(`Trashed ${artist} - ${title}. Pick the correct version below.`);
+                // Nothing left on disk to bin is reported in message; say that rather
+                // than claim a trashing that never happened.
+                showToast(!data.trashed && data.message
+                    ? data.message
+                    : `Trashed ${artist} - ${title}. Pick the correct version below.`);
 
                 // Update the row to show missing state with retry/search options
                 if (row) {
@@ -9297,6 +9446,7 @@
         let selectedArtistName = null;
         let artistRefreshPending = new Map(); // artist_id -> {stage, startedAt}
         let artistRefreshPollInterval = null;
+        let artistLoadInFlight = false;
         let watchedArtistsById = new Map(); // artist_id -> full row, so the Albums panel can look up mbid/auto_add_albums
 
         function startArtistRefreshPolling() {
@@ -9683,9 +9833,12 @@
         const UPGRADES_PER_PAGE = 10;
         let upgradesPage = 1;
         let upgradesSearchToken = 0;  // bumped to abort an in-flight lazy-search sweep
-        const UPGRADE_SOURCE_BADGES = {
-            youtube: 'YT', monochrome: 'MONO', soulseek: 'SLK',
-            soundcloud: 'SC', mp3phoenix: 'PX', zvu4no: 'ZV', freemp3cloud: 'FMC', jiosaavn: 'JS',
+        // Badges come from each source; retired ones keep theirs here, since old
+        // upgrade rows still name them long after the source itself has gone.
+        const RETIRED_SOURCE_BADGES = { mp3phoenix: 'PX', qbdlx: 'QB' };
+        const sourceBadge = source => {
+            const meta = (_cachedSources || []).find(s => s.id === source);
+            return (meta && meta.badge) || RETIRED_SOURCE_BADGES[source] || (source || '').toUpperCase().slice(0, 4);
         };
 
         function upgradeTierLabel(tier) {
@@ -9802,7 +9955,7 @@
                 }, 1500);
                 return;
             }
-            const badge = UPGRADE_SOURCE_BADGES[item.found_source] || item.found_source.toUpperCase().slice(0, 4);
+            const badge = sourceBadge(item.found_source);
             const tier = upgradeTierLabel(item.found_tier);
             const qual = escapeHtml(item.found_quality || tier);
             const output = escapeHtml(item.upgrade_output_label || 'Keep source format');
@@ -10379,6 +10532,10 @@
         }
 
         async function loadWatchedArtists(showLoading = true) {
+            // The 2s poll must not stack up behind a slow response. A deliberate
+            // (showLoading) load is let through, so a click is never swallowed.
+            if (artistLoadInFlight && !showLoading) return;
+            artistLoadInFlight = true;
             const listEl = document.getElementById('watchedArtistList');
             if (showLoading) listEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
             try {
@@ -10387,6 +10544,8 @@
                 renderWatchedArtists(data.artists || []);
             } catch (e) {
                 listEl.innerHTML = '<div class="empty-state"><p>Failed to load watched artists</p></div>';
+            } finally {
+                artistLoadInFlight = false;
             }
         }
 
@@ -10402,6 +10561,8 @@
             let anyRunning = false;
             watchedArtistsById = new Map(artists.map(a => [a.id, a]));
             const singlesOnlyMode = !!(serverConfig && serverConfig.singles_only_mode);
+            const openPanels = liftOpenPanels(listEl);
+            const scrollY = window.scrollY;
             listEl.innerHTML = artists.map(artist => {
                 // Reconcile the optimistic "pending" flag against backend state.
                 // Once the backend reports the refresh as running it's authoritative,
@@ -10528,6 +10689,8 @@
                     <div id="artist-tracks-${artist.id}" class="watched-card-expanded" style="display:none;"></div>
                 </div>`;
             }).join('');
+            dropOpenPanelsBack(openPanels);
+            if (window.scrollY !== scrollY) window.scrollTo(0, scrollY);
 
             if (anyRunning) {
                 startArtistRefreshPolling();
@@ -11024,17 +11187,27 @@
             loadMismatches();
         }
 
+        // The count rides on the pill, so a fresh mismatch gets noticed without
+        // anyone having to go and look.
+        function setMismatchCount(content, count) {
+            document.getElementById('mismatchCount').textContent = count ? String(count) : '';
+            document.getElementById('clearMismatchesBtn').disabled = !count;
+            if (!count) {
+                content.innerHTML = '<div class="empty-state"><p>No mismatches logged. Everything the watched playlists asked for turned up as itself.</p></div>';
+            }
+        }
+
         async function loadMismatches() {
-            const section = document.getElementById('mismatchSection');
             const content = document.getElementById('mismatchContent');
-            if (!section || !content) return;
+            // The log is admin-only, and so is its pill.
+            if (!content || !isAdmin()) return;
 
             try {
                 const res = await apiFetch('/api/mismatches');
-                if (!res.ok) { section.style.display = 'none'; return; }
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
                 const rows = data.mismatches || [];
-                section.style.display = rows.length > 0 ? 'block' : 'none';
+                setMismatchCount(content, rows.length);
                 if (rows.length === 0) return;
 
                 content.innerHTML = rows.map(m => `
@@ -11058,48 +11231,57 @@
                             <div class="mismatch-norm-line"><span class="mismatch-tag">Exp</span> ${escapeHtml(m.exp_normalised)}</div>
                             <div class="mismatch-norm-line"><span class="mismatch-tag">Got</span> ${escapeHtml(m.got_normalised)}</div>
                         </details>
-                        <button class="mismatch-accept-btn" data-mismatch-id="${m.id}" title="Re-download this track, ignoring the name mismatch">Force Download</button>
+                        <div class="mismatch-actions">
+                            ${m.copy ? `
+                            <button class="mismatch-action-btn library-play-btn" data-mismatch-play="${m.id}" aria-label="Play or pause" title="Have a listen to the copy that came down">${_libraryPlayingId === `mismatch:${m.id}` ? '<i class="fa-solid fa-stop"></i>' : '<i class="fa-solid fa-play"></i>'}</button>
+                            <button class="mismatch-action-btn" data-mismatch-action="restore" data-mismatch-id="${m.id}" title="Keep this copy: it goes into the playlist and the track is done">Restore</button>
+                            ` : '<span class="mismatch-gone">This copy is no longer around, so Retry is the way forward.</span>'}
+                            <button class="mismatch-action-btn" data-mismatch-action="retry" data-mismatch-id="${m.id}" title="${m.copy === 'library' ? 'Bin this copy and look for another' : 'Look for another copy'}. The name check stays on, so a wrong one turns up here again.">Retry</button>
+                        </div>
                     </div>
                 `).join('');
 
-                // Wire up force-accept buttons via delegation
-                content.querySelectorAll('.mismatch-accept-btn').forEach(btn => {
+                content.querySelectorAll('[data-mismatch-play]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const id = `mismatch:${btn.dataset.mismatchPlay}`;
+                        if (_libraryPlayingId === id) { stopLibraryPlayback(); return; }
+                        _startLibraryStream(id, `/api/mismatches/${btn.dataset.mismatchPlay}/stream`, btn);
+                    });
+                });
+
+                // Listen first, then choose: Restore keeps that copy, Retry goes
+                // and finds another.
+                content.querySelectorAll('[data-mismatch-action]').forEach(btn => {
                     btn.addEventListener('click', async () => {
                         const mid = btn.dataset.mismatchId;
-                        btn.disabled = true;
-                        btn.textContent = 'Queued...';
+                        const action = btn.dataset.mismatchAction;
+                        const row = btn.closest('.mismatch-row');
+                        if (_libraryPlayingId === `mismatch:${mid}`) stopLibraryPlayback();
+                        row.querySelectorAll('button').forEach(b => { b.disabled = true; });
                         try {
-                            const res = await apiFetch(`/api/mismatches/${mid}/accept`, { method: 'POST' });
-                            if (res.status === 404) {
-                                // Already dealt with elsewhere (e.g. Force Download from the
-                                // Queue tab, which clears this same row as a side effect).
-                                // Stale, not broken, so drop it quietly rather than crying wolf.
+                            const res = await apiFetch(`/api/mismatches/${mid}/${action}`, { method: 'POST' });
+                            const body = await res.json().catch(() => ({}));
+                            if (res.status === 404 && body.detail === 'Mismatch not found') {
+                                // Settled elsewhere already, by a Retry or a Restore from
+                                // the Queue tab. Stale, not broken, so no crying wolf.
                                 showToast('Already handled elsewhere');
-                                btn.closest('.mismatch-row').remove();
-                                if (!content.querySelector('.mismatch-row')) {
-                                    section.style.display = 'none';
-                                }
-                                return;
+                            } else if (!res.ok) {
+                                throw new Error(body.detail || `HTTP ${res.status}`);
+                            } else {
+                                showToast(action === 'restore'
+                                    ? 'Restored, and the playlist has it'
+                                    : 'Gone looking for another copy');
                             }
-                            if (!res.ok) {
-                                const err = await res.json().catch(() => ({}));
-                                throw new Error(err.detail || 'Failed');
-                            }
-                            showToast('Re-queued with mismatch check disabled');
-                            btn.closest('.mismatch-row').remove();
-                            // Hide the section if no rows remain
-                            if (!content.querySelector('.mismatch-row')) {
-                                section.style.display = 'none';
-                            }
+                            row.remove();
+                            setMismatchCount(content, content.querySelectorAll('.mismatch-row').length);
                         } catch (e) {
-                            showToast(`Force download failed: ${e.message}`, true);
-                            btn.disabled = false;
-                            btn.textContent = 'Force Download';
+                            showToast(`${action === 'restore' ? 'Restore' : 'Retry'} failed: ${e.message}`, true);
+                            row.querySelectorAll('button').forEach(b => { b.disabled = false; });
                         }
                     });
                 });
             } catch {
-                section.style.display = 'none';
+                content.innerHTML = '<div class="empty-state"><p>Could not load the mismatch log.</p></div>';
             }
         }
 
@@ -11945,8 +12127,8 @@
                 : (playlistsSelect ? playlistsSelect.value : '');
             const organise = organiseToggle ? organiseToggle.checked : true;
             const includeTrackNumber = trackNumberToggle ? trackNumberToggle.checked : false;
-            const titleExample = includeTrackNumber ? '1 - Track Title.flac' : 'Track Title.flac';
-            const flatTitleExample = includeTrackNumber ? 'Artist Name - 1 - Track Title.flac' : 'Artist Name - Track Title.flac';
+            const titleExample = includeTrackNumber ? '01 - Track Title.flac' : 'Track Title.flac';
+            const flatTitleExample = includeTrackNumber ? 'Artist Name - 01 - Track Title.flac' : 'Artist Name - Track Title.flac';
 
             const musicRoot = (serverConfig && serverConfig.music_dir) ? serverConfig.music_dir.replace(/\/+$/, '') : '/music';
 
@@ -11967,7 +12149,7 @@
                 } else {
                     let p = musicRoot;
                     if (playlistsVal !== '.') p += '/' + playlistsVal;
-                    p += '/Playlist Name/' + (includeTrackNumber ? 'Artist - 1 - Title.flac' : 'Artist - Title.flac');
+                    p += '/Playlist Name/' + (includeTrackNumber ? 'Artist - 01 - Title.flac' : 'Artist - Title.flac');
                     playlistsEl.textContent = 'Files saved to: ' + p;
                 }
             }
@@ -11978,7 +12160,7 @@
             if (albumsEl) {
                 let p = musicRoot;
                 if (albumsVal && albumsVal !== '.') p += '/' + albumsVal;
-                p += '/Artist/Album/' + (includeTrackNumber ? '1 - Track.flac' : 'Track.flac');
+                p += '/Artist/Album/' + (includeTrackNumber ? '01 - Track.flac' : 'Track.flac');
                 albumsEl.textContent = 'Files saved to: ' + p;
             }
         }
@@ -12390,7 +12572,7 @@
             stepsDiv.innerHTML = '';
 
             try {
-                const response = await apiFetch('/api/settings/test/monochrome', {
+                const response = await apiFetch('/api/sources/monochrome/diagnostic', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: '{}'
@@ -12587,8 +12769,7 @@
 
         function setWatchedMode(mode) {
             watchedMode = mode;
-            document.querySelectorAll('#watchedTabContainer .watched-mode-panel, #watchedTabContainer .watched-mode-actions')
-                .forEach(el => el.classList.toggle('watched-mode-hidden', el.dataset.mode !== mode));
+            showPillMode(watchedTabContainer, mode);
             if (mode !== 'audit' && audioAuditPollTimer) {
                 clearTimeout(audioAuditPollTimer);
                 audioAuditPollTimer = null;

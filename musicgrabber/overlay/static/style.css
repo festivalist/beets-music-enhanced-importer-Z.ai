@@ -1804,6 +1804,95 @@ h1 {
     opacity: 0.8;
 }
 
+/* Below desktop width: the source badge sat in the card's bottom corner, on top
+   of whatever happened to be last, which was usually the end of a long "Waiting
+   its turn for 1m 23s · date". It now ends the status line instead, which wraps
+   beside it rather than underneath; the note keeps a line of its own below. */
+@media (max-width: 1023px) {
+    .job-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        column-gap: var(--space-2);
+    }
+
+    .job-head .job-title {
+        flex: 1 0 100%;
+    }
+
+    .job-head .job-meta {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .job-head .job-source-badge {
+        position: static;
+        flex-shrink: 0;
+        padding: var(--space-1) var(--space-1-5);
+        border-radius: 3px;
+    }
+
+    .job-head .job-note {
+        order: 1;
+        flex-basis: 100%;
+    }
+}
+
+/* Desktop: title, note, status, date and source share one line. The column
+   widened in v4.2.3 and the cards simply got wider with it, so the Queue showed
+   no more jobs than before, just longer ones. Real errors keep their own line;
+   they are long, and they are the bit you actually need to read. */
+@media (min-width: 1024px) {
+    #queueTab {
+        gap: var(--space-2);
+    }
+
+    .job-item {
+        padding: var(--space-2) var(--space-3);
+    }
+
+    .job-head {
+        display: flex;
+        align-items: center;
+    }
+
+    .job-head .job-title {
+        flex: 1;
+        min-width: 0;
+        margin-right: var(--space-3);
+    }
+
+    .job-head .job-meta {
+        order: 1;
+        flex-shrink: 0;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .job-head .job-note {
+        flex-shrink: 0;
+        margin-top: 0;
+        white-space: nowrap;
+    }
+
+    /* Real spaces, so this dot matches the one inside .job-meta */
+    .job-head .job-note::after {
+        content: "\00a0·\00a0";
+    }
+
+    /* Out of the corner and into the row, at one width so the dates line up */
+    .job-head .job-source-badge {
+        order: 2;
+        position: static;
+        flex-shrink: 0;
+        min-width: 4.5em;
+        margin-left: var(--space-3);
+        padding: var(--space-1) var(--space-1-5);
+        border-radius: 3px;
+        text-align: center;
+    }
+}
+
 .empty-state {
     text-align: center;
     padding: 60px var(--space-4-5);
@@ -1896,12 +1985,6 @@ h1 {
     display: flex;
     align-items: center;
     gap: var(--space-2-5);
-}
-
-/* The Download Queue header carries a search box now, so give the heading its
-   own line before it gets folded into origami. */
-#queueTabContainer > .queue-header .queue-section-heading {
-    flex: 1 1 260px;
 }
 
 /* Queue search: finding one track in a 900-track import without the scroll wheel
@@ -3792,18 +3875,6 @@ h1 {
     color: var(--error);
 }
 
-.bulk-services-row {
-    margin-top: var(--space-1-5);
-    display: flex;
-    align-items: center;
-    gap: var(--space-1-5);
-}
-
-.bulk-services-hint {
-    font-size: 12px;
-    color: var(--text-secondary);
-}
-
 /* Small circular info badge */
 .info-badge {
     width: 16px;
@@ -3928,6 +3999,15 @@ h1 {
     color: var(--text-secondary);
     font-size: 12px;
     line-height: 1.5;
+}
+
+.album-search-note summary {
+    cursor: pointer;
+    color: var(--text-primary);
+}
+
+.album-search-note p {
+    margin: var(--space-2) 0 0;
 }
 
 .album-artist-btn {
@@ -4235,13 +4315,6 @@ h1 {
     font-size: 14px;
     font-weight: 600;
     color: var(--text-secondary);
-}
-
-.queue-section-heading a {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--accent);
-    text-decoration: none;
 }
 
 /* Modifier: keep the .btn shape, just recolour. */
@@ -4821,8 +4894,22 @@ h1 {
     word-break: break-all;
 }
 
-.mismatch-accept-btn {
+/* Listen, then Restore or Retry. Force Download used to live here, and
+   accepted a copy nobody had heard. */
+.mismatch-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
     margin-top: var(--space-2);
+}
+
+.mismatch-gone {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.mismatch-action-btn {
     padding: var(--space-1) var(--space-3);
     font-size: 13px;
     font-family: inherit;
@@ -4834,11 +4921,11 @@ h1 {
     cursor: pointer;
     transition: background 0.15s, color 0.15s;
 }
-.mismatch-accept-btn:hover {
+.mismatch-action-btn:hover:not(:disabled) {
     background: var(--border);
     color: var(--text-primary);
 }
-.mismatch-accept-btn:disabled {
+.mismatch-action-btn:disabled {
     opacity: 0.65;
     cursor: not-allowed;
 }
@@ -5125,10 +5212,33 @@ h1 {
     max-width: var(--container-max);
 }
 
+/* Only stands in for its label on phones, below. */
+.floating-bar-icon {
+    display: none;
+}
+
+/* Phones get one row, not three. Stacked, the bar took 150px of a 640px
+   screen, and with the Settings pills pinned to the top as well, the settings
+   themselves were left fighting over the middle. Save keeps its words and the
+   width; the coffee and the release notes keep their tooltips. */
 @media (max-width: 600px) {
     .settings-floating-bar-inner {
-        flex-direction: column;
         gap: var(--space-2);
+    }
+
+    #settingsFloatingBar .donation-link,
+    #settingsFloatingBar .release-notes-btn {
+        flex: 0 0 auto;
+        width: auto;
+        padding: var(--space-3) var(--space-4);
+    }
+
+    #settingsFloatingBar .floating-bar-label {
+        display: none;
+    }
+
+    #settingsFloatingBar .floating-bar-icon {
+        display: inline-block;
     }
 }
 
@@ -5892,18 +6002,20 @@ h1 {
 .pill-group {
     position: relative;
     display: inline-flex;
+    flex-wrap: wrap;
     background: var(--bg-tertiary);
     border: 1px solid var(--border);
     border-radius: var(--radius-pill);
     padding: var(--space-1);
     gap: var(--space-0-5);
     max-width: 100%;
-    overflow-x: auto;
-    scrollbar-width: none;
 }
 
-.pill-group::-webkit-scrollbar {
-    display: none;
+/* More pills than a phone has room for: they wrap onto a second row rather
+   than leaving the last one scrolled off the edge where nobody finds it, and
+   the bar squares its shoulders to suit. initPillGroup sets the class. */
+.pill-group.pill-group-wrapped {
+    border-radius: var(--radius-lg);
 }
 
 .pill {
@@ -5932,13 +6044,13 @@ h1 {
 
 .pill-indicator {
     position: absolute;
-    top: 3px;
-    bottom: 3px;
+    top: 0;
     left: 0;
     width: 0;
+    height: 0;
     border-radius: var(--radius-pill);
     background: var(--accent);
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s cubic-bezier(0.4, 0, 0.2, 1), height 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 0;
 }
 
@@ -5949,22 +6061,67 @@ h1 {
     }
 }
 
+/* A number riding along on a pill's label, e.g. "Watch Mismatches 3". Empty
+   when there is nothing to count, so the pill reads as plain text. */
+.pill-count:not(:empty) {
+    margin-left: var(--space-1-5);
+    padding: 0 var(--space-1-5);
+    font-size: 11px;
+    border-radius: var(--radius-pill);
+    background: var(--border);
+    color: var(--text-primary);
+}
+
+.pill.active .pill-count {
+    background: rgba(0, 0, 0, 0.18);
+    color: #000;
+}
+
 /* --------------------------------------------------------------------------
-   Watched tab pills
-   Panels and their header buttons switch by class, not inline display,
-   because applyUserRoleToUI clears inline display on every .peon-hide and
-   would otherwise reveal whichever panel it pleased.
+   Tab pills: Watched, Queue, Stats and Settings
+   Each panel and header button carries data-mode and is switched by class,
+   not inline display, because applyUserRoleToUI clears inline display on
+   every .peon-hide and .admin-only and would otherwise reveal whichever
+   panel it pleased.
    -------------------------------------------------------------------------- */
 
-.watched-mode-hidden {
+.mode-hidden {
     display: none !important;
 }
 
-.watched-mode-actions {
+.mode-actions {
     display: flex;
     align-items: center;
     gap: var(--space-2);
     flex-wrap: wrap;
+}
+
+/* Settings pills stay on screen. Downloads alone runs to several screens, and
+   getting to Connections from the bottom of it meant scrolling all the way
+   back up first. The strip of page background keeps settings from showing
+   through either side of the pills as they pass underneath; the negative
+   margin leaves the pills exactly where they sat before they learnt to stick. */
+#settingsTabContainer > .queue-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    margin-top: calc(-1 * var(--space-2));
+    padding-top: var(--space-2);
+    background: var(--bg-primary);
+}
+
+/* Fades settings out as they slide under the pills rather than slicing them
+   off. At rest it sits over the header's own bottom margin, which is empty
+   page, so it is invisible until there is something to fade. */
+#settingsTabContainer > .queue-header::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    height: var(--space-3);
+    background: linear-gradient(var(--bg-primary), transparent);
+    pointer-events: none;
 }
 
 /* --------------------------------------------------------------------------

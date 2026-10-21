@@ -606,10 +606,12 @@ docker compose logs -f           # Start beobachten (erste Init kann dauern)
 Web-UI: `http://192.168.50.47:38274` — nur LAN, kein Port-Forwarding (von
 unterwegs läuft alles über Telegram-Bot und Plexamp, nicht über MG).
 
-**9.3b Overlay-UI (Story 9.3–9.5, ADR-0001):** Das Image ist **gepinnt
-(`g33kphr33k/musicgrabber:4.3.1`)**; Updates sind bewusste Tag-Bumps. Die
+**9.3b Overlay-UI (Story 9.3–9.5, ADR-0001; Flip 4.4.0 = Story 10.1):**
+Das Image ist **gepinnt
+(`g33kphr33k/musicgrabber:4.4.0`; seit 4.4 wohnt die App in
+`/opt/musicgrabber`)**; Updates sind bewusste Tag-Bumps. Die
 statischen UI-Dateien werden per Bind-Mount
-(`./overlay/static:/app/static:ro`) aus dem Repo-Checkout überlagert —
+(`./overlay/static:/opt/musicgrabber/static:ro`) aus dem Repo-Checkout überlagert —
 dort lebt der **Import-Monitor-Tab** (Nav-Eintrag „Monitor"): Laufstatus,
 filterbare Unit-Liste, Review-Queue, `_incoming`-Stau, Bot-Jobs (Poll
 alle 5 s gegen den Bot-Endpoint :8283) **plus Aktionen**: Review-Units

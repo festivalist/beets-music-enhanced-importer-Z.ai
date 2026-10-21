@@ -775,6 +775,74 @@ Bewusst später (eigene Story, kein Teil dieses EPICs): generelles
 Versions-Pinning für alle Import-Abhängigkeiten (Nutzer-Strategie
 2026-10-19).
 
+## EPIC 10 — MusicGrabber 4.4-Flip (Analyse 2026-10-21, „los" 2026-10-21)
+
+Zielcheck: direkt am Nordstern — Reject-Keywords/Live-Version-Backstop
+laufen in 4.4 erstmals auf ALLEN Quellen (Karaoke-/Tribute-Klasse wie der
+JP-Fall), Staging-Workshop hält Halbfabrikate aus `_incoming` heraus,
+Album-Folder-/Interludes-Fixes senken manuelle Reparaturen; Queue-Poll
+entlastet das Pi. Redundanzcheck: kein Voll-Fork (ADR-0001 bleibt) —
+Overlay-Bump nach overlay/README.md-Prozedur + ein Guard in der
+Ingest-Kette; alle 7 Wrapper-Endpunkte in musik/musicgrabber.py sind in
+4.4.0 unverändert kompatibel (Analyse gegen Upstream-Clone v4.3.1..v4.4.0).
+
+- [x] 10.1 [ready-for-agent] Overlay-Revendor auf v4.4.0 + Ingest-Dot-Dir-Guard (Branch, Pi-Flip erst nach Testmatrix)
+  **ERLEDIGT 2026-10-21, Branch `story/mg-4.4-flip`** (Flip aufs Pi = 10.2,
+  wartet auf „los"): Overlay 16/16 byte-exakt gegen Tag v4.4.0 (12
+  Dateien unverändert, 4 neu: app.js/index.html/style.css/release-notes.js;
+  Blobs via `git show` statt Clone-Checkout — autocrlf/MSYS-tar macht aus
+  LF CRLF), Monitor-Stellen neu eingesetzt (index.html 3 Blöcke, app.js 3
+  Zeilen; Overlay-Diff gegen Upstream = exakt die Monitor-Passage, node
+  --check grün). compose: Tag 4.4.0 + Mount
+  `/opt/musicgrabber/static:ro`. Installer-Check erweitert:
+  `/static/monitor.js` (nur ours) als Mount-Beweis. Ingest-Guard global:
+  Dot-Dirs sind für den Ingest unsichtbar (scan.subdirs_of/
+  collect_audio_tree filtern, ingest._prune_empty_children/
+  _scene_packaging_junk neu — Pruner-Jagdgrund: os.walk(topdown=False)
+  wertet dirnames-Filterung zu spät aus). TDD rot→grün, Testmatrix:
+  smoke_ingest_dotdirs (NEU, 4 Seams), test_scan, smoke_ingest_roots,
+  smoke_cleanup_staging, smoke_decider, smoke_status_state,
+  smoke_bot_http (venv) — alle grün; compose-YAML + bash -n grün.
+  Zwei-Achsen-Review eingearbeitet: `scan.walk_visible` als EINE Heimat
+  der Dot-Dir-Regel für Walker (statt 3× Filterzeile), Pruner behält den
+  alten `root_set`-Schutz für verschachtelte konfigurierte Roots
+  (`keep`-Parameter, Smoke-Case 5).
+  **Offen (10.2):** echter MG-4.4-Import (Album + Single) auf dem Pi,
+  Monitor-Tab live, Overlay-Bump-Realcheck nach compose pull.
+  - **Bruchstelle A (Overlay-Mount):** Image wohnt jetzt in
+    `/opt/musicgrabber`, `/app` nur noch Home — Mount
+    `./overlay/static:/app/static:ro` trifft ins Leere, Monitor-Tab
+    verschwindet STILL (UI läuft upstream weiter, Check auf
+    `/static/app.js` bleibt blind, weil Upstream-Datei). → Mount nach
+    `/opt/musicgrabber/static:ro`, Verify-Check auf `/static/monitor.js`
+    (nur ours) schärfen (install/install.d/70-musicgrabber.sh).
+  - **Bruchstelle B (Ingest vs. `.mg_staging`):** 4.4 arbeitet pro Job in
+    `{music_dir}/.mg_staging/<job>/` = `_incoming/musicgrabber/.mg_staging/…`.
+    `collect_audio_tree()` (musik/scan.py) filtert keine Dot-Dirs → Ingest
+    würde halbfertige Downloads importieren; der Leerordner-Pruner
+    (musik/ingest.py cmd_ingest) kann MGs frisch angelegte, noch leere
+    Job-Dirs rmdir'en (Race). → Dot-Verzeichnisse in beiden Walks
+    überspringen (globale Regel, kein Einzelfall-Filter).
+  - **Overlay-Revendor:** 12 der 16 statischen Dateien sind in 4.4.0
+    byte-identisch; nur `app.js`, `index.html`, `style.css`,
+    `release-notes.js` ändern sich. Monitor-Stellen neu einsetzen
+    (Sentinel-Marker): index.html 3 Blöcke, app.js 3 Zeilen,
+    monitor.js 1:1. `__CACHE_BUST__`-Mechanismus unverändert (jetzt
+    routes/basic.py). docker-compose.yml: Tag `4.4.0`, Mount-Pfad,
+    Pin-Kommentar. Entrypoint/Multi-Arch/PUID kompatibel (Docker Hub:
+    amd64+arm64).
+  - **Testmatrix:** Unit-Tests Dot-Dir-Guard (Audio in `.mg_staging` wird
+    NICHT zur Unit; Pruner rmdir't keine Dot-Dirs; normale Units
+    unverändert), Overlay-Checks (16 Dateien vollständig, Sentinel-Marker
+    je 3/3, byte-identische 12 gegen Upstream-Tag), compose-Parameter.
+    Danach Story 10.2.
+- [ ] 10.2 [ready-for-human] Flip aufs Pi: Branch nach Testmatrix mergen,
+  `docker compose pull && up -d`, Gegenprüfung (UI lädt, Suche/Queue/
+  Settings arbeiten, Monitor-Tab zeigt Daten, `/static/monitor.js` 200,
+  nächster MG-Download landet komplett in `_incoming`, Ingest-zyklus
+  grün). Rollback bleibt offen: compose-Tag zurück auf 4.3.1 + Overlay-
+  Revert (DB-Downgrade laut Upstream-Changelog harmlos).
+
 ## Beim Nutzer anfragen (bei nächster Gelegenheit)
 
 - Pi: SSH-Zugang/Host bekannt geben für Ferndeployment von Phase 9 — oder

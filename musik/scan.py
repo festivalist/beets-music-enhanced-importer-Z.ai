@@ -59,13 +59,21 @@ def audio_files_in(d: str) -> list[str]:
     )
 
 
+def is_hidden(name: str) -> bool:
+    """Dot-prefixed directory names are invisible to the ingest: staging
+    engines (MusicGrabber 4.4: .mg_staging, Syncthing: .stfolder) work in
+    them, so half-finished downloads must never become units (Story 10.1)."""
+    return name.startswith(".")
+
+
 def subdirs_of(d: str) -> list[str]:
     try:
         names = os.listdir(d)
     except OSError:
         return []
     return sorted(
-        os.path.join(d, n) for n in names if os.path.isdir(os.path.join(d, n))
+        os.path.join(d, n) for n in names
+        if os.path.isdir(os.path.join(d, n)) and not is_hidden(n)
     )
 
 
@@ -473,10 +481,20 @@ def note_side_files(d: str, units: list[dict], notes: list[str]) -> None:
             junk_files.append(full)
 
 
+def walk_visible(d: str):
+    """os.walk over d with hidden directories pruned — the ONE place the
+    Story 10.1 rule lives for walkers (hidden dirs are invisible to the
+    ingest); listdir-based readers go through subdirs_of. Callers must
+    not mutate the yielded dirs list."""
+    for cur, dirs, files in os.walk(d):
+        dirs[:] = [n for n in dirs if not is_hidden(n)]
+        yield cur, dirs, files
+
+
 def collect_audio_tree(d: str) -> list[str]:
     out = []
-    for cur, _dirs, files in os.walk(d):
-        out.extend(os.path.join(cur, f) for f in files if is_audio(f))
+    for _cur, _dirs, files in walk_visible(d):
+        out.extend(os.path.join(_cur, f) for f in files if is_audio(f))
     return sorted(out)
 
 

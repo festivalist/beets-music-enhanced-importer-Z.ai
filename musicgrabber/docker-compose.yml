@@ -11,8 +11,11 @@
 # EPIC 9) — das Upstream-Backend bleibt unangetastet.
 services:
   musicgrabber:
-    image: g33kphr33k/musicgrabber:4.3.1   # gepinnt; latest stand bei der
-        # Umstellung auf 4.3.0 (2026-10-02) — Bump nur mit Overlay-Check
+    image: g33kphr33k/musicgrabber:4.4.0   # gepinnt; Bump nur mit Overlay-Check
+        # (overlay/README.md). 4.4.0-Flip (Story 10.1, 2026-10-21): Achtung —
+        # seit 4.4 wohnt die App in /opt/musicgrabber, NICHT mehr /app; der
+        # statische Overlay-Mount unten MITGEZOGEN, sonst verschwindet der
+        # Monitor-Tab still (UI läuft upstream weiter, kein Fehler im Log).
     container_name: musicgrabber
     restart: unless-stopped
     ports:
@@ -34,4 +37,4 @@ services:
     volumes:
       - ./data:/data                                  # sqlite-Index + App-Daten (persistent!)
       - /mnt/music/_incoming/musicgrabber:/music      # Staging = MGs einziger Schreibbereich
-      - ./overlay/static:/app/static:ro               # Overlay-UI (ADR-0001): unsere statischen Dateien, read-only
+      - ./overlay/static:/opt/musicgrabber/static:ro   # Overlay-UI (ADR-0001): unsere statischen Dateien, read-only; seit 4.4.0 /opt/musicgrabber (vorher /app/static)

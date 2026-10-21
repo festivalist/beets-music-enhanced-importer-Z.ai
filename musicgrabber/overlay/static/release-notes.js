@@ -7,6 +7,47 @@
 // changelog dump.
 
 const RELEASE_NOTES = {
+    "4.4.0": {
+        title: "What's New in v4.4.0",
+        sections: [
+            {
+                heading: "One source down, the rest carry on",
+                items: [
+                    "Free music sources come and go (Monochrome has moved house three times this year). Each one now keeps to itself, so when one breaks, or vanishes entirely, it simply drops out of the Sources strip and everything else keeps searching and downloading.",
+                    "One stubborn track no longer gets a whole source benched for everyone. A failed download checks whether its source is really down before parking it, for every source rather than just Monochrome.",
+                ]
+            },
+            {
+                heading: "Tidier tabs",
+                items: [
+                    "Settings had got long enough to need a packed lunch. It's now split into Downloads, Library, Connections, Notifications and System, and remembers which one you were in. The pills stay at the top as you scroll, so hopping from the bottom of Downloads to Connections no longer needs a run-up. Save still saves everything, and on phones its bar slims down to one row to make room.",
+                    "Queue has pills along the top too: Download Queue, Save to Device and Trash. No more scrolling to the bottom to find the bin.",
+                    "On a computer, each download in the Queue now fits on one line, so a whole page of them fits on screen. Less scrolling, same news.",
+                    "Stats splits into Statistics and Watch Mismatches, and the Mismatches pill shows a count when there's something worth a look.",
+                    "Watch Mismatches lets you listen to the copy that came down, then Restore it if it's right or Retry for another if it isn't. That replaces Force Download, which had been answering every press with an error since April. Sorry about that one.",
+                ]
+            },
+            {
+                heading: "Kinder to your files",
+                items: [
+                    "Downloads now do all their converting, checking and tagging out of sight, and only land in your library once they've passed everything. A download that fails or gets rejected leaves nothing behind: no half-finished file, no empty folder.",
+                    "Retrying an album track, or adding one to an album you already have, puts the old copy in the Trash instead of quietly overwriting it. The Trash itself never overwrites either, and Restore won't replace a file that's back where it used to be.",
+                    "Your reject keywords and Reject Live Versions now actually work on single tracks and playlists. They'd been checking the song against itself. It agreed.",
+                    "Upgrading a track no longer scrambles other playlists that happen to have a song with the same filename.",
+                    "Delete and Edit Tags only ever touch the file MusicGrabber downloaded. If it's moved, they say so rather than going looking for something with the same name.",
+                ]
+            },
+            {
+                heading: "Less fidgeting",
+                items: [
+                    "Watched playlist and artist panels stay open while things refresh, instead of slamming shut every two seconds.",
+                    "The Queue only redraws the cards that changed, so you can copy an error message off a failed download without it vanishing under your cursor. It's lighter on your NAS while it's at it.",
+                    "ZZ Top's Recycler shows up in your library again. It had been mistaken for a recycle bin.",
+                    "On phones, the little source badge on Queue cards no longer sits on top of the end of the status line.",
+                ]
+            },
+        ]
+    },
     "4.3.1": {
         title: "What's New in v4.3.1",
         sections: [

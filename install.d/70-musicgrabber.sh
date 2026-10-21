@@ -38,12 +38,12 @@ run sudocmd mkdir -p "$STAGING/Singles" "$STAGING/Albums" "$STAGING/Playlists"
 run sudocmd chown -R "$RUN_UID:$RUN_GID" "$STAGING"
 ok "Staging + Anker (Singles/Albums/Playlists) als $RUN_USER: $STAGING"
 
-# 2b) Overlay-Static muss da sein (ADR-0001: Bind-Mount über /app/static —
-# fehlt er, mountet Docker ein leeres Verzeichnis und die UI 500-t)
+# 2b) Overlay-Static muss da sein (ADR-0001: Bind-Mount über /opt/musicgrabber/static
+# — fehlt er, mountet Docker ein leeres Verzeichnis und die UI 500-t)
 if [[ ! -s "$MGDIR/overlay/static/index.html" ]]; then
     finish fail "musicgrabber/overlay/static/index.html fehlt — Checkout unvollständig (git pull)? Overlay-Deploy, ADR-0001"
 fi
-ok "Overlay-Static vorhanden (gepinntes Image 4.3.1, ADR-0001)"
+ok "Overlay-Static vorhanden (gepinntes Image 4.4.0, ADR-0001)"
 
 # 3) .env aus dem Example (PUID/PGID vom Run-User; KEIN API_KEY — s. compose)
 if [[ ! -f "$MGDIR/.env" ]]; then
@@ -90,7 +90,15 @@ ok "Web-UI antwortet (HTTP 200 auf :$MGPORT)"
 if ! curl -fsS -o /dev/null "http://127.0.0.1:$MGPORT/static/app.js"; then
     finish fail "Web-UI antwortet, aber /static/app.js nicht — Overlay-Mount prüfen (docker compose config; ADR-0001)"
 fi
-ok "Overlay-Static wird ausgeliefert (/static/app.js)"
+# monitor.js gibt es NUR in unserem Overlay (Upstream liefert es nicht) —
+# 200 hier beweist den Mount; /static/app.js allein bliebe bei einem
+# falschen Mount-Pfad stumm grün, weil Upstream die Datei selbst mitbringt
+# (Lehre Story 10.1: 4.4 zog die App nach /opt/musicgrabber, Monitor-Tab
+# verschwand still).
+if ! curl -fsS -o /dev/null "http://127.0.0.1:$MGPORT/static/monitor.js"; then
+    finish fail "Overlay-Mount WIRKT NICHT: /static/monitor.js 404 (nur ours) — Mount-Pfad in docker-compose.yml gegen /opt/musicgrabber/static prüfen; ADR-0001"
+fi
+ok "Overlay-Static wird ausgeliefert (/static/app.js + /static/monitor.js = unser Overlay)"
 
 info "Quellen/Qualität (Monochrome-FLAC lossless-first, Bitrate-Schwelle) im Settings-Tab"
 info "der UI pflegen — Story 1.2. Telegram-Notify: NICHT den musik-bot-Token eintragen!"
