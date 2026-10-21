@@ -193,4 +193,22 @@ assert n == 2, n
 assert item.artist == "Fill Artist" and item.albumartist == "Various Artists"
 print("8) apply_va_plan: filename fill + AA normalization OK")
 
+# 9) va_gate_unit (asis-fallback gate): redundant -> ignored, unique ->
+#    normalize (empty dummy files: mutagen skips writes, gate still fires)
+u = make_va_unit("gate-unit-redundant", essential_tracks(10))
+gate, note = asis_mod.va_gate_unit(u, FakeLib(lib_pairs))
+assert gate == "ignored" and "redundant" in note, (gate, note)
+u = make_va_unit("gate-unit-unique", essential_tracks(10))
+gate, note = asis_mod.va_gate_unit(u, FakeLib([]))
+assert gate == "normalize" and "0/10" in note, (gate, note)
+# not va_like (no hints, no distinct artists) -> pass
+u2 = make_va_unit("gate-unit-single", [
+    ("01.mp3", {"artist": "One Band", "title": "T1", "album": "A",
+                "albumartist": "One Band"}),
+], guessed={"artist": "One Band", "album": "A"})
+u2["hints"] = []
+gate, _note = asis_mod.va_gate_unit(u2, FakeLib([]))
+assert gate == "pass", gate
+print("9) va_gate_unit: ignored/normalize/pass OK (asis fallback)")
+
 print("smoke_va_guard: all assertions passed")

@@ -162,6 +162,80 @@ def apply_va_plan(task, plan: dict) -> int:
     return touched
 
 
+def apply_va_normalize_files(unit: dict, plan: dict) -> bool:
+    """Write the Story-10.6 normalization onto the FILES (asis path,
+    where beets re-reads tags from disk): fill artist/title gaps per the
+    plan, set albumartist=Various Artists where empty. Returns False
+    when a write failed (the unit then falls back to plain asis)."""
+    import mutagen as _mutagen
+
+    from .scan import openable
+
+    for f in unit.get("files") or []:
+        artist, title = plan.get("fill", {}).get(os.fsdecode(f), ("", ""))
+        if not artist and not title and not plan.get("aa"):
+            continue
+        try:
+            m = _mutagen.File(openable(f), easy=True)
+        except Exception:
+            m = None
+        if m is None:
+            continue
+        changed = False
+        if artist and not (m.get("artist") or [""])[0].strip():
+            m["artist"] = artist
+            changed = True
+        if title and not (m.get("title") or [""])[0].strip():
+            m["title"] = title
+            changed = True
+        if plan.get("aa") and not (m.get("albumartist") or [""])[0].strip():
+            m["albumartist"] = "Various Artists"
+            changed = True
+        if changed:
+            try:
+                m.save()
+            except Exception:
+                return False
+    return True
+
+
+def va_gate_unit(unit: dict, lib, dry_run: bool = False) -> tuple[str, str]:
+    """Asis-fallback gate for va_like album units (Stories 10.5/10.6).
+
+    Returns ('ignored', reason) — the compilation is largely already in
+    the library: archive it, don't import; ('normalize', reason) —
+    mostly unique: normalize to a clean Various-Artists album (files
+    written unless dry_run) and import; ('pass', '') — the gate does
+    not apply (not va_like, no library, too few tagged files, or
+    identity not resolvable)."""
+    from .session import Decider, NetworkErrorRecorder
+
+    decider = Decider(
+        NetworkErrorRecorder(), auto_accept_distance=0.25,
+        unit=unit, lib=lib,
+    )
+    if not decider._va_like():
+        return "pass", ""
+    verdict = decider._va_redundancy()
+    if verdict is None:
+        return "pass", ""
+    if verdict[0]:
+        reason = decider._va_ignored_record(
+            verdict, unit.get("guessed")
+        )["reason"]
+        return "ignored", reason
+    plan = plan_va_normalize(list(unit.get("files") or []))
+    if plan is None:
+        return "pass", ""
+    note = (
+        f"VA compilation, own metadata authoritative "
+        f"({verdict[1]}/{verdict[2]} tracks already in library)"
+    )
+    if not dry_run and not apply_va_normalize_files(unit, plan):
+        return "pass", ""
+    return "normalize", note
+
+
 def enrich_from_meta_files(unit: dict) -> int:
     """Fill missing artist/title tags from the release's .nfo/.txt.
 
@@ -535,6 +609,15 @@ def cmd_asis(only: str | None = None, dry_run: bool = False,
     if include_pending:
         statuses += ("pending",)
 
+    from beets import config as beets_config
+    from beets.importer.session import ImportSession
+    from beets.library import Library
+
+    lib = Library(
+        beets_config["library"].as_filename(),
+        beets_config["directory"].as_filename(),
+    )
+
     selected = []
     repaired: dict[str, str] = {}
     for u in state_mod.units(st).values():
@@ -559,6 +642,36 @@ def cmd_asis(only: str | None = None, dry_run: bool = False,
                 # verifiziert unabhängig über den Gate-Lauf.
                 ok = True if dry_run else tags_complete(u)[0]
         if ok:
+            # VA gate (Stories 10.5/10.6): redundant compilations are
+            # archived instead of imported; unique ones are normalized
+            # to a clean Various-Artists album first. Singletons and
+            # network-deferred units stay out of it.
+            if u.get("status") != "network" \
+                    and not (u.get("singleton")
+                             or u.get("split_into_singletons")):
+                gate, note = va_gate_unit(u, lib, dry_run=dry_run)
+                if gate == "ignored":
+                    if dry_run:
+                        print(f"  VA-guard would ignore: "
+                              f"{os.path.basename(u['path'])}")
+                    else:
+                        present = [
+                            os.fsdecode(f) for f in u.get("files", [])
+                            if os.path.isfile(os.fsdecode(f))
+                        ]
+                        if present:
+                            trash_mod.trash_files(
+                                present, "va-redundant", note
+                            )
+                            trash_mod.prune_empty_dirs(present, u["path"])
+                        state_mod.set_status(u, "ignored", note)
+                        state_mod.save(st)
+                        print(f"  ignored (VA redundant): "
+                              f"{os.path.basename(u['path'])}")
+                    continue
+                if gate == "normalize" and note:
+                    print(f"  VA-guard: {note} — "
+                          f"{os.path.basename(u['path'])}")
             selected.append(u)
     selected.sort(key=lambda u: u["path"])
     print(f"asis: {len(selected)} tag-complete unit(s) eligible"
@@ -567,15 +680,6 @@ def cmd_asis(only: str | None = None, dry_run: bool = False,
           + (" (DRY RUN — nothing done)" if dry_run else ""))
     if not selected:
         return 0
-
-    from beets import config as beets_config
-    from beets.importer.session import ImportSession
-    from beets.library import Library
-
-    lib = Library(
-        beets_config["library"].as_filename(),
-        beets_config["directory"].as_filename(),
-    )
 
     # As-is items have no MB original_year; the album templates use it.
     # Swap in $year for this session, restore afterwards.
