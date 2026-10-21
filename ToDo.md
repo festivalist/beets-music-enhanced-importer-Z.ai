@@ -759,7 +759,17 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       smoke_bot_http 4b (error-Retry explizit ✓ / Sammel-Retry lässt
       error in Ruhe), smoke_decider 1–4 grün, tier3/quality/
       review_apply_rows/repair_folder grün.
-      **Ergebnis: (offen — Deploy + Pi-Verifikation)**
+      **Ergebnis:** Deploy 144fecf auf dem Pi (12:21, Bot-Restart,
+      Journal „http monitor auf Port 8283“, Endpoint 200). Shim auf
+      dem Pi gegen ECHTE beets-2.14-Objekte verifiziert
+      (smoke_beetscompat Sektion 3: `Source.from_items` mit echten
+      Items, `desc='A - B'` — exakt der vorher crashende Zweig).
+      Echter Forced-Apply-Fallback tritt beim nächsten Review-Fall
+      mit nicht getroffener Kandidaten-Id auf; Override-/retag-Pfad
+      ist mitgedeckt. Die zwei Befund-Units waren zu diesem Zeitpunkt
+      bereits über den 12:00-Zyklus asis importiert (9.9-Abschluss,
+      Hand-Reset) — K1-Intent überholt, Abnahme der Track-Anzeige
+      (9.10) fällt mit dem nächsten Review-Fall zusammen.
 
 Bewusst später (eigene Story, kein Teil dieses EPICs): generelles
 Versions-Pinning für alle Import-Abhängigkeiten (Nutzer-Strategie
