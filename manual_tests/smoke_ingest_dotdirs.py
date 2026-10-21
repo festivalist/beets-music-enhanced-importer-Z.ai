@@ -11,10 +11,11 @@ import os
 import shutil
 import struct
 import sys
+import tempfile
 
-sys.path.insert(0, r"C:\Users\olive\Documents\MusicBrainz-automated")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-root = os.path.join(os.environ["TEMP"], "musik_dotdirs_test")
+root = os.path.join(tempfile.gettempdir(), "musik_dotdirs_test")
 shutil.rmtree(root, ignore_errors=True)
 
 def touch(*parts):
