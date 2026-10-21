@@ -1028,6 +1028,15 @@ class MusikSession(ImportSession):
             return Action.ASIS
         if action == "apply":
             match = self._match_for(task, record)
+            # Story 2.3: cross-engine singleton dedup (beets' duplicate
+            # detection misses same-song items whose album tags differ).
+            if self._singleton_dupe(task, match):
+                record["status"] = "duplicate"
+                record["reason"] = (
+                    "singleton duplicate of a held track "
+                    "(quality loser archived, Story 2.3)"
+                )
+                return Action.SKIP
             record["file_map"] = [{
                 "file": self._file_basename(task.item),
                 "title": getattr(match.info, "title", "") or "",
@@ -1035,6 +1044,54 @@ class MusikSession(ImportSession):
             }]
             return match
         return Action.SKIP
+
+    def _singleton_dupe(self, task, match) -> bool:
+        """True when the track about to import duplicates a held item:
+        same normalized artist+title within a duration grace (15 s —
+        different recordings of the same title pass). The quality loser
+        goes to _trash: a better new copy replaces the held one, a worse
+        one is archived and the import skipped. Covers both 2.3 findings:
+        cross-engine singletons (MG 320k vs YouTube fallback) and
+        gap-fills whose source release carried duplicate track numbers."""
+        from .scan import norm_name
+
+        info = getattr(match, "info", None)
+        artist = getattr(info, "artist", "") or (task.item.artist or "")
+        title = getattr(info, "title", "") or (task.item.title or "")
+        if not artist or not title or self.lib is None:
+            return False
+        pair = (norm_name(artist), norm_name(title))
+        length = float(getattr(task.item, "length", 0) or 0)
+        old = []
+        for item in self.lib.items():
+            if (norm_name(getattr(item, "artist", "")),
+                    norm_name(getattr(item, "title", ""))) != pair:
+                continue
+            if abs(float(getattr(item, "length", 0) or 0) - length) > 15:
+                continue
+            old.append(item)
+        if not old:
+            return False
+        new_file = os.fsdecode(task.item.path)
+        old_files = [os.fsdecode(i.path) for i in old]
+        if quality.better([new_file], old_files):
+            from . import trash as trash_mod
+
+            losers = [p for p in old_files if os.path.isfile(p)]
+            trash_mod.trash_files(
+                losers, "duplicate",
+                f"replaced by {new_file} (singleton dedup, Story 2.3)",
+            )
+            for item in old:
+                try:
+                    item.remove(with_album=False)
+                except Exception:
+                    pass
+            return False
+        self.duplicate_losers.extend(
+            p for p in [new_file] if os.path.isfile(p)
+        )
+        return True
 
     def _match_for(self, task, record):
         chosen = record.get("chosen") or {}
@@ -1107,8 +1164,14 @@ def aggregate_unit_status(unit: dict, results: list[dict]) -> tuple[str, str]:
             agg = "error"
         elif "review" in statuses:
             agg = "review"
-        elif all(s in ("auto", "review-apply", "asis") for s in statuses):
-            agg = "asis" if "asis" in statuses else "auto"
+        elif all(s in ("auto", "review-apply", "asis", "duplicate")
+                 for s in statuses):
+            if "asis" in statuses:
+                agg = "asis"
+            elif "duplicate" in statuses:
+                agg = "duplicate"
+            else:
+                agg = "auto"
         else:
             agg = "unmatched"
         return agg, "; ".join(dict.fromkeys(reasons))[:500]

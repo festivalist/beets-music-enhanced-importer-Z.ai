@@ -468,6 +468,16 @@ review/unmatched/network units whose source files have vanished entirely
 a `unit` identity column ("Artist - Album (N Tracks)") and the short
 `blocker` reason right behind it.
 
+**Duplicate boundaries:** beets' own duplicate detection compares album
+identity and misses same-song tracks held under different albums and
+singletons with differing album tags. musik adds two layers: singletons
+and gap-fill tracks are compared against the library by normalized
+artist+title within a 15 s duration grace — the quality loser goes to
+`_trash\duplicate\`, the winner stays (Story 2.3); full releases are
+covered by the redundancy guard (tier 4 above). Cross-album duplicates of
+*genuinely different recordings* remain a manual `dedupe --fingerprint`
+case — no tag-level signal can catch those.
+
 ### 0-day material and the asis command
 
 Brand-new scene/WEB releases are often **not in MusicBrainz or Discogs yet**,

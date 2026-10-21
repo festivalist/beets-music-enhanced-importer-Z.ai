@@ -92,7 +92,7 @@ Stories 4.1/4.3 weitergeführt.*
 - [ ] 2.2 MG-Playlists-M3U (`Playlists/…` im Staging) in die playlists-Kette
       einspeisen (prepare/build/matching/Plex-Upload, Nachzügler rebuild);
       smoke_playlists um MG-M3U-Fall erweitern
-- [ ] 2.3 Duplikat-/Qualitätsgrenzstelle absichern + dokumentieren: MG-Downloads
+- [x] 2.3 Duplikat-/Qualitätsgrenzstelle absichern + dokumentieren: MG-Downloads
       vorhandener Alben laufen durch `_prepare_units` (Gap-Fill, _trash mit
       Manifest); MG-Library-Index zeigt NICHT auf die echte Bibliothek.
       Live-Befund 2.5-Probe (Here We Stand): Doppel-Tracknummern im MG-
@@ -104,6 +104,16 @@ Stories 4.1/4.3 weitergeführt.*
       Fallback-Singleton UND MG-320k-Singleton parallel in der DB, kein
       Trash-Eintrag; manuell geräumt) — Singleton-Neuimport sollte per
       artist+title-Fingerprint gegen vorhandene Singletons verglichen werden
+      **ERLEDIGT 2026-10-21:** `MusikSession._singleton_dupe` (choose_item,
+      greift für Singletons UND Gap-Fill-Tracks gleichermaßen): Vergleich
+      gegen die Bibliothek per normalisiertem Artist+Title mit 15-s-
+      Dauergrace (andere Aufnahmen desselben Titels passen durch);
+      Qualitätsverlierer → _trash/duplicate, besserer Neuzugang ersetzt den
+      gehaltenen Item (alter Trash+DB-Remove wie im Duplicate-Action-Pfad).
+      Status „duplicate" faltet im Singleton-Aggregat. smoke_decider Fall 5.
+      Doku: README „Duplicate boundaries". Grenze dokumentiert: echt
+      verschiedene Aufnahmen mit identischem Artist+Title erkennt nur
+      `dedupe --fingerprint`.
 - [x] 2.4 Bot-Routing Freitext → MG-API mit Fallback — **2026-10-08**:
       `musik/musicgrabber.py` (dünner Client: available/search/download/
       wait_for_job; Fehlerklassen MGUnavailable/MGNoResults/MGJobFailed;

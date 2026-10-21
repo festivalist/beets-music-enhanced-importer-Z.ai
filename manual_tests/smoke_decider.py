@@ -113,4 +113,39 @@ assert R._cand_id(u_int, 2) == ""
 assert R._cand_id(u_int, 3) == ""
 print("4) int candidate ids tolerated end-to-end OK (Story 9.8)")
 
+# 5) Story 2.3: singleton cross-engine dedup — same normalized
+#    artist+title within the duration grace duplicates, different
+#    recordings (bigger duration gap) pass
+sess = MusikSession.__new__(MusikSession)
+
+
+class _OldItem:
+    artist, title, length = "a", "t", 201.0
+    path = b"/x/old.mp3"
+
+
+class _FakeLib:
+    def __init__(self, items):
+        self._items = items
+
+    def items(self):
+        return list(self._items)
+
+
+sess.lib = _FakeLib([_OldItem()])
+sess.duplicate_losers = []
+task5 = types.SimpleNamespace(item=types.SimpleNamespace(
+    path=b"/x/new.mp3", artist="A", title="T", length=200.0))
+match5 = types.SimpleNamespace(info=types.SimpleNamespace(artist="A", title="T"))
+assert sess._singleton_dupe(task5, match5) is True, "same song must dedup"
+assert sess.duplicate_losers == [], "skipped file not on disk: nothing to trash"
+
+sess2 = MusikSession.__new__(MusikSession)
+sess2.lib = _FakeLib([types.SimpleNamespace(
+    artist="a", title="t", length=260.0, path=b"/x/live.mp3")])
+sess2.duplicate_losers = []
+assert sess2._singleton_dupe(task5, match5) is False, "live version passes"
+assert sess2.duplicate_losers == []
+print("5) singleton cross-engine dedup OK (Story 2.3)")
+
 print("smoke_decider: all assertions passed")
