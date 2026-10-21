@@ -672,7 +672,13 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       verschwindet; Vinyl-Rips ohne MB-Treffer landen ohne Zutun in der
       Bibliothek. Test: smoke_repair_folder.py
       (5 Defektklassen gegen echte Mini-MP3s) + Echtlauf gegen die 13
-      Pi-Units. **Ergebnis: (offen)**
+      Pi-Units. **Ergebnis:** Echtlauf-Evidenz 2026-10-21 (Live-
+      Snapshot nach dem c149712-Deploy): JP-Tribute („Breaking The
+      Law“, 41 Files) und Louis Armstrong 1971 status=**asis** mit
+      Reparatur-Hinweis „Tags repariert aus Ordner-Identität“ — die
+      vorher bouncenden Asis-Taps sind durchgelaufen, die Review-
+      Queue ist erstmals leer. (Die beiden K1-Fehlerfälle Shadows/
+      Armstrong-Vinyl sind Story 9.11, kein 9.9-Defekt.)
 - [ ] 9.10 Review-Queue zeigt Track-Anzahl je Kandidat —
       **Auslöser 2026-10-21 (Nutzer):** Die Unit zeigt bereits „n
       Datei(en)“, die Kandidaten-Buttons aber nicht, wie viele Tracks
@@ -686,8 +692,42 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       Test: smoke_bot_http (Kandidaten-Seed mit n_tracks +
       Snapshot-Durchgriff) + Live-Blick im Pi-Tab. **Ergebnis:**
       smoke_bot_http grün (n_tracks==12 wandert durch, fehlendes Feld
-      → null/„?“), `node --check monitor.js` ok; Rollout + Live-Blick:
-      (offen)
+      → null/„?“), `node --check monitor.js` ok. Deploy c149712 auf
+      dem Pi (git pull + Bot-Restart 11:53, Journal „http monitor auf
+      Port 8283“): Live-Snapshot trägt n_tracks (Tribute-Unit
+      K1=30/K2=10/K3=10), Container liefert neue monitor.js aus.
+      Visueller Live-Blick im Tab entfiel — die Review-Queue leerte
+      sich im Zug (s. 9.9-Ergebnis); Abnahme am nächsten echten
+      Review-Fall.
+- [ ] 9.11 [ready-for-agent] Forced-Apply/Override/retag: tag_album
+      an beets-2.14-Source-API anpassen — **Befund 2026-10-21 11:22
+      (Nutzer-Taps K1 im Monitor-Tab, Journal musik-bot):** review-
+      apply auf „1963 … The Shadows - Greatest Hits [US Vinyl Mono
+      LP]“ und „1967 … Louis Armstrong - Greatest Hits [US Vinyl LP]“
+      flog jeweils auf `AttributeError: 'list' object has no
+      attribute 'desc'` → beide Units status=error (windows-Staging,
+      Dateien intakt). **Wurzel:** beets 2.14.1 hat `tag_album`
+      umgestellt auf `tag_album(source: Source, …)` — `Source` ist
+      ein NamedTuple (beets/autotag/source.py: `type/artist/name/
+      data/items/id/id_consensus`, `.desc`/`.va_likely` Properties,
+      Konstruktion via `Source.from_items(items)`); derImporter
+      ruft `tag_album(self.source, search_ids=…)`. musik ruft noch
+      im 2.13-Stil mit roher Item-Liste auf → erster Zugriff
+      `source.desc` (match.py:403) crasht. **Call-Sites:** session.py
+      :468 (Forced-Apply-Fallback „id nicht unter Kandidaten“ →
+      search_ids), session.py:487 (Override-Suche), retag.py:69
+      (retag v1 — report-only, betrifft dieselbe Bruchstelle).
+      Betroffen ist nur der Fallback — normaler accept mit getroffener
+      Kandidaten-Id (Mingus/Byrds/Traffic/Kinks 9.8) läuft an der
+      Stelle nicht rein. **Fix:** `Source.from_items(task.items)`
+      übergeben (Import aus beets.autotag.source; Signaturen
+      sonst unverändert), Smoke gegen echte Mini-Items + Retry der
+      beiden Error-Units als Echtlauf (nach Deploy: Monitor-Retry →
+      Ingest; mit 9.9 live rennen sie ggf. über die Ordner-Reparatur
+      ins asis — K1-Intent des Nutzers wäre dann überholt;
+      Entscheidung beim Echtlauf dokumentieren). Zielcheck: behebt
+      die Sackgasse „Review-Tap → error“ für alle Vinyl-/Defekt-Tag-
+      Fälle mit fehlender Kandidaten-Id.
 
 Bewusst später (eigene Story, kein Teil dieses EPICs): generelles
 Versions-Pinning für alle Import-Abhängigkeiten (Nutzer-Strategie
