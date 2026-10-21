@@ -651,7 +651,7 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       (int-Jahr aus MB-Kandidaten vs. String-Erwartung im Forced-Apply)
       → Story 9.8; Review 9→4 (Beatles, Mothers, Willie Nelson,
       Tribute bleiben); Stau 299→246; keine Dubletten (beet-Check).
-- [ ] 9.9 Asis-Tag-Reparatur aus Ordner-Identität (Auto-Regel) —
+- [x] 9.9 Asis-Tag-Reparatur aus Ordner-Identität (Auto-Regel) —
       **Auslöser 2026-10-21 (Nutzer: „los“ + „das muss zukünftig
       automatisch passieren“):** Die 13 GREATEST-HITS-Rips (Vinyl-LPs +
       JP-Tribute, windows-Root) fallen wegen defekter Tags durchs
@@ -679,6 +679,26 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       vorher bouncenden Asis-Taps sind durchgelaufen, die Review-
       Queue ist erstmals leer. (Die beiden K1-Fehlerfälle Shadows/
       Armstrong-Vinyl sind Story 9.11, kein 9.9-Defekt.)
+      **Abschluss 2026-10-21 12:05 (zweite Session, Ergänzung):** Deploy
+      4d0b3ea auf dem Pi; Dry-Run „11 eligible (11 aus Ordner-
+      Identität repariert)“; Echtlauf Zyklus 11:45: **alle 11
+      Review-Units importiert** (Bob Dylan/Armstrong-Live/Orbison/
+      Beach Boys/Buddy Holly/Elton/10CC/ABBA/Aerosmith/Who/JP-Tribute),
+      JP als VA-Album „Various Artists – A Tribute To Judas Priest's
+      Greatest Hits“ mit erhaltenen Band-Artists + Discs 01/02 (beet-
+      Check). Shadows + Armstrong-Vinyl (9.11-Error-Units) per Reset
+      auf pending in den 12:00-Zyklus gegeben → MB-Kette lief OHNE
+      Crash (Shadows→unmatched, Armstrong→review) → **Asis-Fallback
+      fischte beide im selben Zyklus: „2 tag-complete unit(s)
+      eligible (2 aus Ordner-Identität repariert) → 2 imported“** —
+      damit auch sie in der Bibliothek (Ordner-Identität statt der
+      gekippten K1-Kandidaten; MB-Nachdaten holt ggf. ein späteres
+      retag, siehe 9.11). **0 GREATEST-HITS-Ordner in _incoming
+      übrig**, Review/Unmatched leer, error=1 (alter G.-Love-6.9er,
+      dateilos → nächster Scan retiert), Bibliothek 1332 Alben /
+      18471 Items. Die 12:00-Kette beweist zugleich die Auto-Regel
+      für künftige Fälle: pending/unmatched/review + defekte Tags →
+      Reparatur → asis, ohne Nutzerinteraktion.
 - [ ] 9.10 Review-Queue zeigt Track-Anzahl je Kandidat —
       **Auslöser 2026-10-21 (Nutzer):** Die Unit zeigt bereits „n
       Datei(en)“, die Kandidaten-Buttons aber nicht, wie viele Tracks
