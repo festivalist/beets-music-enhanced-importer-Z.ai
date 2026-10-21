@@ -939,7 +939,7 @@ Ingest-Kette; alle 7 Wrapper-Endpunkte in musik/musicgrabber.py sind in
   beets-Plugin-Stage-Reload-Race nach Duplicate-Skip → status error,
   retrybar (Vorher-existing-Klasse, kein 10.7-Code betroffen). Review
   13 → 5.
-- [ ] 10.8 [needs-triage] Datenfix Junk-Credits in der Bibliothek:
+- [x] 10.8 [needs-triage] Datenfix Junk-Credits in der Bibliothek:
   140 Rows mit albumartist='Essential Albums' (4 Alben: Michael
   Jackson, Ray Charles, Sparks, David Allan Coe — als tier3-asis mit
   Junk-Tags importiert, BEVOR der ba57ae9-Fix live war; Ordner+Tags
@@ -949,6 +949,23 @@ Ingest-Kette; alle 7 Wrapper-Endpunkte in musik/musicgrabber.py sind in
   Artist bzw. 'Various Artists' (beet modify + move), Albumnamen
   säubern. Erst nach 10.7 (a) bewerten, ob ein Re-Decide der Units
   einfacher ist als ein Retag der Rows.
+  **ERLEDIGT 2026-10-21:** Einmal-Migration `tools/fix_junk_credits.py`
+  (lokal, gitignored — explizite Aktions-Tabelle nach MB-Handverifikation,
+  KEINE Heuristik; erste Script-Version mit Kandidaten-Heuristik wurde im
+  Dry-Run als falsch erkannt und verworfen): Sparks → echtes MB-Release
+  „New Music For Amnesiacs: The Essential Collection" (2013, 40 Tracks,
+  apply_metadata+Album-Row); Ray Charles → 40-Track-2CD ist NICHT in MB →
+  Artist-Fix lokal, Albumname erhalten; Michael Jackson → kein MB-Release
+  (Ripper-Wasserzeichen „-Ruda") → Titelsurgery („Artist - Title-Ruda" →
+  Title), Artist/Album gefixt; David-Allan-Coe-Junk-Kopie → Duplikat der
+  sauberen 10.7-Importes, 40 Dateien → _trash/duplicate. Danach
+  `beet modify`: AA 'VA' → 'Various Artists' (160 Rows), Trailing-Space-AA
+  getrimmt, Ibiza-Album umbenannt + year/original_year 2014. 60 tote Rows
+  (VA-Clubhouse-Alben zeigten ins Staging, Dateien vom 10.5-Guard
+  archiviert) entfernt; Datei-Moves nachgezogen (apply_metadata bewegt
+  nicht — Item.move nötig!), leere Ordner gepingt, Plex-Scan angestoßen.
+  **Endstand: 0 Junk-Credits, Bibliothek 19.506 Items, alle Essentials
+  korrekt unter echten Artists bzw. Various Artists.**
 
 ## Beim Nutzer anfragen (bei nächster Gelegenheit)
 
