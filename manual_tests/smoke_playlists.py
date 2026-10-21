@@ -102,6 +102,9 @@ class FakeJob:  # noqa: D401 - minimal FetchJob stand-in
 
 
 P.m3u_dir = lambda: m3u_dir
+# isolate build() from the REAL library (on the Pi it matches
+# 'Smells Like Teen Spirit' to the live Nirvana item, leaving
+# case 5's rebuild nothing to fill)
 spec = {"name": "Best of 2026", "entries": [dict(e1), dict(e2), dict(e4)]}
 states = P.build(FakeJob(), [spec], ids_before=set())  # empty diff = all new
 assert len(states) == 1
