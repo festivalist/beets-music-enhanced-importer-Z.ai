@@ -211,4 +211,36 @@ gate, _note = asis_mod.va_gate_unit(u2, FakeLib([]))
 assert gate == "pass", gate
 print("9) va_gate_unit: ignored/normalize/pass OK (asis fallback)")
 
+# 10) thin tags + parseable filenames: overlap is measured on the
+#     RESOLVED identity (tags + filename fills) — a unique comp imports,
+#     a redundant one is ignored, both without review
+thin = []
+for i in range(1, 7):
+    p = os.path.join(tmp, f"thin-{i}", f"{i:02d}. Thin Artist {i} - Thin Title {i}.mp3")
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    open(p, "wb").close()
+    tags = {"artist": "", "title": "", "album": "Thin Comp", "albumartist": ""}
+    if i == 1:  # one tagged reference file votes the orientation
+        tags = {"artist": "Thin Artist 1", "title": "Thin Title 1",
+                "album": "Thin Comp", "albumartist": ""}
+    TAGS[os.path.normcase(p)] = tags
+    thin.append(p)
+u = make_va_unit("thin-unique", [
+    (os.path.basename(p), {}) for p in thin
+])
+u["files"] = list(thin)
+u["n_files"] = len(thin)
+dec = Decider(netrec, auto_accept_distance=0.25, unit=u, lib=FakeLib([]))
+action, record = dec.decide_album(fake_task([weak_candidate()]))
+assert action == "apply-asis" and record["status"] == "asis", (action, record)
+assert record["normalize_va"]["fill"], record
+lib_pairs_thin = [("Thin Artist %d" % i, "Thin Title %d" % i) for i in range(1, 6)]
+u = make_va_unit("thin-redundant", [(os.path.basename(p), {}) for p in thin])
+u["files"] = list(thin)
+dec = Decider(netrec, auto_accept_distance=0.25, unit=u, lib=FakeLib(lib_pairs_thin))
+action, record = dec.decide_album(fake_task([weak_candidate()]))
+assert action == "skip" and record["status"] == "ignored", (action, record)
+assert "5/6" in record["reason"], record
+print("10) thin tags: resolved-identity overlap -> survivor / ignored OK")
+
 print("smoke_va_guard: all assertions passed")

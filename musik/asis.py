@@ -216,16 +216,13 @@ def va_gate_unit(unit: dict, lib, dry_run: bool = False) -> tuple[str, str]:
     )
     if not decider._va_like():
         return "pass", ""
-    verdict = decider._va_redundancy()
-    if verdict is None:
-        return "pass", ""
-    if verdict[0]:
+    plan, verdict = decider._va_assess()
+    if verdict is not None and verdict[0]:
         reason = decider._va_ignored_record(
             verdict, unit.get("guessed")
         )["reason"]
         return "ignored", reason
-    plan = plan_va_normalize(list(unit.get("files") or []))
-    if plan is None:
+    if plan is None or verdict is None:
         return "pass", ""
     note = (
         f"VA compilation, own metadata authoritative "

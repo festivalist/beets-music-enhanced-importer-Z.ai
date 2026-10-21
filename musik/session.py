@@ -123,6 +123,8 @@ class Decider:
         # None in dry runs — the guard never fires without it.
         self.lib = lib
         self._pair_cache: set[tuple[str, str]] | None = None
+        self._va_cache: tuple[dict | None,
+                              tuple[bool, int, int] | None] | None = None
 
     # -- classification of an empty candidate list -------------------------
 
@@ -471,25 +473,30 @@ class Decider:
             self._pair_cache = pairs
         return self._pair_cache
 
-    def _va_redundancy(self) -> tuple[bool, int, int] | None:
-        """How much of a va_like unit's track tags the library already
-        holds. Returns (redundant, hits, total), or None when the guard
-        cannot decide: no library handle, or fewer than
-        va_redundant_min_tracks tagged files. Track identity comes from
-        the files' own tags — junk-tag units naturally measure ~0%
-        overlap and survive (Story 10.6 imports those instead)."""
+    def _va_redundancy(self, plan: dict | None = None) -> tuple[bool, int, int] | None:
+        """How much of a va_like unit's track identity the library already
+        holds. Identity is resolved per file first (Story 10.6): tags are
+        authoritative, the filename plan fills the gaps — thin-tag units
+        with parseable filenames get a real overlap measurement instead
+        of abstaining. Returns (redundant, hits, total), or None when the
+        guard cannot decide: no library handle, or fewer than
+        va_redundant_min_tracks resolvable files."""
         from .paths import musik_config
         from .scan import norm_name, openable, tag_of
 
         pairs = self._library_pairs()
         if pairs is None:
             return None
+        fills = (plan or {}).get("fill") or {}
         total = hits = 0
         for f in self.unit.get("files", []):
             if not os.path.isfile(openable(f)):
                 continue
             artist = tag_of(f, "artist")
             title = tag_of(f, "title")
+            fa, ft = fills.get(os.fsdecode(f), ("", ""))
+            artist = artist or fa
+            title = title or ft
             if not artist or not title:
                 continue
             total += 1
@@ -504,6 +511,17 @@ class Decider:
             musik_config().get("va_redundant_threshold", 0.6)
         )
         return hits / total >= threshold, hits, total
+
+    def _va_assess(self) -> tuple[dict | None, tuple[bool, int, int] | None]:
+        """Resolution plan + redundancy verdict for a va_like unit,
+        computed once per decision (the plan feeds both the ignored and
+        the survivor outcome)."""
+        if self._va_cache is None:
+            from .asis import plan_va_normalize
+
+            plan = plan_va_normalize(list(self.unit.get("files") or []))
+            self._va_cache = (plan, self._va_redundancy(plan))
+        return self._va_cache
 
     def _va_ignored_record(self, verdict: tuple[bool, int, int],
                            guessed: dict | None) -> dict:
@@ -524,18 +542,14 @@ class Decider:
             "guessed": guessed or {},
         }
 
-    def _va_survivor_record(self, verdict: tuple[bool, int, int],
-                            guessed: dict | None) -> dict | None:
+    def _va_survivor_record(self, verdict: tuple[bool, int, int] | None,
+                            guessed: dict | None, plan: dict) -> dict:
         """Story 10.6: a compilation that is NOT redundant carries mostly
         new music — import it as a clean Various-Artists album on its own
-        metadata instead of parking it in review. Only when every file's
-        identity is resolvable (tags, or a filename that fills the gaps)."""
-        from .asis import plan_va_normalize
-
-        plan = plan_va_normalize(list(self.unit.get("files") or []))
-        if plan is None:
-            return None
-        _, hits, total = verdict
+        metadata instead of parking it in review. The caller guarantees
+        a resolvable plan; the verdict may be None when too few tracks
+        exist for an overlap measurement (tiny units import too)."""
+        _, hits, total = (verdict or (False, 0, 0))
         return {
             "status": "asis",
             "reason": (
@@ -613,13 +627,13 @@ class Decider:
             status, reason = self._classify_empty()
             if status == "unmatched":
                 if self._va_like():
-                    verdict = self._va_redundancy()
-                    if verdict is not None:
-                        if verdict[0]:
-                            return "skip", self._va_ignored_record(verdict, guessed)
-                        rec = self._va_survivor_record(verdict, guessed)
-                        if rec is not None:
-                            return "apply-asis", rec
+                    plan, verdict = self._va_assess()
+                    if verdict is not None and verdict[0]:
+                        return "skip", self._va_ignored_record(verdict, guessed)
+                    if plan is not None and verdict is not None:
+                        return "apply-asis", self._va_survivor_record(
+                            verdict, guessed, plan
+                        )
                 tier3 = self._tier3_check()
                 if tier3 is not None:
                     return "apply-asis", tier3
@@ -637,7 +651,7 @@ class Decider:
         # the library is archived instead of imported. User decisions
         # (forced ids, overrides) are handled above and never get here.
         if self._va_like():
-            verdict = self._va_redundancy()
+            _plan, verdict = self._va_assess()
             if verdict is not None and verdict[0]:
                 return "skip", self._va_ignored_record(verdict, guessed)
 
@@ -683,13 +697,15 @@ class Decider:
         # VA survivor (Story 10.6): not redundant, but every own-tags
         # fallback above declined (typically: junk folder name vetoed the
         # tier-3 folder corroboration). If the files still carry a
-        # resolvable identity, import as a clean Various-Artists album.
+        # resolvable identity AND the overlap measurement is valid
+        # (>= va_redundant_min_tracks), import as a clean
+        # Various-Artists album.
         if self._va_like():
-            verdict = self._va_redundancy()
-            if verdict is not None:
-                rec = self._va_survivor_record(verdict, guessed)
-                if rec is not None:
-                    return "apply-asis", rec
+            plan, verdict = self._va_assess()
+            if plan is not None and verdict is not None and not verdict[0]:
+                return "apply-asis", self._va_survivor_record(
+                    verdict, guessed, plan
+                )
         return "skip", {
             "status": "review",
             "reason": "below auto-accept confidence: " + "; ".join(reasons),
