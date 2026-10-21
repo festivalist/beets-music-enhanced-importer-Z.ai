@@ -89,9 +89,20 @@ Stories 4.1/4.3 weitergeführt.*
       **code-fertig 2026-10-08, Deploy/Erstlauf läuft**; MG-Staging gilt
       jetzt als Downloader-Staging (from_fetch erkennt musicgrabber-Pfade,
       per-Track-Albumtags autoritativ); smoke_tier3 Fall 6 deckt das ab
-- [ ] 2.2 MG-Playlists-M3U (`Playlists/…` im Staging) in die playlists-Kette
+- [x] 2.2 MG-Playlists-M3U (`Playlists/…` im Staging) in die playlists-Kette
       einspeisen (prepare/build/matching/Plex-Upload, Nachzügler rebuild);
       smoke_playlists um MG-M3U-Fall erweitern
+      **ERLEDIGT 2026-10-21:** `playlists.prepare_mg()` (Name+Reihenfolge
+      aus MGs eigener M3U, sonst Tags alphabetisch als Fallback) +
+      `_mg_playlist_plans()` im Ingest: Units unter
+      `musicgrabber/Playlists/<Name>/` werden zu Singletons gesplittet
+      (nicht als VA-Album importiert, Hint mg-playlist), Specs werden vor
+      dem Import geschnappt (item_id-Snapshot), nach dem asis-Lauf
+      build() + nach dem Plex-Refresh upload(). Nachzügler laufen über das
+      bestehende rebuild() (job_dir=MG-Ordner ist der Schlüssel).
+      Synergie: die 2.3-Singleton-Dedup greift bei Playlist-Re-Downloads.
+      smoke_playlists Fall 9 (m3u-Order, Build, alphabetischer Fallback).
+      PI-SETUP 9.4: „Create M3U" in MG aktivieren für echte Reihenfolge.
 - [x] 2.3 Duplikat-/Qualitätsgrenzstelle absichern + dokumentieren: MG-Downloads
       vorhandener Alben laufen durch `_prepare_units` (Gap-Fill, _trash mit
       Manifest); MG-Library-Index zeigt NICHT auf die echte Bibliothek.

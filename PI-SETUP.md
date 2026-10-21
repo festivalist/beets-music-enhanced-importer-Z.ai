@@ -643,6 +643,11 @@ Installer (70-musicgrabber) prüft Overlay-Datei und
   Telegram erlaubt pro Token nur einen Betriebstyp (Polling XOR Webhook), der
   musik-bot pollt bereits. Entweder eigenen BotFather-Bot für MG anlegen oder
   verzichten (der Import-Bericht kommt über den musik-bot).
+- **Watched Playlists: „Create M3U" aktivieren** (Story 2.2). Der Ingest
+  erkennt `Playlists/<Name>/`-Staging-Ordner, importiert die Tracks als
+  Singletons (nicht als VA-Album) und legt automatisch die Plex-Playlist an —
+  die echte Reihenfolge liefert aber nur MGs eigene M3U; ohne sie gilt
+  alphabetische Sortierung als bester Kompromiss.
 
 **9.5 Erster Test (Akzeptanz Story 1.1):**
 

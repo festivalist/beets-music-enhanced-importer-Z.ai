@@ -170,6 +170,62 @@ def cmd_ingest(root: str | None = None) -> int:
     return rc
 
 
+def _mg_playlist_plans(root: str) -> list[dict]:
+    """Story 2.2: MusicGrabber playlist staging (Playlists/<Name>/) —
+    the scanned units force singleton split (playlist tracks belong on
+    their real albums / Singles, not as one VA album) and the playlist
+    specs get prepared for the post-import build. [] on roots without a
+    musicgrabber/Playlists subtree."""
+    from types import SimpleNamespace
+
+    from . import playlists as playlists_mod
+    from . import state as state_mod
+    from .playlists import _safe_filename
+
+    orig_marker = os.path.normpath(
+        os.path.join(root, "musicgrabber", "Playlists"))
+    norm_marker = os.path.normcase(orig_marker)
+    if not os.path.isdir(orig_marker):
+        return []
+    st = state_mod.load()
+    changed = False
+    dirs: dict[str, str] = {}
+    for key, u in state_mod.units(st).items():
+        k = os.path.normcase(os.path.normpath(key))
+        if not k.startswith(norm_marker + os.sep):
+            continue
+        if not (u.get("singleton") or u.get("split_into_singletons")):
+            u["split_into_singletons"] = True
+            u.setdefault("hints", []).append("mg-playlist")
+            changed = True
+        rel = k[len(norm_marker) + 1:]
+        ndir = norm_marker + os.sep + rel.split(os.sep)[0]
+        # normcase only lowercases (same length) — the original-case dir
+        # path can be cut from the raw key at the same offsets
+        dirs.setdefault(ndir, orig_marker + os.sep
+                        + key[len(orig_marker) + 1:].split(os.sep)[0])
+    if changed:
+        state_mod.save(st)
+    plans = []
+    for ndir, pl_dir in sorted(dirs.items()):
+        prep = playlists_mod.prepare_mg(pl_dir)
+        if prep is None:
+            continue
+        name, spec = prep
+        plans.append({
+            "job": SimpleNamespace(
+                job_id=f"mg-{_safe_filename(name)}",
+                job_dir=pl_dir,
+                query="",
+            ),
+            "spec": spec,
+            "ids": playlists_mod.snapshot_ids(),
+        })
+        print(f"ingest: MG playlist „{name}“ "
+              f"({len(spec['entries'])} Einträge) vorgemerkt")
+    return plans
+
+
 def _ingest_one(root: str) -> int:
     from . import asis as asis_mod
     from . import cleanup as cleanup_mod
@@ -234,6 +290,9 @@ def _ingest_one(root: str) -> int:
         and (k == rk or k.startswith(rk + os.sep))
     }
 
+    # Story 2.2: MusicGrabber playlist dirs — singleton split + specs
+    mg_plans = _mg_playlist_plans(root)
+
     print("ingest: running import (musicbrainz chain)")
     _activity("import", root)
     engine.cmd_import(only=root)
@@ -243,6 +302,17 @@ def _ingest_one(root: str) -> int:
     print("ingest: asis fallback for review/unmatched/pending units")
     _activity("asis", root)
     asis_mod.cmd_asis(only=root, include_pending=True)
+
+    # Story 2.2: match the imported playlist tracks, write the m3u
+    pl_states = []
+    if mg_plans:
+        from . import playlists as playlists_mod
+
+        for plan in mg_plans:
+            pl_states.extend(playlists_mod.build(
+                plan["job"], [plan["spec"]], plan["ids"]))
+            print(f"ingest: {playlists_mod.summarize(pl_states[-1])}"
+                  if pl_states else "ingest: playlist build leer")
 
     if os.path.isdir(root):
         # keep_root: the staging root is a docker bind-mount source —
@@ -274,4 +344,9 @@ def _ingest_one(root: str) -> int:
     ok, msg = plex_mod.refresh_library()
     if ok and msg:
         print("ingest:", msg)
+    if pl_states:
+        from . import playlists as playlists_mod
+
+        for line in playlists_mod.upload(pl_states):
+            print("ingest:", line)
     return 0

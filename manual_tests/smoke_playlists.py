@@ -205,4 +205,46 @@ specs = P.prepare(FakeYTJob)
 assert [e["file"] for e in specs[0]["entries"]] == ["c.m4a", "a.m4a", "b.m4a"]
 assert specs[0]["name"] == FakeYTJob.job_id.split("-", 3)[3]
 print("prepare (mtime fallback) OK")
+# 9) Story 2.2: MusicGrabber playlist dir — m3u gives name+order,
+#    without m3u the tags in alphabetical order are the fallback
+mg_dir = os.path.join(tmp, "musicgrabber", "Playlists", "Sommer 2026")
+os.makedirs(mg_dir)
+with open(os.path.join(mg_dir, "Zedd - Candy.m4a"), "w") as fh:
+    fh.write("x")
+with open(os.path.join(mg_dir, "Ava - Sunrise.m4a"), "w") as fh:
+    fh.write("x")
+with open(os.path.join(mg_dir, "Sommer 2026.m3u"), "w", encoding="utf-8") as fh:
+    fh.write("#EXTM3U\n"
+             "#EXTINF:200,Ava - Sunrise\n"
+             "Ava - Sunrise.m4a\n"
+             "#EXTINF:190,Zedd - Candy\n"
+             "Zedd - Candy.m4a\n")
+got = P.prepare_mg(mg_dir)
+assert got is not None
+name, spec = got
+assert name == "Sommer 2026"
+assert [e["title"] for e in spec["entries"]] == ["Sunrise", "Candy"], spec
+print("prepare_mg (m3u order) OK")
+
+class FakeMGJob:
+    job_id = "mg-Sommer 2026"
+    job_dir = mg_dir
+    query = ""
+
+
+states = P.build(FakeMGJob(), [spec], ids_before=set())
+assert len(states) == 1 and states[0]["name"] == "Sommer 2026"
+assert states[0]["job_dir"] == mg_dir, states[0]  # rebuild() keyed on this
+print("prepare_mg build OK:", P.summarize(states[0]))
+
+mg2 = os.path.join(tmp, "musicgrabber", "Playlists", "Ohne M3U")
+os.makedirs(mg2)
+for nm in ("B - Zwei.m4a", "A - Eins.m4a"):
+    with open(os.path.join(mg2, nm), "w") as fh:
+        fh.write("x")
+got2 = P.prepare_mg(mg2)
+assert got2[0] == "Ohne M3U"
+assert [e["file"] for e in got2[1]["entries"]] == ["A - Eins.m4a", "B - Zwei.m4a"]
+print("prepare_mg (alphabetical fallback) OK")
+
 print("ALL SMOKE TESTS PASSED")

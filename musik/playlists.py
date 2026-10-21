@@ -225,6 +225,37 @@ def _job_label(job_id: str) -> str:
     return (parts[3] if len(parts) > 3 else job_id).strip("-")
 
 
+def prepare_mg(pl_dir: str) -> tuple[str, dict] | None:
+    """Story 2.2: specs for a MusicGrabber playlist staging dir
+    (Playlists/<Name>/ with 'Artist - Title' files and optionally MG's
+    own m3u). Name and order come from the m3u when MG's 'Create M3U'
+    is on; without it the tags in alphabetical order are the best
+    available guess. Returns (name, spec) or None when the dir holds no
+    audio."""
+    from .scan import is_audio
+
+    try:
+        names = sorted(os.listdir(pl_dir))
+    except OSError:
+        return None
+    audio = [
+        os.path.join(pl_dir, n) for n in names
+        if os.path.isfile(os.path.join(pl_dir, n)) and is_audio(n)
+    ]
+    if not audio:
+        return None
+    name = os.path.basename(os.path.normpath(pl_dir)) or "MG Playlist"
+    entries = None
+    for n in names:
+        if n.lower().endswith((".m3u", ".m3u8")):
+            entries = _parse_sidecar(os.path.join(pl_dir, n))
+            if entries:
+                break
+    if not entries:
+        entries = _tag_entries(audio)
+    return name, {"name": name, "entries": entries}
+
+
 def prepare(job) -> list[dict] | None:
     """Collect playlist specs for a fetch job before the import runs.
 
