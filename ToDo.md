@@ -673,6 +673,21 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       Bibliothek. Test: smoke_repair_folder.py
       (5 Defektklassen gegen echte Mini-MP3s) + Echtlauf gegen die 13
       Pi-Units. **Ergebnis: (offen)**
+- [ ] 9.10 Review-Queue zeigt Track-Anzahl je Kandidat —
+      **Auslöser 2026-10-21 (Nutzer):** Die Unit zeigt bereits „n
+      Datei(en)“, die Kandidaten-Buttons aber nicht, wie viele Tracks
+      der jeweilige Release hat — Sampler-/Single-Fallen sind erst
+      nach dem Tap sichtbar. `candidate_preview` liefert `n_tracks`
+      ohnehin (seit 4ef7e99), der Snapshot schnitt sie weg: Fix ist
+      nur Durchgriff + Anzeige — bot_http-Review-Kandidaten nehmen
+      `n_tracks` auf, Monitor-Tab hängt „· N Tracks“ an K1/K2/K3 an
+      („?“ bei Alt-State ohne Feld). Keine neue Entscheidungsklasse,
+      nur Infosättigung der bestehenden Review-Fläche (Zielcheck ✓).
+      Test: smoke_bot_http (Kandidaten-Seed mit n_tracks +
+      Snapshot-Durchgriff) + Live-Blick im Pi-Tab. **Ergebnis:**
+      smoke_bot_http grün (n_tracks==12 wandert durch, fehlendes Feld
+      → null/„?“), `node --check monitor.js` ok; Rollout + Live-Blick:
+      (offen)
 
 Bewusst später (eigene Story, kein Teil dieses EPICs): generelles
 Versions-Pinning für alle Import-Abhängigkeiten (Nutzer-Strategie

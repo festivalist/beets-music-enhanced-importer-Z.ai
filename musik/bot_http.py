@@ -83,7 +83,8 @@ def snapshot() -> dict:
             "candidates": [
                 {"source": c.get("source", ""), "artist": c.get("artist", ""),
                  "album": c.get("album", ""), "year": c.get("year", ""),
-                 "distance": c.get("distance", "")}
+                 "distance": c.get("distance", ""),
+                 "n_tracks": c.get("n_tracks")}
                 for c in (u.get("candidates") or [])[:3]
             ],
         })

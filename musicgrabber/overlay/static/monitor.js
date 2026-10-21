@@ -119,7 +119,7 @@
             const label = [g.artist, g.album].filter(Boolean).join(" - ")
                 || baseName(u.path);
             const cands = (u.candidates || []).map((c, ci) =>
-                `<button class="mon-act" data-rev="${i}" data-dec="${ci ? "accept2" : "accept"}">K${ci + 1}: ${esc([c.artist, c.album].filter(Boolean).join(" - ") || c.source || "?")}${c.year ? " (" + c.year + ")" : ""}</button>`);
+                `<button class="mon-act" data-rev="${i}" data-dec="${ci ? "accept2" : "accept"}">K${ci + 1}: ${esc([c.artist, c.album].filter(Boolean).join(" - ") || c.source || "?")}${c.year ? " (" + c.year + ")" : ""} · ${c.n_tracks ?? "?"} Tracks</button>`);
             return `<div class="mon-item">` +
                 `<div>⚠️ <b>${esc(label)}</b> <span class="mon-mut">· ${u.n_files ?? "?"} Datei(en) · ${esc(relAge(u.updated))}${u.reason ? " · " + esc(String(u.reason).slice(0, 120)) : ""}</span></div>` +
                 `<div class="mon-acts">${cands.join("")}` +

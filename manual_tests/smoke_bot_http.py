@@ -85,7 +85,8 @@ def main() -> int:
         ru = state_mod.get_unit(st, r"C:\lib\review-album")
         ru["candidates"] = [{"id": "cand-1", "artist": "A One",
                              "album": "Alpha", "year": "2001",
-                             "distance": 0.1, "source": "mb"},
+                             "distance": 0.1, "source": "mb",
+                             "n_tracks": 12},
                             {"id": "cand-2", "artist": "A Two",
                              "album": "Beta", "year": "2002",
                              "distance": 0.2, "source": "mb"}]
@@ -118,6 +119,12 @@ def main() -> int:
             assert snap["ingest"]["busy"] in (True, False, None)
             assert len(snap["review"]) == 1, snap["review"]
             assert snap["review"][0]["path"].endswith("review-album")
+            # Story 9.10: n_tracks wandert durch den Snapshot (Tab zeigt
+            # sie an den Kandidaten-Buttons); fehlendes Feld → null
+            assert snap["review"][0]["candidates"][0]["n_tracks"] == 12, \
+                snap["review"][0]["candidates"]
+            assert snap["review"][0]["candidates"][1]["n_tracks"] is None, \
+                snap["review"][0]["candidates"]
             assert snap["backlog"]["audio_files"] == 2, snap["backlog"]
             assert snap["jobs"]["queued"] == 0, snap["jobs"]
 

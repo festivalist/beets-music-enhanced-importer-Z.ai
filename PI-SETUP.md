@@ -613,7 +613,9 @@ statischen UI-Dateien werden per Bind-Mount
 dort lebt der **Import-Monitor-Tab** (Nav-Eintrag „Monitor"): Laufstatus,
 filterbare Unit-Liste, Review-Queue, `_incoming`-Stau, Bot-Jobs (Poll
 alle 5 s gegen den Bot-Endpoint :8283) **plus Aktionen**: Review-Units
-direkt im Tab entscheiden (K1/K2-Kandidat, As-is, Override, Ignorieren),
+direkt im Tab entscheiden (K1/K2-Kandidat — mit Track-Anzahl zum
+Abgleich mit den eigenen Dateien (Story 9.10) —, As-is, Override,
+Ignorieren),
 Ingest-Lauf anstoßen, Netzwerk-Units zurücksetzen — alles mit
 Bestätigungsdialog, ausgeführt vom Bot unter dem ingest.lock, Fortschritt
 im Bot-Jobs-Block. **Aktionen laufen nie ins Leere (Story 9.6):** Ist der
