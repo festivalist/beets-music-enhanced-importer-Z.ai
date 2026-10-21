@@ -109,7 +109,8 @@ class Decider:
                  forced_track_id: str | None = None,
                  override_artist: str | None = None,
                  override_album: str | None = None,
-                 unit: dict | None = None) -> None:
+                 unit: dict | None = None,
+                 lib=None) -> None:
         self.netrec = netrec
         self.auto_accept_distance = auto_accept_distance
         self.review_candidates = review_candidates
@@ -118,6 +119,10 @@ class Decider:
         self.override_artist = override_artist
         self.override_album = override_album
         self.unit = unit or {}
+        # Live library handle for the VA redundancy guard (Story 10.5).
+        # None in dry runs — the guard never fires without it.
+        self.lib = lib
+        self._pair_cache: set[tuple[str, str]] | None = None
 
     # -- classification of an empty candidate list -------------------------
 
@@ -446,6 +451,103 @@ class Decider:
             "guessed": g,
         }
 
+    # -- VA redundancy guard (Story 10.5) -----------------------------------
+
+    def _library_pairs(self) -> set[tuple[str, str]] | None:
+        """Normalized (artist, title) pairs of the live library, cached
+        per decision run. None without a library handle (dry runs) —
+        the guard abstains instead of guessing."""
+        if self.lib is None:
+            return None
+        if self._pair_cache is None:
+            from .scan import norm_name
+
+            pairs = set()
+            for item in self.lib.items():
+                pairs.add((
+                    norm_name(getattr(item, "artist", "")),
+                    norm_name(getattr(item, "title", "")),
+                ))
+            self._pair_cache = pairs
+        return self._pair_cache
+
+    def _va_redundancy(self) -> tuple[bool, int, int] | None:
+        """How much of a va_like unit's track tags the library already
+        holds. Returns (redundant, hits, total), or None when the guard
+        cannot decide: no library handle, or fewer than
+        va_redundant_min_tracks tagged files. Track identity comes from
+        the files' own tags — junk-tag units naturally measure ~0%
+        overlap and survive (Story 10.6 imports those instead)."""
+        from .paths import musik_config
+        from .scan import norm_name, openable, tag_of
+
+        pairs = self._library_pairs()
+        if pairs is None:
+            return None
+        total = hits = 0
+        for f in self.unit.get("files", []):
+            if not os.path.isfile(openable(f)):
+                continue
+            artist = tag_of(f, "artist")
+            title = tag_of(f, "title")
+            if not artist or not title:
+                continue
+            total += 1
+            if (norm_name(artist), norm_name(title)) in pairs:
+                hits += 1
+        min_tracks = int(
+            musik_config().get("va_redundant_min_tracks", 5)
+        )
+        if total < min_tracks:
+            return None
+        threshold = float(
+            musik_config().get("va_redundant_threshold", 0.6)
+        )
+        return hits / total >= threshold, hits, total
+
+    def _va_ignored_record(self, verdict: tuple[bool, int, int],
+                           guessed: dict | None) -> dict:
+        from .paths import musik_config
+
+        threshold = float(
+            musik_config().get("va_redundant_threshold", 0.6)
+        )
+        _, hits, total = verdict
+        return {
+            "status": "ignored",
+            "reason": (
+                f"VA compilation redundant: {hits}/{total} tracks already "
+                f"in the library (threshold {threshold:.0%}) — files "
+                "archived to _trash (Story 10.5)"
+            ),
+            "candidates": [],
+            "guessed": guessed or {},
+        }
+
+    def _va_survivor_record(self, verdict: tuple[bool, int, int],
+                            guessed: dict | None) -> dict | None:
+        """Story 10.6: a compilation that is NOT redundant carries mostly
+        new music — import it as a clean Various-Artists album on its own
+        metadata instead of parking it in review. Only when every file's
+        identity is resolvable (tags, or a filename that fills the gaps)."""
+        from .asis import plan_va_normalize
+
+        plan = plan_va_normalize(list(self.unit.get("files") or []))
+        if plan is None:
+            return None
+        _, hits, total = verdict
+        return {
+            "status": "asis",
+            "reason": (
+                f"VA compilation, own metadata authoritative "
+                f"({hits}/{total} tracks already in library) — imported "
+                "as Various Artists (Story 10.6)"
+            ),
+            "candidates": [],
+            "guessed": guessed or {},
+            "normalize_va": plan,
+        }
+
     # -- album decisions ----------------------------------------------------
 
     def decide_album(self, task) -> tuple[str, dict]:
@@ -510,6 +612,14 @@ class Decider:
         if not candidates:
             status, reason = self._classify_empty()
             if status == "unmatched":
+                if self._va_like():
+                    verdict = self._va_redundancy()
+                    if verdict is not None:
+                        if verdict[0]:
+                            return "skip", self._va_ignored_record(verdict, guessed)
+                        rec = self._va_survivor_record(verdict, guessed)
+                        if rec is not None:
+                            return "apply-asis", rec
                 tier3 = self._tier3_check()
                 if tier3 is not None:
                     return "apply-asis", tier3
@@ -521,6 +631,15 @@ class Decider:
         for cand in candidates[: self.CANDIDATE_SCAN]:
             if self._passes_all(task, cand):
                 return "apply", self._apply_record(cand, "auto", "", guessed)
+
+        # VA redundancy guard (Story 10.5): no candidate passed — before
+        # any own-tags fallback, a compilation that is largely already in
+        # the library is archived instead of imported. User decisions
+        # (forced ids, overrides) are handled above and never get here.
+        if self._va_like():
+            verdict = self._va_redundancy()
+            if verdict is not None and verdict[0]:
+                return "skip", self._va_ignored_record(verdict, guessed)
 
         best = candidates[0]
         dist = float(best.distance)
@@ -561,6 +680,16 @@ class Decider:
                     "(artist/title level) — imported as-is by user rule"
                 )
                 return "apply-asis", tier3
+        # VA survivor (Story 10.6): not redundant, but every own-tags
+        # fallback above declined (typically: junk folder name vetoed the
+        # tier-3 folder corroboration). If the files still carry a
+        # resolvable identity, import as a clean Various-Artists album.
+        if self._va_like():
+            verdict = self._va_redundancy()
+            if verdict is not None:
+                rec = self._va_survivor_record(verdict, guessed)
+                if rec is not None:
+                    return "apply-asis", rec
         return "skip", {
             "status": "review",
             "reason": "below auto-accept confidence: " + "; ".join(reasons),
@@ -717,6 +846,18 @@ class MusikSession(ImportSession):
         self.results.append(record)
         if action == "apply-asis":
             # Tier-3 own-metadata decision: import with current tags.
+            # Story 10.6: VA survivors get their in-memory items
+            # normalized first (albumartist=Various Artists, gaps filled
+            # from filenames); beets writes the tags onto the copies.
+            if record.get("normalize_va"):
+                from .asis import apply_va_plan
+
+                n = apply_va_plan(task, record["normalize_va"])
+                if n:
+                    record["reason"] += (
+                        f"; normalized {n} tag field(s) "
+                        "(albumartist/filename fills)"
+                    )
             return Action.ASIS
         if action == "apply":
             match = self._match_for(task, record)

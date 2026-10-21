@@ -872,6 +872,40 @@ Ingest-Kette; alle 7 Wrapper-Endpunkte in musik/musicgrabber.py sind in
     seit ≥144fecf (nicht durch 10.x), Test-Harness-Problem, kein
     Produktionscode. Entweder Harness fixen (dict-Kopie testen) oder
     als Umgebungabhängig markieren.
+- [ ] 10.5 [ready-for-agent] VA-Kompilations-Redundanzguard: Album-Units
+  mit va_like-Identität, die den Auto-Accept nicht schaffen, gegen die
+  beets-Bibliothek prüfen (normalisiertes Artist+Title-Set); Überlappung
+  ≥ Schwelle (`musik: va_redundant_threshold`, Default 0.6; min_tracks
+  5) → Status `ignored` mit dokumentiertem Grund + Audio-Dateien ins
+  `_trash` (Kind `va-redundant`), damit die Dropzone selbstreinigend
+  bleibt. Auslöser 2026-10-21: windows-Alt-Kollektion kippt Dutzende
+  „Essential Albums"-Kompis ins Review; Nutzer bewilligte automatische
+  Ablehnung echter Redundanz (z. B. Lynyrd-Skynyrd-Essential 62 % in
+  der Bibliothek), lehnte Einmal-Durchlauf ab (weitere Kompis kommen).
+  Kein Fire ohne Bibliothekszugriff (Dry-Run bleibt beobachtend).
+  **Implementiert 2026-10-21:** Guard vor den tier3-Fallbacks in
+  `decide_album` (auch im Empty-Candidates-Zweig), Archivieren der
+  Dateien in `run_unit_real` bei Status `ignored`; `build_decider(lib=)`
+  überall durchgereicht (dry-run ohne lib → Guard hält sich heraus);
+  smoke_va_guard 8/8 grün. Pi-Echtlauf + Abnahme offen.
+- [ ] 10.6 [ready-for-agent] VA-Survivor-Import: Kompis, die den Guard
+  überleben (überwiegend NEUE Musik — 26/27 windows-Units haben 0 %
+  Überlappung), ohne Review importieren: pro Track sind die eigenen
+  Tags autoritativ (Datenbefund: Tags korrekt, wo der DATEINAME den
+  Fehler hat — „Yargbourgh" vs. Tag „Yarbrough"); fehlende
+  Artist/Title-Tags aus dem Dateinamen füllen (Konvention
+  „NN. Artist - Title.ext"), albumartist=Various Artists setzen, dann
+  As-is-Import als sauberes VA-Album. Voraussetzung je Datei: Tags ODER
+  parsebarer Dateiname, sonst bleibt das Unit im Review. Nur
+  Album-Units (va_like), Singleton/Fetch-Pfade unberührt.
+  **Implementiert 2026-10-21:** `scan.parse_track_filename` (beide
+  Orientierungen, Tracknummern-Präfixe) + `asis.plan_va_normalize`
+  (Tags autoritativ, Orientierung per Mehrheitsvote, AA-Bedarf) +
+  `asis.apply_va_plan` (mutiert In-Memory-Items, beets schreibt beim
+  Import) + Survivor-Zweig in `decide_album` NACH den tier3-Versuchen
+  (gute MB-Matches und tier3 gewinnen weiterhin); apply via
+  `choose_match`-Hook; smoke_va_guard 8/8 grün. Pi-Echtlauf + Abnahme
+  offen.
 
 ## Beim Nutzer anfragen (bei nächster Gelegenheit)
 

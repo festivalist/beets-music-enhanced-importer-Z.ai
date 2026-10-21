@@ -426,7 +426,22 @@ unit wins:
    beneficiaries: 0-day/scene WEB releases MusicBrainz hasn't indexed yet,
    and DJ mixes/live sets that never will be. Units imported this way are
    marked `asis` and can be re-tagged once MusicBrainz catches up;
-4. **review queue** — everything else: contradictory tags/folder names,
+4. **VA compilation guard** — album units whose files carry no meaningful
+   release credit (no albumartist, several distinct track artists) are
+   checked against the live library once no MusicBrainz candidate passed:
+   a compilation whose (normalized artist+title) tracks are already
+   largely in the library (≥ `va_redundant_threshold`, default 60 %, at
+   least `va_redundant_min_tracks` = 5 tagged files) is archived to
+   `_trash\va-redundant\` and marked `ignored` — importing it would only
+   add duplicates. A mostly-*unique* compilation instead imports on its
+   own tags as a clean **Various Artists** album: the per-track tags are
+   authoritative, gaps are filled from the filename
+   (`NN. Part A - Part B.ext`, orientation majority-voted per unit), and
+   `albumartist=Various Artists` is set. Only when a file's identity is
+   neither tagged nor filename-parseable does the unit fall through to
+   review. The guard never fires in dry runs or after a network failure;
+   forced review decisions (accept/override) always win.
+5. **review queue** — everything else: contradictory tags/folder names,
    middle-band candidates (distance 0.25–0.35, where MusicBrainz might
    still know the release), untagged files.
 

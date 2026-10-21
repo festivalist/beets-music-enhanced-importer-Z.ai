@@ -106,6 +106,13 @@ musik:
     retry_rounds: 2
     retry_cooldown_seconds: 20
 
+    # --- VA-Kompilations-Guard (Stories 10.5/10.6) ---
+    # va_like-Units ohne MB-Pass: >=60% Bibliotheks-Ueberlappung ->
+    # ignored + _trash; darunter -> Import als Various-Artists-Album
+    # (Tags autoritativ, Luecken aus dem Dateinamen).
+    # va_redundant_threshold: 0.6
+    # va_redundant_min_tracks: 5
+
     # --- remote-download pipeline (`musik fetch` / `musik bot`) ---
     # Downloads land under <library>/_incoming/ before import.
     # Telegram bot: token lives in {telegram_tokenfile}

@@ -126,7 +126,8 @@ def preflight() -> dict:
     return out
 
 
-def build_decider(unit: dict | None = None, forced: dict | None = None) -> Decider:
+def build_decider(unit: dict | None = None, forced: dict | None = None,
+                  lib=None) -> Decider:
     cfg = musik_config()
     forced = forced or {}
     return Decider(
@@ -138,6 +139,7 @@ def build_decider(unit: dict | None = None, forced: dict | None = None) -> Decid
         override_artist=forced.get("artist"),
         override_album=forced.get("album"),
         unit=unit,
+        lib=lib,
     )
 
 
@@ -218,6 +220,21 @@ def run_unit_real(lib, unit: dict, decider: Decider) -> dict:
     outcome = {"status": status, "reason": reason, "results": session.results}
     if session.extra_files:
         outcome["unmapped_files"] = list(session.extra_files)
+
+    # A guard-ignored unit (e.g. VA compilation redundant, Story 10.5)
+    # never imports; archive its audio so the dropzone self-cleans and
+    # cleanup can remove the folder.
+    if status == "ignored":
+        present = [
+            os.fsdecode(f) for f in (unit.get("files") or [])
+            if os.path.isfile(os.fsdecode(f))
+        ]
+        if present:
+            trash_mod.trash_files(
+                present, "va-redundant",
+                f"VA compilation redundant ({unit['path']})",
+            )
+            trash_mod.prune_empty_dirs(present, unit["import_path"])
     return outcome
 
 
@@ -481,7 +498,7 @@ def cmd_import(dry_run: bool = False, statuses: list[str] | None = None,
         if unit.get("status") in ("auto", "duplicate", "ignored"):
             continue
         netrec.clear()
-        decider = build_decider(unit)
+        decider = build_decider(unit, lib=lib)
         label = _unit_label(unit)
         try:
             if dry_run:
@@ -547,7 +564,7 @@ def cmd_import(dry_run: bool = False, statuses: list[str] | None = None,
             time.sleep(cooldown)
             for unit in pending:
                 netrec.clear()
-                decider = build_decider(unit)
+                decider = build_decider(unit, lib=lib)
                 try:
                     outcome = run_unit_real(lib, unit, decider)
                     _merge_result(unit, outcome)

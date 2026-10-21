@@ -108,6 +108,36 @@ def tag_of(path: str, field: str) -> str:
         return ""
 
 
+def norm_name(value: str) -> str:
+    """Normalize an artist/title for identity comparison: lowercase,
+    parenthesized qualifiers dropped, punctuation collapsed to spaces."""
+    value = (value or "").lower()
+    value = re.sub(r"\(.*?\)|\[.*?\]", " ", value)
+    value = re.sub(r"[^a-z0-9]+", " ", value)
+    return " ".join(value.split())
+
+
+_TRACKNUM_PREFIX_RE = re.compile(r"^\s*\d{1,3}[\s.\-_]+\s*")
+
+
+def parse_track_filename(path: str) -> tuple[str, str] | None:
+    """Split 'NN. Part A - Part B.ext' into its two name parts.
+
+    Track dumps use both 'Artist - Title' and 'Title - Artist'; the
+    orientation is decided per unit (majority vote against the tags,
+    see asis.plan_va_normalize), not here. None when the name carries
+    no ' - ' separator or one side is empty."""
+    stem = os.path.splitext(os.path.basename(path))[0].replace("_", " ")
+    stem = _TRACKNUM_PREFIX_RE.sub("", stem).strip()
+    if " - " not in stem:
+        return None
+    a, b = stem.split(" - ", 1)
+    a, b = a.strip(" .-_"), b.strip(" .-_")
+    if not a or not b:
+        return None
+    return a, b
+
+
 def artist_values(files: list[str]) -> list[str]:
     """Per-file albumartist tags (falling back to artist), lowercased."""
     out = []

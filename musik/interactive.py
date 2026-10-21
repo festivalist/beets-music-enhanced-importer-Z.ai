@@ -69,7 +69,7 @@ def _run_forced(lib, unit: dict, forced: dict) -> str:
     from . import state as state_mod
 
     engine.netrec.clear()
-    decider = engine.build_decider(unit, forced=forced)
+    decider = engine.build_decider(unit, forced=forced, lib=lib)
     try:
         outcome = engine.run_unit_real(lib, unit, decider)
     except Exception as exc:

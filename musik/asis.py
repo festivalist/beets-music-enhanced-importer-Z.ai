@@ -80,6 +80,88 @@ def tags_complete(unit: dict) -> tuple[bool, str]:
     return True, ""
 
 
+# --- VA-Survivor-Normalisierung (Story 10.6) -----------------------------
+
+def plan_va_normalize(files: list) -> dict | None:
+    """Decide whether a va_like album unit can import as a clean
+    Various-Artists album on its own metadata (Story 10.6), and how.
+
+    The files' own tags are authoritative — the live windows drop even
+    carries CORRECT tags where the filename has the typo. A filename
+    ('NN. Part A - Part B.ext') only FILLS missing artist/title tags;
+    its orientation (artist first vs. title first) is majority-voted
+    per unit against the fully tagged files.
+
+    Returns None (stay in review) when a file has neither complete tags
+    nor a filename that can fill its gaps. Otherwise:
+    {"fill": {path: (artist, title)}, "aa": bool} — "aa" says whether
+    albumartist needs the Various Artists normalization."""
+    from .scan import norm_name, openable, parse_track_filename, tag_of
+
+    entries = []
+    votes_artist = votes_title = 0
+    for f in files:
+        if not os.path.isfile(openable(f)):
+            return None
+        artist = tag_of(f, "artist")
+        title = tag_of(f, "title")
+        parsed = parse_track_filename(os.fsdecode(f))
+        if artist and title and parsed:
+            pa, pt = parsed
+            if (norm_name(pa) == norm_name(artist)
+                    and norm_name(pt) == norm_name(title)):
+                votes_artist += 1
+            elif (norm_name(pa) == norm_name(title)
+                    and norm_name(pt) == norm_name(artist)):
+                votes_title += 1
+        entries.append((f, artist, title, parsed))
+
+    orientation = None
+    if votes_artist or votes_title:
+        orientation = (
+            "artist_first" if votes_artist >= votes_title else "title_first"
+        )
+
+    fill: dict[str, tuple[str, str]] = {}
+    aa = 0
+    for f, artist, title, parsed in entries:
+        if not tag_of(f, "albumartist"):
+            aa += 1
+        if artist and title:
+            continue
+        if parsed is None or orientation is None:
+            return None
+        pa, pt = parsed
+        fa, ft = (
+            (pa, pt) if orientation == "artist_first" else (pt, pa)
+        )
+        fill[os.fsdecode(f)] = (
+            fa if not artist else "", ft if not title else ""
+        )
+    return {"fill": fill, "aa": aa > 0}
+
+
+def apply_va_plan(task, plan: dict) -> int:
+    """Mutate the task's in-memory items per plan_va_normalize; beets
+    writes the tags onto the imported copies (write: yes). Returns the
+    number of fields touched."""
+    touched = 0
+    fills = plan.get("fill") or {}
+    for item in task.imported_items():
+        path = os.fsdecode(item.path)
+        artist, title = fills.get(path, ("", ""))
+        if artist and not (item.artist or "").strip():
+            item.artist = artist
+            touched += 1
+        if title and not (item.title or "").strip():
+            item.title = title
+            touched += 1
+        if plan.get("aa") and not (item.albumartist or "").strip():
+            item.albumartist = "Various Artists"
+            touched += 1
+    return touched
+
+
 def enrich_from_meta_files(unit: dict) -> int:
     """Fill missing artist/title tags from the release's .nfo/.txt.
 

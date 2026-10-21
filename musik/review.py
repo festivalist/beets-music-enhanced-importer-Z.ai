@@ -235,7 +235,7 @@ def apply_decisions_rows(rows: list[dict]) -> tuple[int, list[str]]:
             beets_config["library"].as_filename(),
             beets_config["directory"].as_filename(),
         )
-        decider = engine.build_decider(unit, forced=forced)
+        decider = engine.build_decider(unit, forced=forced, lib=lib)
         engine.netrec.clear()
         try:
             outcome = engine.run_unit_real(lib, unit, decider)

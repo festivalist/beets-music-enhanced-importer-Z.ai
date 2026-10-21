@@ -268,3 +268,26 @@ test for §4.2. The tool must work for any mix of material, not just these.
 
 Plexamp project · Deezer plugin · scheduled re-scans · `retag --apply` (re-file as-is albums that gained a strong MusicBrainz match — needs a careful move-out/re-import/row-swap flow) · `musik similar` via a user-provided last.fm key as alternative data source · any web UI (→ Scope-Change 2026-10-19: der schlanke Import-Monitor ist
 jetzt in Scope, siehe §2) · Soulseek via slskd as further MusicGrabber source · active (applying, not report-only) lossless upgrades of existing stock.
+
+*Scope change 2026-10-21 (VA-Kompilations-Guard + Survivor-Import,
+Stories 10.5/10.6): Album-Units mit VA-Identität (kein Albumartist,
+mehrere Track-Artists), die keinen MusicBrainz-Kandidaten passieren,
+werden gegen die live-Bibliothek geprüft (normalisiertes
+Artist+Title-Set): ≥ `va_redundant_threshold` (60 %, mind. 5 getaggte
+Dateien) → Unit `ignored`, Audio geht mit Manifest ins `_trash` (Kind
+`va-redundant`) — automatische Ablehnung echter Redundanz statt
+Review-Interaktion (Beschluss des Owners 2026-10-21 nach dem
+windows-„Essential Albums"-Stau; Einmal-Durchläufe bewusst abgelehnt,
+weil weitere Kompilations-Drops erwartet werden). Überlebende
+Kompilationen (Datenbefund: 26/27 windows-Units haben 0 %
+Bibliotheks-Überlappung — sie sind neue Musik, kein Müll) importieren
+ohne Review als sauberes Various-Artists-Album: Track-Tags bleiben
+autoritativ (nachgewiesen korrekt, wo der Dateiname den Fehler hat),
+fehlende Artist/Title-Tags werden aus dem Dateinamen gefüllt
+(`NN. Teil A - Teil B`, Orientierung per Mehrheitsvote gegen die Tags),
+albumartist=Various Artists. Nur wenn eine Datei weder Tags noch
+parsebaren Dateinamen hat, bleibt das Unit im Review. Guard feuert nie
+in Dry-Runs oder nach Netzwerkfehlern; erzwungene Review-Entscheidungen
+gewinnen immer. Akzeptiertes Restrisiko: Cross-Album-Dubletten unterhalb
+der Schwelle werden nicht erkannt (bekannte beets-Grenze,
+Fingerprint-Dedupe bleibt Werkzeug der Wahl).*
