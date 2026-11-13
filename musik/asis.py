@@ -58,6 +58,75 @@ def artist_present(value: str) -> bool:
     return (value or "").strip().lower() not in _UNKNOWN_ARTISTS
 
 
+def va_like_unit(unit: dict) -> bool:
+    """True for album units whose file tags carry no meaningful release
+    credit: no/blank albumartist with several distinct track artists, or
+    an albumartist that already says "various" (VA compilations, DJ-mixed
+    albums), or a series/junk credit matching none of the >=3 real track
+    artists ("Essential Albums" stamped onto a 20-artist compilation).
+    On these the artist-vs-credit comparison is meaningless — the track
+    artists belong to individual tracks, not to the release.
+    (Single source of truth: session.Decider._va_like delegates here.)"""
+    u = unit or {}
+    hints = u.get("hints") or []
+    if "multi-artist-dir" in hints or "va-album" in hints:
+        return True
+    from .scan import openable, tag_of
+
+    first = next(
+        (f for f in u.get("files", []) if os.path.isfile(openable(f))), None
+    )
+    aa = tag_of(first, "albumartist") if first else ""
+    if aa and aa.strip().lower() in (
+        "various artists", "various", "va", "v.a.",
+    ):
+        return True
+    seen = u.get("artists_seen") or []
+    if len(seen) < 3:
+        return False
+    if not aa:
+        return True
+    return aa.strip().lower() not in seen
+
+
+def plan_artist_fill(unit: dict) -> dict | None:
+    """Story 11.5: streaming-catalog sources (live case 2026-11-13:
+    jiosaavn) can write a valid ALBUMARTIST while the per-track ARTIST
+    tag is junk ("Unknown"). tags_complete's identity check takes
+    `albumartist OR artist`, so the unit passes — and the junk artist
+    used to land in the DB. For NON-VA units the albumartist IS the
+    identity: return {"fill": {path: aa}} for every file whose artist
+    tag is junk while the albumartist is valid. VA-like units return
+    None — their per-track artists are legitimately messy and Story
+    10.6 owns that path."""
+    if va_like_unit(unit):
+        return None
+    from .scan import tag_of
+
+    fills: dict[str, str] = {}
+    for f in unit.get("files") or []:
+        if artist_present(tag_of(f, "artist")):
+            continue
+        aa = tag_of(f, "albumartist")
+        if artist_present(aa):
+            fills[f] = aa.strip()
+    return {"fill": fills} if fills else None
+
+
+def apply_artist_fill(task, plan: dict) -> int:
+    """Mutate the task's in-memory items per plan_artist_fill; beets
+    writes the tags onto the imported copies (write: yes). Mirrors
+    apply_va_plan. Returns the number of fields touched."""
+    touched = 0
+    fills = plan.get("fill") or {}
+    for item in task.imported_items():
+        aa = fills.get(os.fsdecode(item.path))
+        if aa and not artist_present(item.artist or ""):
+            item.artist = aa
+            touched += 1
+    return touched
+
+
 def tags_complete(unit: dict) -> tuple[bool, str]:
     """Every file needs artist/album/title; album must be consistent.
 

@@ -273,35 +273,12 @@ class Decider:
 
     def _va_like(self) -> bool:
         """True for album units whose file tags carry no meaningful
-        release credit: no/blank albumartist with several distinct track
-        artists, or an albumartist that already says "various" (VA
-        compilations, DJ-mixed albums). On these the artist-vs-credit
-        comparison is meaningless — the track artists belong to
-        individual tracks, not to the release."""
-        u = self.unit or {}
-        hints = u.get("hints") or []
-        if "multi-artist-dir" in hints or "va-album" in hints:
-            return True
-        from .scan import openable, tag_of
+        release credit (VA compilations, DJ-mixed albums, series/junk
+        credits). Single source of truth: asis.va_like_unit (Story
+        11.5 — plan_artist_fill needs the same verdict)."""
+        from .asis import va_like_unit
 
-        first = next(
-            (f for f in u.get("files", []) if os.path.isfile(openable(f))), None
-        )
-        aa = tag_of(first, "albumartist") if first else ""
-        if aa and aa.strip().lower() in (
-            "various artists", "various", "va", "v.a.",
-        ):
-            return True
-        seen = u.get("artists_seen") or []
-        if len(seen) < 3:
-            return False
-        if not aa:
-            return True
-        # Series/junk albumartist that matches none of the >=3 real
-        # track artists ("Essential Albums" stamped onto a 20-artist
-        # compilation): the release credit is meaningless — it is a
-        # compilation for every practical purpose.
-        return aa.strip().lower() not in seen
+        return va_like_unit(self.unit or {})
 
     # Album-title looseness for va_like units: the tags often carry the
     # full retail title ("…Volume 1 Compiled By X (catalog#)") while the
@@ -472,11 +449,16 @@ class Decider:
             )
         else:
             reason = "own metadata: no suitable MusicBrainz/Discogs match; tags complete"
+        from .asis import plan_artist_fill
+
         return {
             "status": "asis",
             "reason": reason,
             "candidates": [],
             "guessed": g,
+            # Story 11.5: jiosaavn-class AA-valid/artist-junk files would
+            # import artist=Unknown; the plan repairs that on apply.
+            "fill_artist": plan_artist_fill(self.unit),
         }
 
     # -- VA redundancy guard (Story 10.5) -----------------------------------
@@ -1003,6 +985,16 @@ class MusikSession(ImportSession):
                         f"; normalized {n} tag field(s) "
                         "(albumartist/filename fills)"
                     )
+            # Story 11.5: AA-valid/artist-junk files get artist := AA so
+            # the junk never reaches the DB (non-VA units only).
+            if record.get("fill_artist"):
+                from .asis import apply_artist_fill
+
+                n = apply_artist_fill(task, record["fill_artist"])
+                if n:
+                    record["reason"] += (
+                        f"; artist filled from albumartist on {n} item(s)"
+                    )
             return Action.ASIS
         if action == "apply":
             match = self._match_for(task, record)
@@ -1025,6 +1017,16 @@ class MusikSession(ImportSession):
         record["paths"] = [os.fsdecode(p) for p in task.paths]
         self.results.append(record)
         if action == "apply-asis":
+            # Story 11.5: singletons take the same AA-valid/artist-junk
+            # repair as album units — the live case was a singleton.
+            if record.get("fill_artist"):
+                from .asis import apply_artist_fill
+
+                n = apply_artist_fill(task, record["fill_artist"])
+                if n:
+                    record["reason"] += (
+                        f"; artist filled from albumartist on {n} item(s)"
+                    )
             return Action.ASIS
         if action == "apply":
             match = self._match_for(task, record)
