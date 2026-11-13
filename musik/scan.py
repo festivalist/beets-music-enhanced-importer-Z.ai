@@ -14,6 +14,7 @@ by the autotagger. Nothing is moved during a scan.
 
 import os
 import re
+import time
 from collections import Counter
 
 import mutagen
@@ -528,6 +529,51 @@ def collect_audio_tree(d: str) -> list[str]:
     return sorted(out)
 
 
+_DECISION_FIELDS = ("decision_kind", "decision_type", "file_results",
+                    "chosen", "candidates", "guessed", "unmapped_files")
+
+
+def merge_unit(existing: dict, key: str, u: dict) -> str:
+    """Merge a freshly classified unit into the state (Story 11.4).
+
+    A decision belongs to the file set the scan saw at decision time —
+    not to the folder forever. When the file set of an already-decided
+    unit changes (re-download into a decided folder; live case
+    2026-11-13: a fresh single landed in an `ignored` unit and could
+    never be decided), the unit re-opens as `pending` so the decider
+    decides the NEW set. An unchanged file set keeps everything the
+    engine learned. Returns "kept" | "reopened" | "added".
+    """
+    if key not in existing:
+        existing[key] = u
+        return "added"
+    old = existing[key]
+    old_files = {os.path.normcase(f) for f in old.get("files") or []}
+    new_files = {os.path.normcase(f) for f in u.get("files") or []}
+    changed = old_files != new_files
+    # Refresh scan facts, keep everything the engine learned.
+    for k in ("files", "n_files", "total_duration", "hints",
+              "artists_seen", "import_path", "kind", "source",
+              "singleton", "split_into_singletons", "year_guess",
+              "guessed", "unreadable_files", "meta_files"):
+        if k in u:
+            old[k] = u[k]
+    # A newly-detected dead unit (e.g. cue-only rip) that never
+    # went through an import gets retired.
+    if u.get("status") == "ignored" and old.get("status") == "pending":
+        old["status"] = "ignored"
+        old["reason"] = u.get("reason", "")
+    if changed and old.get("status") not in (None, "pending"):
+        old["status"] = "pending"
+        old["reason"] = "re-opened: unit file set changed since decision"
+        old["updated"] = time.time()
+        for k in _DECISION_FIELDS:
+            old.pop(k, None)
+        return "reopened"
+    old.setdefault("status", "pending")
+    return "kept"
+
+
 def cmd_scan(root: str) -> int:
     from . import report as report_mod
 
@@ -583,27 +629,15 @@ def cmd_scan(root: str) -> int:
             u["reason"] = "retired: source files no longer exist"
             retired += 1
 
-    kept, added = 0, 0
+    kept, added, reopened = 0, 0, 0
     for u in new_units:
         key = os.path.normcase(os.path.normpath(u["path"]))
-        if key in existing:
-            old = existing[key]
-            # Refresh scan facts, keep everything the engine learned.
-            for k in ("files", "n_files", "total_duration", "hints",
-                      "artists_seen", "import_path", "kind", "source",
-                      "singleton", "split_into_singletons", "year_guess",
-                      "guessed", "unreadable_files", "meta_files"):
-                if k in u:
-                    old[k] = u[k]
-            # A newly-detected dead unit (e.g. cue-only rip) that never
-            # went through an import gets retired.
-            if u.get("status") == "ignored" and old.get("status") == "pending":
-                old["status"] = "ignored"
-                old["reason"] = u.get("reason", "")
-            old.setdefault("status", "pending")
+        outcome = merge_unit(existing, key, u)
+        if outcome == "kept":
             kept += 1
+        elif outcome == "reopened":
+            reopened += 1
         else:
-            existing[key] = u
             added += 1
 
     st.setdefault("meta", {})["last_scan"] = {
@@ -616,6 +650,7 @@ def cmd_scan(root: str) -> int:
     report_mod.write_scan_report(st, notes)
     c = state_mod.counts(st)
     print(f"scan: {added} new units, {kept} known, {removed} stale removed"
+          + (f", {reopened} re-opened (file set changed)" if reopened else "")
           + (f", {retired} gone-file unit(s) retired to ignored" if retired else "")
           + f" (root: {root})")
     print("unit status counts:", ", ".join(f"{k}={v}" for k, v in sorted(c.items())))
