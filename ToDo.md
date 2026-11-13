@@ -1130,7 +1130,7 @@ als eigene Story.
   („2.14 echt: Source.from_items OK"). Alle 18 lokalen Smokes grün;
   smoke_ingest_roots bleibt lokal grün (der 10.4-Quirk ist Pi-spezifisch,
   Story bleibt wontfix-Kandidat). requirements >=2.14.
-- [ ] 11.4 [ready-for-agent] Re-Decision bei Unit-Datei-Änderung: Neue
+- [x] 11.4 [ready-for-agent] Re-Decision bei Unit-Datei-Änderung: Neue
   Dateien in einer bereits ENTSCHEIDENEN Unit erben deren Status — im
   11.2-Echtlauf (2026-11-13) landete der frische Chaise-Longue-Download
   in `Singles/Unknown` (Unit seit 08.11. `ignored` via Review wegen
@@ -1144,6 +1144,21 @@ als eigene Story.
   DAMALS gefundene Datei-Set, nicht für den Ordner für alle Zeit).
   Testmatrix: ignored-Unit + neue Datei → pending; duplicate-Unit +
   bessere Datei → pending; auto-Unit unverändert → bleibt.
+  **ERLEDIGT 2026-11-13 (57987a8, Pi live):** `scan.merge_unit()` —
+  File-Set-Vergleich (normcase) VOR dem Facts-Refresh; Abweichung bei
+  entschiedenem Status → `pending` + reason „re-opened: unit file set
+  changed since decision" + Entscheidungs-Felder (decision_kind/type,
+  file_results, chosen/candidates/guessed, unmapped_files) geräumt.
+  Unverändertes Set = Entscheidung bleibt (ignored/review stabil).
+  cmd_scan-Journal erweitert: „N re-opened (file set changed)".
+  smoke_scan_reopen 6 Cases (unchanged-kept, added-reopens, removed-
+  reopens, pending-refresh, review-kept, added-pending) Win+Pi grün.
+  **Live-Beweis beidseitig:** (1) Kopie der importierten Wet-Leg-Datei
+  in die ignored-Unit → nächster Ingest re-opened → Decider lief NEU
+  an (`[1/1] review Unknown … artist mismatch 'Unknown' vs 'Wet Leg'`);
+  (2) nach Wiederherstellung des 08.11.-Zustands (Test-Artefakt
+  zurückgerollt, Backup state.json.bak-1133) → „1 known", KEIN re-open,
+  Baseline counts wiederhergestellt.
 - [ ] 11.5 [ready-for-agent] tags_complete-Lücke: `albumartist OR artist`
   lässt AA-gültig/Artist-junk durch — im 11.2-Echtlauf importierte
   jiosaavn-Datei (albumartist='Wet Leg' ✓, artist='Unknown' ✗, Titel ✓)
