@@ -87,3 +87,34 @@ def queue_stats() -> dict:
             j for j in reversed(jobs) if j["status"] in ("done", "error")
         ][:5],
     }
+
+
+def recover_interrupted() -> tuple[list[dict], list[dict]]:
+    """Boot-time repair for the in-memory worker queue (Story 11.6).
+
+    The queue lives only in memory, so after a restart every 'running'
+    record is a zombie (its thread died with the process — live case:
+    job e3eba9be sat 12.8 days on 'running' after a manual restart) and
+    every 'queued' record would be silently dropped. Mark the zombies as
+    error with an honest summary and return (killed, requeued) so the
+    caller can notify the affected chats and re-enqueue the queued jobs
+    in file order.
+    """
+    killed: list[dict] = []
+    requeued: list[dict] = []
+    with _lock:
+        jobs = load_jobs()
+        changed = False
+        for job in jobs:
+            if job["status"] == "running":
+                job["status"] = "error"
+                job["finished"] = time.time()
+                job["summary"] = ("Bot-Neustart hat den Job unterbrochen "
+                                  "— Link erneut schicken.")
+                killed.append(job)
+                changed = True
+            elif job["status"] == "queued":
+                requeued.append(job)
+        if changed:
+            _save(jobs)
+    return killed, requeued

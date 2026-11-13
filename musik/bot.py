@@ -720,8 +720,23 @@ async def _worker(app) -> None:
             queue.task_done()
 
 
+def _restart_notice(texts: list[str]) -> str:
+    """Build the chat message for jobs killed by a restart (Story 11.6)."""
+    shown = "\n".join(f"• {t[:80]}" for t in texts[:5])
+    more = f"\n… +{len(texts) - 5} weitere" if len(texts) > 5 else ""
+    return (f"⚠️ Der Bot wurde neu gestartet — {len(texts)} Job(s) wurden "
+            f"unterbrochen. Bitte erneut schicken:\n{shown}{more}")
+
+
 async def _post_init(app) -> None:
-    app.bot_data["queue"] = asyncio.Queue()
+    queue: asyncio.Queue = asyncio.Queue()
+    app.bot_data["queue"] = queue
+    # Story 11.6: the queue is memory-only — repair the store BEFORE the
+    # worker starts, so zombies don't haunt the monitor and queued jobs
+    # survive the restart instead of vanishing silently.
+    killed, requeued = jobs_mod.recover_interrupted()
+    for job in requeued:
+        queue.put_nowait(job)
     app.create_task(_worker(app))
     http_cfg = musik_config().get("bot_http") or {}
     if http_cfg.get("enabled", True):
@@ -734,6 +749,21 @@ async def _post_init(app) -> None:
                                              bot_http.DEFAULT_PORT)))
     me = await app.bot.get_me()
     print(f"bot: listening as @{me.username} (long polling, Ctrl+C to stop)")
+    if killed:
+        texts = [j.get("text", "") for j in killed if j.get("chat_id")]
+        print(f"bot: restart killed {len(killed)} job(s) "
+              f"(re-enqueued {len(requeued)} queued)")
+        by_chat: dict[int, list[str]] = {}
+        for job in killed:
+            chat = job.get("chat_id")
+            if chat:
+                by_chat.setdefault(chat, []).append(job.get("text", ""))
+        for chat, chat_texts in by_chat.items():
+            try:
+                await app.bot.send_message(chat_id=chat,
+                                           text=_restart_notice(chat_texts))
+            except Exception as e:
+                print(f"bot: restart-notify failed for chat {chat}: {e}")
 
 
 # --------------------------------------------------------------------------
