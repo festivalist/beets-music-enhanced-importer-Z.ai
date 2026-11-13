@@ -1161,7 +1161,7 @@ als eigene Story.
   Auto-Fill). (b) Datenfix-Backlog: /mnt/music/Singles/Unknown/ hält
   ~5 Legacy-Singletons mit Junk-Artist („0000 - Ain't No Rest for the
   Wicked" = Cage the Elephant usw.) — explizite Tabelle wie 10.8.
-- [ ] 11.6 [ready-for-agent] Bot-Job-Watchdog: Job e3eba9be (somedl-
+- [x] 11.6 [ready-for-agent] Bot-Job-Watchdog: Job e3eba9be (somedl-
   Playlist-Pfad) hing 12,8 Tage auf „running" ohne Kindprozess und ohne
   Timeout — der Serial-Worker (asyncio.Queue, in-memory) blockiert
   dadurch ALLE neuen Links (queued-Jobs laufen nie; in-memory-Queue
@@ -1172,6 +1172,21 @@ als eigene Story.
   „running"-Jobs aus bot-jobs.json beim Boot auf error setzen (Zombie-
   Aufräumung, da Queue in-memory); (d) queued-Jobs beim Boot restaurieren
   oder Nutzer informieren. Getroffen 2026-11-13 im 11.1-Rollout.
+  **ERLEDIGT 2026-11-13 (53f6f7c, Pi live):** Ursachenanalyse verschärft —
+  e3eba9be hing NICHT im Code: der Bot wurde 31.10. 16:13 MANUELL neu
+  gestartet, mitten im Download (Journal: „starte long polling" 16:13:26,
+  2 min nach dem Running-Stamp); die in-memory Queue starb, der Record
+  blieb als Zombie stehen. (a) existierte bereits (DOWNLOAD_TIMEOUT 3600 s
+  + kill_tree via fetch._run_logged); (b) bewusst NICHT gebaut — ein
+  Watchdog ohne Kill-Möglichkeit wäre Split-Brain-Schreiberei
+  (musik-dev-prinzipien: kein Pseudo-Guard); (c)+(d) neu:
+  `jobs.recover_interrupted()` — Boot-Cleanup VOR Worker-Start
+  (running → error mit ehrlichem Summary), queued-Jobs werden in
+  Datei-Reihenfolge re-enqueued (bisher silently lost) und die betroffenen
+  Chats bekommen `_restart_notice`-Nachricht (max 5 Texte + „+N weitere").
+  smoke_job_watchdog (3 Cases) Win+Pi grün; Live-Beweis: gepflanzter
+  running-Record + Neustart → Journal „restart killed 1 job(s)
+  (re-enqueued 0 queued)", Record → error, Testrecord wieder entfernt.
 
 ## Beim Nutzer anfragen (bei nächster Gelegenheit)
 
