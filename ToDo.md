@@ -1053,7 +1053,21 @@ als eigene Story.
   (installers kopieren Deno). Fehlende Testlinks beim Nutzer erfragen
   (musik-testdaten). Rollout: Pi → Echtlauf → requirements.txt
   same-commit → Win.
-- [ ] 11.2 [ready-for-agent] MG-Flip 4.4.0 → 4.5.3 mit Overlay-Revendor
+  **ERLEDIGT 2026-11-13 (e59fc26 + Pi-Rollout):** Pi-venv
+  (spotdl 4.6.0 → zieht yt-dlp 2026.10.26, yt-dlp-ejs 0.8.0 bleibt) +
+  Win-.venv gleich — ACHTUNG: das echte Win-Env ist `<repo>/.venv`
+  (musik.bat), der System-Python 3.14.7 war ein Nebenschauplatz.
+  Pi-Smokes alle grün (beetscompat inkl. Sektion 3, va_guard, decider,
+  tier3, playlists, ingest_dotdirs). Funktionstest Pi: somedl
+  „Chemical Brothers – Galvanize" opus in 15 s ✓, spotdl 4.6.0 „Massive
+  Attack – Teardrop" ✓ (CLI-Syntax 4.6: `spotdl download Q --output
+  tpl`, kein --download-directory mehr). Bot-Restart gesund (running 0).
+  Rest (beim nächsten echten Bot-Link): Nutzer-Echtlauf über Telegram
+  als Abnahme. **Nebenbefund (eigene Story 11.6):** Bot-Job e3eba9be
+  hing seit 12,8 Tagen auf „running" (somedl-Playlist-Pfad, kein
+  Kindprozess, kein Timeout) — Worker-Warteschlange (asyncio.Queue,
+  nur Speicher) stand still; Record per Hand auf error gesetzt.
+- [x] 11.2 [ready-for-agent] MG-Flip 4.4.0 → 4.5.3 mit Overlay-Revendor
   (Branch, Pi-Flip erst nach Testmatrix — 10.1/10.2-Prozedur)
   Overlay-Sensitivität (KERN): unsere 16 statischen Dateien sind gegen
   v4.4.0 byte-exakt; **4.4.1 hat app.js (13.676 Zeilen) in 12 Dateien
@@ -1075,7 +1089,30 @@ als eigene Story.
   Kompilation-Verbesserungen + zip-CVE-Fix — direkt am Nordstern
   (lossless-Beschaffung, weniger Reparaturen). Rollback: Tag 4.4.0 +
   Overlay-Revert.
-- [ ] 11.3 [ready-for-agent] Dev-Umgebung auf Pi-Parität (beets 2.14.1 +
+  **ERLEDIGT 2026-11-13, Pi LIVE auf 4.5.3 (97e37ae):** Prozedur-Anpassung
+  nötig — das GitLab-Repo publiziert seit 4.5.1 KEINE Tags mehr (public
+  main = v4.5.0), Revendor-Quelle ist das DOCKER-IMAGE (docker create +
+  docker cp /opt/musicgrabber/static — byte-exakt, LF; auf dem Pi
+  ausführen, root-ownership beachten). Overlay 31 Dateien byte-exakt
+  (11 davon 4.4.0-identisch: fonts/images/icons), app.js entfernt,
+  js/ (12 Dateien) + theme.js neu; Monitor-Stellen: index.html 3 Blöcke
+  (Nav nach Queue, Panel vor Stats, script nach boot.js) + js/core.js
+  3 Stellen (const/allTabPanels/panelMap); Overlay-Diff gegen Upstream =
+  exakt die Monitor-Passage, node --check grün. Alle 7 Wrapper-Endpunkte
+  im extrahierten 4.5.3-Backend verifiziert (@router-Routen: settings,
+  search, download, jobs/{job_id} jobs.py:479, albums/
+  resolve-release-group, albums/download, bulk-import/{id}/status).
+  Flip: git pull → `sudo -E docker compose pull && up -d` (compose-
+  Plugin liegt in ~/.docker/cli-plugins des pi-Users — sudo resettet
+  HOME, -E nötig; KEIN docker-compose-standalone auf dem Pi!) → healthy.
+  Probes: / 200, /static/js/core.js 200, /static/monitor.js 200 mit
+  unserem Header (Mount-Beweis), /api/settings 200, /static/app.js 404
+  (korrekt weg), ausgeliefertes index.html mit Monitor-Markern +
+  Cache-Bust ?v=4.5.3.<ts> live ersetzt. Echtlauf über den Wrapper:
+  „Wet Leg – Chaise Longue" (jiosaavn) → job completed, .mg_staging
+  restlos entfernt; Import-Kette → asis-Import (siehe 11.4/11.5-Befunde).
+  Pi-deployed + Abnahme im Monitor-Tab steht beim nächsten Review-Fall.
+- [x] 11.3 [ready-for-agent] Dev-Umgebung auf Pi-Parität (beets 2.14.1 +
   beatport4 1.4.0, lokal UND Pi)
   Lokal läuft beets 2.13.1 während das Pi auf 2.14.1 ist —
   smoke_beetscompat Sektion 3 (2.14-only, echte Source-Objekte) läuft
@@ -1087,6 +1124,54 @@ als eigene Story.
   Discogs month/day-Erhalt. beatport4 1.3.0 → 1.4.0 auf Pi UND Win
   (requires Python ≥3.11: Pi 3.13.5 ✓, Win 3.14.7 ✓). requirements.txt:
   `beets>=2.13` auf `>=2.14` heben, um die Parität festzuschreiben.
+  **ERLEDIGT 2026-11-13 (e59fc26):** .venv lokal beets 2.14.1 +
+  beatport4 1.4.0 + Pi .venv beatport4 1.4.0 (beets war auf dem Pi schon
+  2.14.1). smoke_beetscompat Sektion 3 läuft jetzt ERSTMALS auch lokal
+  („2.14 echt: Source.from_items OK"). Alle 18 lokalen Smokes grün;
+  smoke_ingest_roots bleibt lokal grün (der 10.4-Quirk ist Pi-spezifisch,
+  Story bleibt wontfix-Kandidat). requirements >=2.14.
+- [ ] 11.4 [ready-for-agent] Re-Decision bei Unit-Datei-Änderung: Neue
+  Dateien in einer bereits ENTSCHEIDENEN Unit erben deren Status — im
+  11.2-Echtlauf (2026-11-13) landete der frische Chaise-Longue-Download
+  in `Singles/Unknown` (Unit seit 08.11. `ignored` via Review wegen
+  Master-At-Work-Junk), Scan mergte die Datei in die Unit (n_files 1→2),
+  Status blieb `ignored` → „nothing to import", Datei rot für immer
+  („Dropzone selbstreinigend" für Re-Downloads in entschiedene Ordner
+  gebrochen). Operativ per 9.9-Ordner-Reparatur gelöst (eigener Ordner
+  → neue Unit → saubere asis-Entscheidung). Fix-Richtung: Scan vergleicht
+  Unit-Fingerprint (Datei-Set/Hashes) — Abweichung → Status zurück auf
+  `pending` (ignorierte Units inklusive; Ignore-Entscheid gilt für das
+  DAMALS gefundene Datei-Set, nicht für den Ordner für alle Zeit).
+  Testmatrix: ignored-Unit + neue Datei → pending; duplicate-Unit +
+  bessere Datei → pending; auto-Unit unverändert → bleibt.
+- [ ] 11.5 [ready-for-agent] tags_complete-Lücke: `albumartist OR artist`
+  lässt AA-gültig/Artist-junk durch — im 11.2-Echtlauf importierte
+  jiosaavn-Datei (albumartist='Wet Leg' ✓, artist='Unknown' ✗, Titel ✓)
+  passierte `asis.tags_complete` (asis.py:79 nimmt AA als Artist-Proxy)
+  und landete mit artist='Unknown' in der DB (10.3-Guard-Ziel „Unknown
+  nie Own-Tags-Import" nur bei BEIDEN junk erfüllt). Operativ gefixt
+  (beet modify artist='Wet Leg' + beet move per musik-config — Achtung:
+  bare `beet` liest ~/.config/beets (Stale-DB/~/Music!), immer
+  `-c ~/musik/config.yaml` oder musik-API nutzen). Fix-Richtung:
+  (a) tags_complete verlangt artist_present(ARTIST-Tag) für Nicht-VA-
+  Units (VA-Albums: AA autoritativ, per-track-junk ok); asis-Import
+  schreibt bei junk-artist + gültigem AA den AA in artist (Reparatur
+  statt Verweigerung? — 10.3-Doctrine: review bevorzugen, wenn nicht
+  eindeutig; Singleton mit AA=artist-Identität ist eindeutig genug für
+  Auto-Fill). (b) Datenfix-Backlog: /mnt/music/Singles/Unknown/ hält
+  ~5 Legacy-Singletons mit Junk-Artist („0000 - Ain't No Rest for the
+  Wicked" = Cage the Elephant usw.) — explizite Tabelle wie 10.8.
+- [ ] 11.6 [ready-for-agent] Bot-Job-Watchdog: Job e3eba9be (somedl-
+  Playlist-Pfad) hing 12,8 Tage auf „running" ohne Kindprozess und ohne
+  Timeout — der Serial-Worker (asyncio.Queue, in-memory) blockiert
+  dadurch ALLE neuen Links (queued-Jobs laufen nie; in-memory-Queue
+  heißt auch: Restart verwirft queued-Jobs ohne Nachricht). Fix-Richtung:
+  (a) subprocess-timeout in fetch.run_fetch (somedl/spotdl-Aufrufe
+  hart begrenzen,Playlist-Größe berücksichtigen); (b) Worker-Heartbeat/
+  Job-Max-Alter → status error + Telegram-Nachricht; (c) Startup:
+  „running"-Jobs aus bot-jobs.json beim Boot auf error setzen (Zombie-
+  Aufräumung, da Queue in-memory); (d) queued-Jobs beim Boot restaurieren
+  oder Nutzer informieren. Getroffen 2026-11-13 im 11.1-Rollout.
 
 ## Beim Nutzer anfragen (bei nächster Gelegenheit)
 
