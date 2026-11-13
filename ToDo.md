@@ -1004,6 +1004,90 @@ Ingest-Kette; alle 7 Wrapper-Endpunkte in musik/musicgrabber.py sind in
   **Endstand: 0 Junk-Credits, Bibliothek 19.506 Items, alle Essentials
   korrekt unter echten Artists bzw. Various Artists.**
 
+## EPIC 11 — Dependency-Updates (Audit 2026-11-13)
+
+Zielcheck: direkt am Nordstern — yt-dlp/spotdl sind die Download-Arbeiter
+der Bot-Kette, MusicGrabber die Beschaffungs-Engine Nr. 2; Security-Fixes
+und YouTube-Extraktions-Robustheit verhindern Beschaffungsausfälle, die
+beets-Parität Win↔Pi verhindert Dev/Prod-Drift in den Smokes.
+Redundanzcheck: kein Neubau — Versions-Bumps nach etablierter Prozedur
+(Testmatrix je musik-testdaten, Overlay-Revendor nach 10.1-Vorbild).
+Empfohlene Reihenfolge: 11.1 → 11.3 → 11.2.
+
+Befund (Ist → Neueste, geprüft 2026-11-13 gegen PyPI/Docker Hub/GitLab):
+
+| Paket | Ist | Neueste | Bewertung |
+|---|---|---|---|
+| MusicGrabber (Pi, gepinnt) | 4.4.0 | **4.5.3** (08.11.) | → 11.2, Overlay-Kritisch |
+| yt-dlp (Pi venv + Win) | 2026.8.19 | **2026.10.26** | → 11.1, Security + YouTube-Robustheit |
+| spotdl (Pin ~=4.5.2) | 4.5.2 | **4.6.0** (26.10.) | → 11.1, Pin schließt 4.6 aus |
+| somedl | 1.7.1 | 1.7.1 (05.08.) | aktuell, nichts zu tun |
+| beets (Pi) | 2.14.1 | 2.14.1 (17.09.) | aktuell |
+| beets (Win, dev) | 2.13.1 | 2.14.1 | → 11.3, Parität |
+| beets-beatport4 (Pi) | 1.3.0 | **1.4.0** (22.10.) | → 11.3 |
+| python-telegram-bot | 22.8 | 22.8 | aktuell (Pin ~=22.0 deckt ab) |
+| discogs-client | 2.3.0 | 2.3.0 | latest, aber upstream INAKTIV — Risiko-Notiz, keine Story |
+
+Risiko-Notiz discogs-client: PyPI meldet „Development Status :: 7 -
+Inactive", letzte Release Juni 2020. Bei einem Discogs-API-Bruch ist mit
+keinem Upstream-Fix zu rechnen; beets-2.14.1-Plugin-Fixes (month/day-
+Erhalt) mildern. Beobachten; falls Discogs bricht, Wrapper/Plugin-Bypass
+als eigene Story.
+
+- [ ] 11.1 [ready-for-agent] yt-dlp → 2026.10.26 + spotdl → 4.6.0
+  koordiniert heben (Pi-venv zuerst, dann Win)
+  Warum wichtig: (a) Security — brotli 1.2.1/curl-cffi 0.17.0 schließen
+  einen certifi-MITM-Vektor (2026.10.21/26) — relevant für die
+  Download-Maschine; (b) YouTube-Robustheit — neuer Default-Player-Client
+  `tv_samsung` (2026.10.21) gegen den häufigsten Betriebsfehler
+  („n challenge"/format-not-available, YouTube-Breakage-Runbook EPIC 5);
+  (c) spotdl 4.6.0 fixt Artist-Credit-Matching + YT-Music-Viewcounts-als-
+  Artist (Tag-Qualität → Decider), Pin in requirements.txt (~=4.5.2)
+  explizit auf ~=4.6.0 heben.
+  Breaking: yt-dlp ab 2026.10.26 Python ≥3.11 (Pi 3.13.5 ✓, Win
+  3.14.7 ✓), Win-Binaries Win10+ ✓. Gemeinsam bumpen, weil spotdl 4.5.2
+  als Bibliothek gegen yt-dlp 2026.10.x ungeprüft ist; somedl 1.7.1 nutzt
+  dasselbe venv-yt-dlp → mittesten.
+  Testmatrix: Spotify-Single + -Album (spotdl), YouTube-Single +
+  -Playlist (somedl), Bot-End-to-End inkl. Deno/n-challenge-Pfad
+  (installers kopieren Deno). Fehlende Testlinks beim Nutzer erfragen
+  (musik-testdaten). Rollout: Pi → Echtlauf → requirements.txt
+  same-commit → Win.
+- [ ] 11.2 [ready-for-agent] MG-Flip 4.4.0 → 4.5.3 mit Overlay-Revendor
+  (Branch, Pi-Flip erst nach Testmatrix — 10.1/10.2-Prozedur)
+  Overlay-Sensitivität (KERN): unsere 16 statischen Dateien sind gegen
+  v4.4.0 byte-exakt; **4.4.1 hat app.js (13.676 Zeilen) in 12 Dateien
+  unter static/js/ gesplittet** + erzwingt CSP (keine Inline-Scripts/
+  Handler) + named JS actions. Die alten statics über das 4.5.3-Backend
+  zu mounten = UI/Backend-Mismatch (stille-Ausfall-Klasse wie Bruchstelle
+  A in 10.1). → Revendor wie 10.1: Blobs via `git show` (autocrlf-Falle),
+  Sentinel-Marker neu einsetzen (Monitor-Blöcke liegen jetzt vermutlich
+  in static/js/* statt app.js), monitor.js 1:1, Mount bleibt
+  /opt/musicgrabber/static:ro, Verify-Check /static/monitor.js.
+  Wrapper-Endpunkte (musik/musicgrabber.py, 7) gegen 4.5.3 re-verifizieren:
+  4.5.0 änderte `POST /api/albums/download` (additive
+  source_id/source_album_id) und ergänzte u. a. GET /api/jobs?slim=1.
+  Lücke: 4.5.1–4.5.3 haben KEINE öffentlichen Release-Notes (nur
+  Docker-Hub-Tags 03./07./08.11.) → vor dem Flip Commit-Bereich
+  v4.5.0..HEAD im GitLab-Repo (zarguell/musicgrabber) sichten.
+  Nutzen: 4.4.2 Year-in-Folder-Fix (weniger Track-by-Track-Fallback-Junk),
+  4.4.3 Entrypoint-Fix (Container-Recreate), 4.5.0 Soulseek Multi-Disc/
+  Kompilation-Verbesserungen + zip-CVE-Fix — direkt am Nordstern
+  (lossless-Beschaffung, weniger Reparaturen). Rollback: Tag 4.4.0 +
+  Overlay-Revert.
+- [ ] 11.3 [ready-for-agent] Dev-Umgebung auf Pi-Parität (beets 2.14.1 +
+  beatport4 1.4.0, lokal UND Pi)
+  Lokal läuft beets 2.13.1 während das Pi auf 2.14.1 ist —
+  smoke_beetscompat Sektion 3 (2.14-only, echte Source-Objekte) läuft
+  lokal GAR nicht; Dev/Prod-Drift-Risiko. beets 2.14.x-Fixes sind für uns
+  relevant: „ft"-Distance-Fix (Wörter wie draft/gift zählen nicht mehr
+  als Feat.-Suffix — Decider-Distanzen), `duplicate_action: upgrade`
+  (Bitrate-Vergleich — Dedupe-Klasse 2.3/EPIC 12-Kandidat),
+  `tempfile_prefix` (Cross-FS-Moves Win/Samba — _trash/_incoming-Flüsse),
+  Discogs month/day-Erhalt. beatport4 1.3.0 → 1.4.0 auf Pi UND Win
+  (requires Python ≥3.11: Pi 3.13.5 ✓, Win 3.14.7 ✓). requirements.txt:
+  `beets>=2.13` auf `>=2.14` heben, um die Parität festzuschreiben.
+
 ## Beim Nutzer anfragen (bei nächster Gelegenheit)
 
 - Pi: SSH-Zugang/Host bekannt geben für Ferndeployment von Phase 9 — oder
