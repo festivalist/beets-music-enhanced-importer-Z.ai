@@ -616,10 +616,12 @@ unsere Monitor-Stellen liegen in `index.html` + `js/core.js`; Revendor
 aus dem Image, weil das GitLab-Repo 4.5.1–4.5.3 nicht publiziert). Die
 statischen UI-Dateien werden per Bind-Mount
 (`./overlay/static:/opt/musicgrabber/static:ro`) aus dem Repo-Checkout überlagert —
-dort lebt der **Import-Monitor-Tab** (Nav-Eintrag „Monitor"): Laufstatus,
+dort lebt der **Import-Monitor-Eintrag** (Nav „Monitor"): seit Story 11.7
+(2026-11-13) öffnet er den Monitor, den der **musik-Bot selbst
+ausliefert: `http://192.168.50.43:8283/monitor`** — Laufstatus,
 filterbare Unit-Liste, Review-Queue, `_incoming`-Stau, Bot-Jobs (Poll
-alle 5 s gegen den Bot-Endpoint :8283) **plus Aktionen**: Review-Units
-direkt im Tab entscheiden (K1/K2-Kandidat — mit Track-Anzahl zum
+alle 5 s, same-origin) **plus Aktionen**: Review-Units
+direkt entscheiden (K1/K2-Kandidat — mit Track-Anzahl zum
 Abgleich mit den eigenen Dateien (Story 9.10) —, As-is, Override,
 Ignorieren),
 Ingest-Lauf anstoßen, Netzwerk-Units zurücksetzen — alles mit

@@ -21,18 +21,23 @@ mehr (public main = v4.5.0) — Revendor-Quelle ist das DOCKER-IMAGE
 selbst (`docker create` + `docker cp <c>:/opt/musicgrabber/static …`,
 docker cp ist byte-exakt; auf dem Pi arbeiten, root ownership beachten).
 
-**Unser eigener Diff (Import-Monitor-Tab, Story 9.4):** Alle eigenen
+**Unser eigener Diff (Import-Monitor, Story 9.4 + 11.7):** Alle eigenen
 Stellen sind mit `musik-monitor:begin` / `musik-monitor:end` (HTML) bzw.
 `musik-monitor`-Zeilenkommentaren (JS) markiert:
 
 - `index.html` — 3 Blöcke: Monitor-Button in der Nav (nach Queue),
-  `#monitorTabContainer`-Panel (vor `#statsTabContainer`),
+  `#monitorTabContainer`-Panel (vor `#statsTabContainer`; seit 11.7
+  Inhalt = Öffnen-Link statt Datenpanel),
   `<script src="…/static/monitor.js?v=__CACHE_BUST__">` (nach `js/boot.js`)
 - `js/core.js` — 3 markierte Stellen (seit 4.4.1, formerly `app.js`):
   `monitorTabContainer`-Konstante (nach `settingsTabContainer`), Eintrag
   in `allTabPanels`, Eintrag in `panelMap`
-- `monitor.js` — komplett ours (standalone, kein Upstream-Code, nur
-  fetch gegen bot_http :8283)
+- `monitor.js` — seit 11.7 ein slim Boot-Script, das nur den Öffnen-Link
+  setzt (CSP-grund: siehe unten); die eigentliche Monitor-UI liefert
+  der musik-Bot selbst aus: **`http://<pi>:8283/monitor`**
+  (`musik/monitor.html`, same-origin — MG 4.4.1+ erzwingt CSP
+  `connect-src 'self'` als Backend-Header, womit der frühere
+  Cross-Origin-Tab still leer blieb, entdeckt 2026-11-13)
 
 Der Installations-Modul-Check verlangt `overlay/static/index.html`
 (70-musicgrabber.sh), probiert `/static/js/core.js` und — entscheidend —

@@ -1222,6 +1222,27 @@ als eigene Story.
   smoke_job_watchdog (3 Cases) Win+Pi grün; Live-Beweis: gepflanzter
   running-Record + Neustart → Journal „restart killed 1 job(s)
   (re-enqueued 0 queued)", Record → error, Testrecord wieder entfernt.
+- [x] 11.7 [ready-for-agent] Import-Monitor wandert auf den Bot
+  (:8283/monitor) — **ERLEDIGT 2026-11-13 (03a7efb, Pi live,
+  Browser-verifiziert)**: Nutzerbefund „Monitor-Tab zeigt nichts" —
+  Ursache: MG 4.4.1+ erzwingt CSP `connect-src 'self'` als
+  HTTP-Header (`core/middleware.py`, hart kodiert — für das
+  Static-Overlay unantastbar; kein Settings-Schalter). Der Overlay-Tab
+  durfte :8283 nicht mehr fetchen → stiller Leer-Tab (meine Flip-Probes
+  mit curl sahen CSP nicht — nur echte Browser; Lehre: Overlay-Checks
+  brauche einen echten Browser-Lauf). Fix: der Monitor wird vom
+  musik-Bot SELBST ausgeliefert — `musik/monitor.html` (voller
+  Funktionsumfang: Review-Entscheidungen K1/K2/asis/override/ignore,
+  Unit-Filter, Bot-Jobs, Ingest/Retry), bot_http GET /monitor + /
+  →302, same-origin ohne CSP-Konflikt. Overlay: Panel = Öffnen-Link
+  (slim monitor.js setzt href dynamisch — externes Script ist
+  CSP-konform), core.js-Marker unverändert. Doku: overlay/README,
+  PI-SETUP 9.3b (+ PI-IP .47→.43, c390779). smoke_bot_http um
+  /monitor-Cases erweitert; Live im Browser: Tab-Panel ✓, Monitor-
+  Seite mit Review-Queue/Units/Jobs ✓. Nebeneffekt-Demo: ein manueller
+  Bot-Restart des Nutzers mitten im Spotify-Job wurde von 11.6 korrekt
+  behandelt (error + Telegram-Notice); der fertige Download wurde
+  ohne Re-Download per `ingest --root` importiert.
 
 ## Beim Nutzer anfragen (bei nächster Gelegenheit)
 
