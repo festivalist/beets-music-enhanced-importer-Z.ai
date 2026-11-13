@@ -1,6 +1,6 @@
 # PI-SETUP — Raspberry-Pi-Aufbau: Link → Download → beets → Plexamp
 
-> **Zielgerät:** Raspberry Pi 5, `192.168.50.47` (SSH-Port 22 offen; Stand 2026-09-20)
+> **Zielgerät:** Raspberry Pi 5 (ArgonEON), `192.168.50.43` (SSH-Port 22; Stand 2026-11-13, früher .47)
 > **Annahme:** Raspberry Pi OS (64-bit, Bookworm oder trixie) mit SSH-Zugang.
 >
 > **Dieses Dokument pflegen:** Es muss *immer* den aktuellen Stand von
@@ -24,7 +24,7 @@ Handy (unterwegs) ──Link──> Telegram-Bot (auf dem Pi)
 
 ## Phase 0 — Voraussetzungen
 
-- [ ] Pi ist per SSH erreichbar: `ssh <user>@192.168.50.47`
+- [ ] Pi ist per SSH erreichbar: `ssh <user>@192.168.50.43`
 - [ ] Internet auf dem Pi (Downloads + MusicBrainz + Telegram)
 - [ ] Optional: USB-Festplatte für die Musik (empfohlen bei größeren Libraries)
 - [ ] Diese Dinge bereithalten: Telegram-Bot-Token, YouTube-Cookies (Phase 3),
@@ -149,7 +149,7 @@ im Repo-Ordner (`~/musik/cookies.txt`). Config ist bereits vorbereitet
 **Auf den Pi übertragen (vom PC aus, in PowerShell/cmd):**
 
 ```powershell
-scp cookies.txt <user>@192.168.50.47:~/musik/cookies.txt
+scp cookies.txt <user>@192.168.50.43:~/musik/cookies.txt
 ```
 
 **Auf dem Pi absichern und prüfen:**
@@ -273,7 +273,7 @@ URL=$(curl -fsSL https://plex.tv/api/downloads/5.json | python3 -c \
 cd /tmp && curl -fsSLO "$URL" && sudo apt install ./"${URL##*/}"
 ```
 
-**5.2 Server claimen:** Am PC im Netzwerk `http://192.168.50.47:32400/web`
+**5.2 Server claimen:** Am PC im Netzwerk `http://192.168.50.43:32400/web`
 öffnen, mit dem Plex-Account anmelden.
 
 **5.3 Musik-Bibliothek anlegen:** Plex Web → Settings → Libraries →
@@ -604,7 +604,7 @@ docker compose up -d              # als pi nach newgrp/Neuanmeldung, sonst sudo
 docker compose logs -f           # Start beobachten (erste Init kann dauern)
 ```
 
-Web-UI: `http://192.168.50.47:38274` — nur LAN, kein Port-Forwarding (von
+Web-UI: `http://192.168.50.43:38274` — nur LAN, kein Port-Forwarding (von
 unterwegs läuft alles über Telegram-Bot und Plexamp, nicht über MG).
 
 **9.3b Overlay-UI (Story 9.3–9.5, ADR-0001; Flip 4.4.0 = Story 10.1):**
