@@ -1159,7 +1159,7 @@ als eigene Story.
   (2) nach Wiederherstellung des 08.11.-Zustands (Test-Artefakt
   zurückgerollt, Backup state.json.bak-1133) → „1 known", KEIN re-open,
   Baseline counts wiederhergestellt.
-- [ ] 11.5 [ready-for-agent] tags_complete-Lücke: `albumartist OR artist`
+- [x] 11.5 [ready-for-agent] tags_complete-Lücke: `albumartist OR artist`
   lässt AA-gültig/Artist-junk durch — im 11.2-Echtlauf importierte
   jiosaavn-Datei (albumartist='Wet Leg' ✓, artist='Unknown' ✗, Titel ✓)
   passierte `asis.tags_complete` (asis.py:79 nimmt AA als Artist-Proxy)
@@ -1176,6 +1176,26 @@ als eigene Story.
   Auto-Fill). (b) Datenfix-Backlog: /mnt/music/Singles/Unknown/ hält
   ~5 Legacy-Singletons mit Junk-Artist („0000 - Ain't No Rest for the
   Wicked" = Cage the Elephant usw.) — explizite Tabelle wie 10.8.
+  **ERLEDIGT 2026-11-13 (a19aa6d, Pi live):** (a) `va_like_unit()` aus
+  session._va_like extrahiert (single source of truth); `plan_artist_fill()`
+  — nur Nicht-VA-Units, {path: AA} für junk-artist + validen AA;
+  `apply_artist_fill()` an choose_match UND choose_item (Live-Fall war
+  ein Singleton), Plan hängt am _tier3_check-Record — decide_item routet
+  alle apply-asis durch _tier3_check, also auch der asis-Fallback.
+  Both-junk bleibt Review (10.3 unberührt). smoke_artist_fill 6 Cases +
+  13-Smoke-Regression Win+Pi grün; Bot neu gestartet (live ab dem
+  nächsten jiosaavn-Fall). (b) Datenfix nach 10.8-Doctrine (explizite
+  Tabelle, MB-Dauerabgleich ENTSCHEIDET): 4 Rows in Singles/Unknown →
+  **Cage the Elephant** „Ain't No Rest for the Wicked" (2008, 2:55 ≈
+  MB 2:56, Cage in der Bibliothek), **The Devil Makes Three** „Do Wrong
+  Right" (2009, exakt 4:21; Haddix 4:44 ✗) — dabei Kollision mit einer
+  row-losen Alt-Datei vom 10.10-Drop entdeckt → 2.3-Qualitätsvergleich
+  (259 vs. 325 kbps) → Alt-Datei → _trash/duplicate, `.1`-Suffix
+  aufgeräumt; **The Avalanches** „No Bad Memories" (2026-10-16, exakt
+  1:54 — 0-day!, Antarctigo 2:15/2:54 ✗); **„Break Break" (18579)
+  bewusst UNVERÄNDERT** — MB hat keinen 6:00-Treffer, Identität nicht
+  verifizierbar → kein Pseudo-Fix (10.8-Doctrine), bleibt artist=Unknown
+  dokumentiert. Alle Moves in Artist-Ordner, Plex-Scans angestoßen.
 - [x] 11.6 [ready-for-agent] Bot-Job-Watchdog: Job e3eba9be (somedl-
   Playlist-Pfad) hing 12,8 Tage auf „running" ohne Kindprozess und ohne
   Timeout — der Serial-Worker (asyncio.Queue, in-memory) blockiert
