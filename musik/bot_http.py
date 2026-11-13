@@ -235,7 +235,8 @@ def _enqueue_job(text: str, **fields) -> tuple[int, dict]:
 
 
 class _Handler(BaseHTTPRequestHandler):
-    """Nur /api/status (GET) und /api/action (POST); alles andere 404."""
+    """GET /api/status (JSON), GET /monitor (+ / leitet dorthin),
+    POST /api/action; sonst 404."""
 
     def log_message(self, fmt, *args) -> None:
         pass  # Journal schonen — die Status-Codes sprechen für sich
@@ -246,9 +247,10 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type",
                          "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        # CORS (Story 9.4): der Monitor-Tab läuft im Browser auf der
-        # MG-Origin (:38274) und liest hier cross-port. LAN-only ohne
-        # Credentials — "*" ist hier die richtige Postur (ADR-0001).
+        # CORS (Story 9.4): seit 11.7 läuft der Monitor hier same-origin
+        # (:/monitor), der Header bleibt für ältere Depot-Depots/externen
+        # LAN-Zugriff bestehen. LAN-only ohne Credentials — "*" ist hier
+        # die richtige Postur (ADR-0001).
         self._cors()
         self.end_headers()
         self.wfile.write(body)
@@ -265,9 +267,36 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    def _monitor_page(self) -> None:
+        """Story 11.7: der Import-Monitor wird vom Bot SELBST ausgeliefert.
+        MG 4.4.1+ erzwingt eine CSP mit connect-src 'self' (HTTP-Header,
+        core/middleware.py — für das Static-Overlay unantastbar), womit
+        Cross-Origin-Fetches des Overlay-Tabs gegen :8283 im Browser
+        blockiert werden. Same-origin hier braucht keine Ausnahme."""
+        page = (os.path.join(os.path.dirname(__file__), "monitor.html"))
+        try:
+            with open(page, "rb") as fh:
+                body = fh.read()
+        except OSError:
+            self._json(500, {"error": "monitor.html fehlt"})
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self) -> None:
-        if self.path.split("?")[0] == "/api/status":
+        path = self.path.split("?")[0]
+        if path == "/api/status":
             self._json(200, snapshot())
+        elif path == "/monitor":
+            self._monitor_page()
+        elif path == "/":
+            self.send_response(302)
+            self.send_header("Location", "/monitor")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
         else:
             self._json(404, {"error": "unbekannter Pfad"})
 

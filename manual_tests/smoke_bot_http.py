@@ -130,6 +130,22 @@ def main() -> int:
             assert snap["backlog"]["audio_files"] == 2, snap["backlog"]
             assert snap["jobs"]["queued"] == 0, snap["jobs"]
 
+            # 1b) Story 11.7: der Monitor wird vom Bot selbst ausgeliefert
+            # (MG 4.4.1+ CSP connect-src 'self' macht den Overlay-Tab tot)
+            req = urllib.request.Request(
+                f"http://127.0.0.1:{port}/monitor")
+            with urllib.request.urlopen(req, timeout=5) as r:
+                page = r.read().decode("utf-8")
+                assert r.status == 200
+                assert r.headers["Content-Type"].startswith("text/html")
+            assert "/api/status" in page and "monitorContent" in page, \
+                "monitor.html eingebettet?"
+            req = urllib.request.Request(
+                f"http://127.0.0.1:{port}/")
+            with urllib.request.urlopen(req, timeout=5) as r:
+                assert r.status == 200 and r.url.endswith("/monitor"), \
+                    (r.status, r.url)  # / leitet auf /monitor
+
             # 2) asis-Aktion: validiert, canonical, chat_id 0, persistiert
             code, out = _post(port, "/api/action", {
                 "action": "asis",
