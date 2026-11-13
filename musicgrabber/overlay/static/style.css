@@ -855,6 +855,19 @@ h1 {
     gap: var(--space-3);
 }
 
+/* Album imports busy before their tracks have cards, sat above the cards. */
+.queue-album-fetches {
+    margin-bottom: var(--space-3);
+}
+
+/* A sentence with a release name in it, not a one-word status: capitalising
+   every word turns "-k4" into "-K4" and "attempt 1 of 3" into "Attempt 1 Of 3". */
+.album-fetch-notice .job-status-label {
+    text-transform: none;
+    /* Scene release names are one 60-character word, wider than a phone. */
+    overflow-wrap: anywhere;
+}
+
 .search-duplicate-notice {
     display: flex;
     align-items: flex-start;
@@ -1211,45 +1224,7 @@ h1 {
     text-transform: uppercase;
 }
 
-.source-badge.youtube {
-    background: #ff0000;
-    color: white;
-}
-
-.source-badge.soundcloud {
-    background: #ff5500;
-    color: white;
-}
-
-.source-badge.mp3phoenix {
-    background: #e05c00;
-    color: white;
-}
-
-.source-badge.zvu4no {
-    background: #7a6aee;
-    color: white;
-}
-
-.source-badge.soulseek {
-    background: #4a9eff;
-    color: white;
-}
-
-.source-badge.monochrome {
-    background: #0f766e;
-    color: white;
-}
-
-.source-badge.freemp3cloud {
-    background: #3a2fd6;
-    color: white;
-}
-
-.source-badge.jiosaavn {
-    background: #2bc5b4;
-    color: #000;
-}
+/* Each source's colour is painted from /api/sources (paintSourceBadges in shared.js). */
 
 /* Watched Upgrades rows */
 .upgrade-row {
@@ -1656,6 +1631,16 @@ h1 {
 .job-status.completed { background: var(--accent); }
 .job-status.completed_with_errors { background: var(--warning); }
 .job-status.failed { background: var(--error); }
+/* Hollow: not waiting its turn like queued, waiting on you. */
+.job-status.unsure { box-shadow: inset 0 0 0 2px var(--warning); }
+
+/* An Unsure card's answers sit in plain sight, not behind a click to expand. */
+.job-unsure-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+}
 
 .job-warning-badge {
     font-size: 12px;
@@ -2860,7 +2845,10 @@ h1 {
     color: var(--text-secondary);
 }
 
-.settings-row input {
+/* The health-check numbers sit in a grid rather than a settings row, and went
+   without for a while, as plain white browser boxes on a dark page. */
+.settings-row input,
+.settings-inline-grid input {
     padding: var(--space-2-5) var(--space-3);
     font-size: 14px;
     font-family: inherit;
@@ -2872,7 +2860,8 @@ h1 {
     transition: border-color 0.2s;
 }
 
-.settings-row input:focus {
+.settings-row input:focus,
+.settings-inline-grid input:focus {
     border-color: var(--accent);
 }
 
@@ -3232,7 +3221,9 @@ h1 {
     .job-status.downloading,
     .queue-live-dot.active,
     .stats-equaliser span,
-    .stats-reveal {
+    .stats-reveal,
+    .config-check-panel,
+    .config-check-flash {
         animation: none !important;
     }
 
@@ -3252,7 +3243,8 @@ h1 {
 .save-btn { flex: 1; padding: var(--space-3) var(--space-5); }
 
 /* .release-notes-btn now driven by .btn .btn-ghost, just kept for layout. */
-.release-notes-btn { flex: 1; padding: var(--space-3) var(--space-5); }
+.release-notes-btn,
+.check-config-btn { flex: 1; padding: var(--space-3) var(--space-5); }
 
 .release-notes-nav {
     display: flex;
@@ -3430,6 +3422,7 @@ h1 {
     }
 
     #settingsFloatingBar .save-btn,
+    #settingsFloatingBar .check-config-btn,
     #settingsFloatingBar .donation-link,
     #settingsFloatingBar .release-notes-btn {
         width: 100%;
@@ -3895,6 +3888,10 @@ h1 {
     color: var(--text-secondary);
 }
 
+.bulk-services-note.is-warning {
+    color: var(--warning, #f59e0b);
+}
+
 .bulk-textarea-wrap {
     position: relative;
 }
@@ -4149,6 +4146,34 @@ h1 {
 .album-track-missing {
     color: var(--accent);
     font-weight: 600;
+    transition: color 0.15s ease;
+}
+
+/* Missing but unticked: it will not queue, so it stops looking like it will. */
+.album-track-missing:has(.album-track-pick:not(:checked)) {
+    color: var(--text-secondary);
+    font-weight: normal;
+}
+
+.album-track-pick-label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    cursor: pointer;
+}
+
+.album-track-pick {
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.album-track-pick:disabled,
+.album-track-pick-label:has(.album-track-pick:disabled) {
+    cursor: default;
+}
+
+.album-tick-all-btn {
+    margin-bottom: var(--space-1);
 }
 
 .album-track-legend {
@@ -4176,9 +4201,11 @@ h1 {
     margin: 0 0 var(--space-2-5);
     padding: var(--space-2) var(--space-2-5);
     border-radius: 8px;
-    border: 1px solid var(--warning-border, #d97706);
-    background: var(--warning-bg, #fef3c7);
-    color: var(--warning-text, #92400e);
+    /* Tinted like the other warnings, not pale yellow: --warning-bg and friends
+       were never defined, so dark mode got white button text on light-mode cream. */
+    border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+    background: color-mix(in srgb, var(--warning) 12%, transparent);
+    color: var(--text-primary);
     font-size: 12px;
 }
 
@@ -4400,6 +4427,20 @@ h1 {
     gap: var(--space-2);
     margin-bottom: var(--space-2);
     align-items: center;
+}
+
+.charts-row {
+    margin-bottom: var(--space-3);
+}
+
+.charts-row .settings-hint-sm {
+    margin: 0 0 var(--space-2);
+}
+
+.charts-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
 }
 
 
@@ -5205,11 +5246,122 @@ h1 {
 }
 
 .settings-floating-bar-inner {
+    position: relative;
     display: flex;
     align-items: stretch;
     gap: var(--space-4);
     width: 100%;
     max-width: var(--container-max);
+}
+
+/* Check my config: rises out of the top of the floating bar, as wide as the
+   buttons beneath it, problems first. */
+.config-check-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + var(--space-3));
+    display: flex;
+    flex-direction: column;
+    max-height: min(60vh, 520px);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.3);
+    animation: config-check-rise 0.18s ease-out;
+}
+
+.config-check-panel[hidden] {
+    display: none;
+}
+
+@keyframes config-check-rise {
+    from { opacity: 0; transform: translateY(var(--space-2)); }
+    to { opacity: 1; transform: none; }
+}
+
+.config-check-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--border);
+}
+
+.config-check-title {
+    font-weight: 600;
+}
+
+.config-check-summary {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.config-check-summary.ok { color: var(--accent); }
+.config-check-summary.warn { color: var(--warning); }
+.config-check-summary.error { color: var(--error); }
+
+.config-check-list {
+    overflow-y: auto;
+    padding: var(--space-2) var(--space-4) var(--space-3);
+}
+
+.config-check-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+    font-size: 13px;
+}
+
+.config-check-row + .config-check-row {
+    border-top: 1px solid var(--border);
+}
+
+.config-check-row > i {
+    margin-top: var(--space-0-5);
+}
+
+.config-check-row.ok > i { color: var(--accent); }
+.config-check-row.warn > i { color: var(--warning); }
+.config-check-row.error > i { color: var(--error); }
+
+.config-check-text {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.config-check-text strong {
+    margin-right: var(--space-2);
+}
+
+.config-check-text span {
+    color: var(--text-secondary);
+}
+
+.config-check-go {
+    flex: 0 0 auto;
+    padding: var(--space-1) var(--space-3);
+    font-size: 12px;
+}
+
+.config-check-note {
+    padding: var(--space-2) 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+/* Where "Go" lands, so the eye finds it after the scroll. */
+.config-check-flash {
+    animation: config-check-flash 1.6s ease-out;
+}
+
+@keyframes config-check-flash {
+    0%, 30% { box-shadow: 0 0 0 3px var(--accent); }
+    100% { box-shadow: 0 0 0 3px transparent; }
 }
 
 /* Only stands in for its label on phones, below. */
@@ -5226,6 +5378,7 @@ h1 {
         gap: var(--space-2);
     }
 
+    #settingsFloatingBar .check-config-btn,
     #settingsFloatingBar .donation-link,
     #settingsFloatingBar .release-notes-btn {
         flex: 0 0 auto;
@@ -5665,13 +5818,13 @@ h1 {
 -------------------------------------------------------------------------- */
 
 .cookies-expired-banner {
-    background: var(--warning-bg, #fef3c7);
-    border: 1px solid var(--warning-border, #d97706);
+    background: color-mix(in srgb, var(--warning) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
     border-radius: 6px;
     padding: var(--space-2-5) var(--space-3);
     margin-bottom: var(--space-3);
     font-size: 13px;
-    color: var(--warning-text, #92400e);
+    color: var(--text-primary);
 }
 
 /* --------------------------------------------------------------------------

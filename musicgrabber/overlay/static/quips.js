@@ -2,7 +2,7 @@
 // Search progress quips
 // =============================================================================
 // Cheeky-but-honest status lines for the live search progress panel.
-// One global object, mirroring how release-notes.js is loaded before app.js.
+// One global object, mirroring how release-notes.js is loaded before the app's scripts.
 //
 // Structure:
 //   SEARCH_QUIPS.searching[<source>]  -> shown while a source is still being searched

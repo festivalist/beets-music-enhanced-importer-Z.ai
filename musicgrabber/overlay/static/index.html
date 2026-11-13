@@ -11,16 +11,10 @@
     <link rel="preload" as="font" type="font/woff2" crossorigin href="__ROOT_PATH__/static/fonts/suse-mono-400-latin.woff2">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
     <link rel="stylesheet" href="__ROOT_PATH__/static/style.css?v=__CACHE_BUST__">
-    <script>
-        // Apply the saved theme before first paint, so neither the boot panel nor
-        // the app underneath it flashes dark at somebody who picked light.
-        try {
-            document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'dark');
-        } catch (e) {}
-    </script>
+    <script src="__ROOT_PATH__/static/theme.js?v=__CACHE_BUST__"></script>
     <style>
         /* Boot panel. Deliberately inline and self-contained: it needs to paint
-           the moment the DOM does, which is a good while before 400KB of app.js
+           the moment the DOM does, which is a good while before 400KB of scripts
            has turned up and populated anything. Without it the first thing you
            see is an empty, uninitialised app shell, which looks convincingly
            like a broken one. */
@@ -80,11 +74,11 @@
             <h2 class="auth-title">MusicGrabber</h2>
             <input id="loginUsername" type="text" placeholder="Username" autocomplete="username"
                    class="auth-input"
-                   onkeydown="if(event.key==='Enter') document.getElementById('loginPassword').focus()">
+                   data-ui-keydown="focusLoginPassword">
             <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password"
                    class="auth-input mb-16"
-                   onkeydown="if(event.key==='Enter') doLogin()">
-            <button id="loginBtn" onclick="doLogin()" class="btn btn-primary btn-block auth-submit-btn">
+                   data-ui-keydown="loginOnEnter">
+            <button id="loginBtn" data-ui-click="doLogin" class="btn btn-primary btn-block auth-submit-btn">
                 Sign In
             </button>
             <div id="loginError" style="display:none;" class="auth-error"></div>
@@ -104,8 +98,8 @@
                    class="auth-input">
             <input id="changePasswordConfirm" type="password" placeholder="Confirm new password"
                    class="auth-input mb-16"
-                   onkeydown="if(event.key==='Enter') doChangePassword()">
-            <button onclick="doChangePassword()" class="btn btn-primary btn-block auth-submit-btn">
+                   data-ui-keydown="changePasswordOnEnter">
+            <button data-ui-click="doChangePassword" class="btn btn-primary btn-block auth-submit-btn">
                 Update Password
             </button>
             <div id="changePasswordError" style="display:none;" class="auth-error"></div>
@@ -127,7 +121,7 @@
                 <button id="themeToggle" class="theme-toggle-btn" title="Toggle light/dark theme"><i class="fa-solid fa-moon"></i></button>
                 <span id="versionLabel" class="version-label"></span>
                 <span id="currentUserDisplay" style="display:none;" class="header-user-text"></span>
-                <button id="logoutBtn" style="display:none;" class="btn btn-ghost logout-btn" onclick="doLogout()">Sign out</button>
+                <button id="logoutBtn" style="display:none;" class="btn btn-ghost logout-btn" data-ui-click="doLogout">Sign out</button>
             </div>
         </header>
 
@@ -137,7 +131,7 @@
             <div class="update-banner-actions">
                 <a id="updateBannerChangelog" class="btn btn-ghost update-banner-btn" href="https://gitlab.com/g33kphr33k/musicgrabber/-/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">What's new</a>
                 <a class="donation-link update-banner-coffee" href="https://ko-fi.com/geekphreek" target="_blank" rel="noopener noreferrer" title="Support Music Grabber on Ko-fi"><i class="fa-solid fa-mug-hot"></i> Buy me a coffee</a>
-                <button type="button" class="modal-close-btn update-banner-close" onclick="dismissUpdateBanner()" title="Hide until the next release" aria-label="Dismiss update notice">&#x2715;</button>
+                <button type="button" class="modal-close-btn update-banner-close" data-ui-click="dismissUpdateBanner" title="Hide until the next release" aria-label="Dismiss update notice">&#x2715;</button>
             </div>
         </div>
 
@@ -145,8 +139,8 @@
             <i class="fa-solid fa-rotate update-banner-icon" aria-hidden="true"></i>
             <span class="update-banner-text">MusicGrabber was updated while this tab was open. Reload to swap yesterday's code for today's.</span>
             <div class="update-banner-actions">
-                <button type="button" class="btn btn-primary update-banner-btn" onclick="location.reload()">Reload</button>
-                <button type="button" class="modal-close-btn update-banner-close" onclick="dismissReloadBanner()" title="Hide until the next update" aria-label="Dismiss reload notice">&#x2715;</button>
+                <button type="button" class="btn btn-primary update-banner-btn" data-ui-click="reloadPage">Reload</button>
+                <button type="button" class="modal-close-btn update-banner-close" data-ui-click="dismissReloadBanner" title="Hide until the next update" aria-label="Dismiss reload notice">&#x2715;</button>
             </div>
         </div>
 
@@ -290,8 +284,8 @@
                     <div id="longformSplitPanel" style="display: none;" class="album-existing-warning longform-split-panel"></div>
                     <details class="album-search-note url-types-note">
                         <summary>Which links work?</summary>
-                        <p><strong>Albums</strong>, downloaded as proper albums: MusicBrainz releases, and album links from Spotify, Apple Music, YouTube Music, Tidal, Amazon Music, Beatport and Monochrome.</p>
-                        <p><strong>Playlists</strong>: Spotify playlists and your Liked Songs (Liked Songs needs Spotify cookies in Settings), YouTube and YouTube Music playlists and mixes, Apple Music playlists, Amazon Music playlists, SoundCloud sets and likes, Tidal and Monochrome playlists, ListenBrainz playlists, and Beatport Top 100, genre and DJ charts.</p>
+                        <p><strong>Albums</strong>, downloaded as proper albums: MusicBrainz releases, and album links from Spotify, Apple Music, YouTube Music, Tidal, Amazon Music, Beatport, Monochrome and Qobuz.</p>
+                        <p><strong>Playlists</strong>: Spotify playlists and your Liked Songs (Liked Songs needs Spotify cookies in Settings), YouTube and YouTube Music playlists and mixes, Apple Music playlists, Amazon Music playlists, SoundCloud sets and likes, Tidal and Monochrome playlists, Qobuz playlists, ListenBrainz playlists, Beatport Top 100, genre and DJ charts, and any UK Official Charts song chart.</p>
                         <p><strong>No link?</strong> Type an artist and album (e.g. "Portishead - Dummy") or just an album name to search MusicBrainz.</p>
                         <p>For a playlist that keeps growing, add it in Watched instead: it fetches new tracks on its own, in the best quality the sources can find.</p>
                     </details>
@@ -335,10 +329,14 @@
                     <input
                         type="text"
                         id="playlistNameInput"
-                        placeholder="Playlist name (e.g., My Mixtape 2026)"
+                        placeholder="Playlist name: pick one to add to it, or type a new one"
+                        list="playlistNameSuggestions"
+                        autocomplete="off"
                         style="display: none;"
                         class="bulk-playlist-name-input"
                     >
+                    <datalist id="playlistNameSuggestions"></datalist>
+                    <div id="playlistNameHint" class="bulk-services-note" style="display: none;"></div>
                     <label id="usePlaylistsDirRow" style="display: none;" class="bulk-playlists-dir-label">
                         <input type="checkbox" id="usePlaylistsDirCheckbox" class="bulk-checkbox">
                         <span>Save files to Playlists folder</span>
@@ -449,7 +447,7 @@
                 <div id="artistAlbumsFollowPanel" style="display: none;" class="artist-add-panel">
                     <div id="artistAlbumsFollowName" class="artist-selected-name"></div>
                     <div class="album-search-note">
-                        Album mode uses best-effort single-track matching, not full release mirroring. It will try to source each track intelligently, but it may not produce a perfect 1:1 album copy. For exact album hunting, use Lidarr (with Usenet/torrents) or Soulseek.
+                        Albums come down whole where they can, from Usenet, a Soulseek folder or a torrent, whichever you have switched on. Anything still missing is found track by track, so the odd song may come from a different pressing.
                     </div>
                     <label class="watched-control-label" title="Switching this on does NOT fetch the back catalogue; it only picks up albums that appear from now on, same idea as the singles from-date. Leave it off and nothing is followed, you just get whatever you tick below.">
                         Automatically download future albums
@@ -476,7 +474,7 @@
                 <div id="artistOneOffPanel" style="display: none;" class="artist-add-panel">
                     <div id="artistOneOffName" class="artist-selected-name"></div>
                     <div class="album-search-note">
-                        Album mode uses best-effort single-track matching, not full release mirroring. It will try to source each track intelligently, but it may not produce a perfect 1:1 album copy. For exact album hunting, use Lidarr (with Usenet/torrents) or Soulseek.
+                        Albums come down whole where they can, from Usenet, a Soulseek folder or a torrent, whichever you have switched on. Anything still missing is found track by track, so the odd song may come from a different pressing.
                     </div>
                     <div id="artistOneOffBrowserMount"></div>
                     <button class="btn btn-ghost artist-cancel-btn" id="cancelArtistOneOffBtn">Cancel</button>
@@ -551,17 +549,17 @@
                     <button class="btn accent-btn" id="refreshAllWatchedBtn">Check All Now</button>
                 </div>
                 <div class="upgrade-header-actions mode-actions mode-hidden" data-mode="upgrades">
-                    <button class="btn btn-ghost" id="upgradeAllBtn" onclick="upgradeAll()" title="Best-effort: download and swap in every proposed upgrade">Upgrade All</button>
+                    <button class="btn btn-ghost" id="upgradeAllBtn" data-ui-click="upgradeAll" title="Best-effort: download and swap in every proposed upgrade">Upgrade All</button>
                     <button class="btn btn-ghost" id="quarantineToggleBtn" title="Files an upgrade swapped out: restore or delete them">Quarantine</button>
                     <button class="btn accent-btn" id="rescanUpgradesBtn">Rescan Library</button>
                 </div>
                 <div class="audio-audit-header-actions mode-actions mode-hidden" data-mode="audit">
-                    <button class="btn btn-ghost" id="audioAuditExportCsvBtn" onclick="exportAudioAudit('csv')">Export CSV</button>
-                    <button class="btn btn-ghost" id="audioAuditExportJsonBtn" onclick="exportAudioAudit('json')">Export JSON</button>
-                    <button class="btn accent-btn" id="runAudioAuditBtn" onclick="runAudioAudit()">Run Audit</button>
+                    <button class="btn btn-ghost" id="audioAuditExportCsvBtn" data-ui-click="exportAudioAuditCsv">Export CSV</button>
+                    <button class="btn btn-ghost" id="audioAuditExportJsonBtn" data-ui-click="exportAudioAuditJson">Export JSON</button>
+                    <button class="btn accent-btn" id="runAudioAuditBtn" data-ui-click="runAudioAudit">Run Audit</button>
                 </div>
                 <div class="mode-actions mode-hidden" data-mode="m3u">
-                    <button class="btn accent-btn" id="m3uRefreshBtn" onclick="loadM3uFiles()">Refresh</button>
+                    <button class="btn accent-btn" id="m3uRefreshBtn" data-ui-click="loadM3uFiles">Refresh</button>
                 </div>
             </div>
 
@@ -572,7 +570,7 @@
                 </p>
                 <details class="album-search-note url-types-note">
                     <summary>Which links work?</summary>
-                    <p>Spotify playlists and your Liked Songs (Liked Songs needs Spotify cookies in Settings), YouTube and YouTube Music playlists and mixes, Apple Music playlists, Amazon Music playlists, SoundCloud sets and likes, Tidal and Monochrome playlists, ListenBrainz playlists or a ListenBrainz username, and Beatport Top 100, genre and DJ charts. Spotify and Apple Music album links can be watched too.</p>
+                    <p>Spotify playlists and your Liked Songs (Liked Songs needs Spotify cookies in Settings), YouTube and YouTube Music playlists and mixes, Apple Music playlists, Amazon Music playlists, SoundCloud sets and likes, Tidal and Monochrome playlists, Qobuz playlists, ListenBrainz playlists or a ListenBrainz username, Beatport Top 100, genre and DJ charts, and any UK Official Charts song chart (album charts are not supported). Spotify and Apple Music album links can be watched too.</p>
                     <p>A ListenBrainz username follows its "Created for You" playlists; the button below sets that up for you.</p>
                 </details>
                 <p id="watchedScheduleInfo" class="watched-schedule-info"></p>
@@ -591,7 +589,7 @@
                     </button>
                 </div>
                 <div class="lb-toggle-row">
-                    <button type="button" id="lbToggleBtn" onclick="toggleLbRow()" class="lb-toggle-btn">+ ListenBrainz "Created for You" playlists</button>
+                    <button type="button" id="lbToggleBtn" data-ui-click="toggleLbRow" class="lb-toggle-btn">+ ListenBrainz "Created for You" playlists</button>
                 </div>
                 <div id="lbRow" style="display: none;" class="lb-row input-action">
                     <input
@@ -602,11 +600,25 @@
                     >
                     <button
                         id="addLbBtn"
-                        onclick="addListenBrainzPlaylists()"
+                        data-ui-click="addListenBrainzPlaylists"
                         class="btn btn-primary input-action-btn panel-action-btn"
                     >
                         Add
                     </button>
+                </div>
+                <div class="lb-toggle-row">
+                    <button type="button" id="chartsToggleBtn" data-ui-click="toggleChartsRow" class="lb-toggle-btn">+ UK Official Charts</button>
+                </div>
+                <div id="chartsRow" style="display: none;" class="charts-row">
+                    <p class="settings-hint-sm">One tap watches a chart, with Sync set to Mirror and an M3U, so the playlist follows the chart week by week. Songs that drop out stay in your library.</p>
+                    <div class="charts-presets">
+                        <button type="button" class="btn btn-ghost btn-sm" data-ui-click="watchChartPreset" data-ui-click-args='["https://www.officialcharts.com/charts/uk-top-40-singles-chart/"]'>UK Top 40</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-ui-click="watchChartPreset" data-ui-click-args='["https://www.officialcharts.com/charts/singles-chart/"]'>UK Top 100</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-ui-click="watchChartPreset" data-ui-click-args='["https://www.officialcharts.com/charts/end-of-year-singles-chart/"]'>End of Year</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-ui-click="watchChartPreset" data-ui-click-args='["https://www.officialcharts.com/charts/dance-singles-chart/"]'>Dance</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-ui-click="watchChartPreset" data-ui-click-args='["https://www.officialcharts.com/charts/rock-and-metal-singles-chart/"]'>Rock &amp; Metal</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-ui-click="watchChartPreset" data-ui-click-args='["https://www.officialcharts.com/charts/official-hip-hop-and-r-and-b-singles-chart/"]'>Hip Hop &amp; R&amp;B</button>
+                    </div>
                 </div>
                 <div class="watched-controls-row">
                     <label class="watched-control-label">
@@ -667,11 +679,11 @@
                 <div class="watched-controls-row" id="watchedDestRow">
                     <div class="watched-dest-add-row">
                         <span class="watched-dest-hint">To save to a different folder than the default playlist location:</span>
-                        <button type="button" id="watchedSetDestBtn" class="watched-dest-set-btn" onclick="openDestPicker(document.getElementById('watchedCustomSubdir').value, v => { document.getElementById('watchedCustomSubdir').value = v; updateWatchedDestDisplay(); })">
+                        <button type="button" id="watchedSetDestBtn" class="watched-dest-set-btn" data-ui-click="chooseWatchedCustomFolder">
                             <i class="fa-solid fa-folder-open"></i> Set Destination
                         </button>
                         <span id="watchedDestDisplay" class="watched-dest-display"></span>
-                        <button type="button" id="watchedClearDestBtn" class="watched-dest-clear" title="Reset to default" style="display:none;" onclick="clearWatchedCustomSubdir()">&#x2715;</button>
+                        <button type="button" id="watchedClearDestBtn" class="watched-dest-clear" title="Reset to default" style="display:none;" data-ui-click="clearWatchedCustomSubdir">&#x2715;</button>
                         <input type="hidden" id="watchedCustomSubdir">
                     </div>
                 </div>
@@ -684,7 +696,7 @@
             <div id="orphansSection" class="watched-add-panel section-with-top-margin">
                 <div class="input-action">
                     <span class="watched-panel-text" style="flex:1; margin:0;">Mirror-mode removals leave audio files behind in playlist folders (deleting music is not our department). Scan for these orphans and, if you like, rehome them in Singles.</span>
-                    <button class="btn accent-btn" id="findOrphansBtn" onclick="findPlaylistOrphans()">Find Orphans</button>
+                    <button class="btn accent-btn" id="findOrphansBtn" data-ui-click="findPlaylistOrphans">Find Orphans</button>
                 </div>
                 <div id="orphansResult" style="display:none;"></div>
             </div>
@@ -732,37 +744,37 @@
                 <div class="audio-audit-filters" aria-label="Audio audit filters">
                     <label>
                         Classification
-                        <select id="audioAuditClassification" class="watched-select" onchange="audioAuditFiltersChanged()">
+                        <select id="audioAuditClassification" class="watched-select" data-ui-change="audioAuditFiltersChanged">
                             <option value="">All classifications</option>
                         </select>
                     </label>
                     <label>
                         Container
-                        <select id="audioAuditContainer" class="watched-select" onchange="audioAuditFiltersChanged()">
+                        <select id="audioAuditContainer" class="watched-select" data-ui-change="audioAuditFiltersChanged">
                             <option value="">All containers</option>
                         </select>
                     </label>
                     <label>
                         Codec
-                        <select id="audioAuditCodec" class="watched-select" onchange="audioAuditFiltersChanged()">
+                        <select id="audioAuditCodec" class="watched-select" data-ui-change="audioAuditFiltersChanged">
                             <option value="">All codecs</option>
                         </select>
                     </label>
                     <label>
                         Acquisition source
-                        <select id="audioAuditSource" class="watched-select" onchange="audioAuditFiltersChanged()">
+                        <select id="audioAuditSource" class="watched-select" data-ui-change="audioAuditFiltersChanged">
                             <option value="">All sources</option>
                         </select>
                     </label>
                     <label>
                         Effective quality
-                        <select id="audioAuditEffective" class="watched-select" onchange="audioAuditFiltersChanged()">
+                        <select id="audioAuditEffective" class="watched-select" data-ui-change="audioAuditFiltersChanged">
                             <option value="">All effective qualities</option>
                         </select>
                     </label>
                     <label>
                         Lossless view
-                        <select id="audioAuditLossless" class="watched-select" onchange="audioAuditFiltersChanged()">
+                        <select id="audioAuditLossless" class="watched-select" data-ui-change="audioAuditFiltersChanged">
                             <option value="">All files</option>
                             <option value="stored">Stored in a lossless codec</option>
                             <option value="recorded">Recorded lossless acquisition</option>
@@ -772,9 +784,9 @@
             </div>
             <div id="audioAuditList" class="results peon-hide"></div>
             <div id="audioAuditPager" class="upgrades-pager peon-hide" style="display: none;">
-                <button class="btn btn-ghost" id="audioAuditPrevBtn" onclick="changeAudioAuditPage(-1)">&#8592; Prev</button>
+                <button class="btn btn-ghost" id="audioAuditPrevBtn" data-ui-click="changeAudioAuditPagePrevious">&#8592; Prev</button>
                 <span id="audioAuditPageInfo" class="upgrades-page-info"></span>
-                <button class="btn btn-ghost" id="audioAuditNextBtn" onclick="changeAudioAuditPage(1)">Next &#8594;</button>
+                <button class="btn btn-ghost" id="audioAuditNextBtn" data-ui-click="changeAudioAuditPageNext">Next &#8594;</button>
             </div>
             </div>
 
@@ -786,7 +798,7 @@
                     </p>
                     <div class="input-action">
                         <input type="text" id="m3uNewNameInput" class="panel-text-input" placeholder="New playlist name" autocomplete="off">
-                        <button class="btn btn-primary input-action-btn panel-action-btn" id="m3uCreateBtn" onclick="createM3uFile()">New Playlist</button>
+                        <button class="btn btn-primary input-action-btn panel-action-btn" id="m3uCreateBtn" data-ui-click="createM3uFile">New Playlist</button>
                     </div>
                     <p id="m3uFolderInfo" class="watched-schedule-info"></p>
                 </div>
@@ -836,11 +848,12 @@
             <div class="mode-panel" data-mode="queue">
                 <div id="queueLiveSummary" class="queue-live-summary" style="display:none;" role="status" aria-live="polite" aria-atomic="false"></div>
                 <div id="queueSearchStatus" class="queue-search-status" style="display:none;" role="status" aria-live="polite"></div>
+                <div id="queueAlbumFetches" class="results queue-album-fetches" style="display:none;" role="status" aria-live="polite"></div>
                 <div id="queueTab" class="results"></div>
                 <div id="queuePager" style="display:none;" class="downloadable-pager">
-                    <button class="btn btn-ghost" id="queuePrevBtn" onclick="changeQueuePage(-1)" disabled>&#8592; Prev</button>
+                    <button class="btn btn-ghost" id="queuePrevBtn" data-ui-click="changeQueuePagePrevious" disabled>&#8592; Prev</button>
                     <span id="queuePagerInfo" class="pager-info"></span>
-                    <button class="btn btn-ghost" id="queueNextBtn" onclick="changeQueuePage(1)">Next &#8594;</button>
+                    <button class="btn btn-ghost" id="queueNextBtn" data-ui-click="changeQueuePageNext">Next &#8594;</button>
                 </div>
             </div>
 
@@ -848,9 +861,9 @@
                 <p class="downloadable-intro-text">All completed downloads available to save locally, newest first.</p>
                 <div id="downloadableList" class="results"></div>
                 <div id="downloadablePager" style="display:none;" class="downloadable-pager">
-                    <button class="btn btn-ghost" id="downloadablePrevBtn" onclick="loadDownloadable(-1)" disabled>&#8592; Prev</button>
+                    <button class="btn btn-ghost" id="downloadablePrevBtn" data-ui-click="loadDownloadablePrevious" disabled>&#8592; Prev</button>
                     <span id="downloadablePagerInfo" class="pager-info"></span>
-                    <button class="btn btn-ghost" id="downloadableNextBtn" onclick="loadDownloadable(1)">Next &#8594;</button>
+                    <button class="btn btn-ghost" id="downloadableNextBtn" data-ui-click="loadDownloadableNext">Next &#8594;</button>
                 </div>
             </div>
 
@@ -956,10 +969,31 @@
                                     <span class="toggle-slider"></span>
                                 </div>
                             </label>
-                            <label class="source-toggle-item" title="Search Monochrome for lossless FLAC via its tracks API.">
+                            <label class="source-toggle-item" title="Search Monochrome for full-length 320 kbps MP3 through Indiachrome.">
                                 <span class="source-toggle-text">Monochrome <i class="fa-solid fa-circle-info source-toggle-help" aria-label="Monochrome help"></i></span>
                                 <div class="toggle-switch">
                                     <input type="checkbox" id="settingSourceMonochrome">
+                                    <span class="toggle-slider"></span>
+                                </div>
+                            </label>
+                            <label class="source-toggle-item" title="Search Tidal and download CD-quality FLAC through Zarz. Browser verification runs automatically when needed; sessions are saved and refreshed.">
+                                <span class="source-toggle-text">Zarz <i class="fa-solid fa-circle-info source-toggle-help" aria-label="Zarz help"></i></span>
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="settingSourceZarz" checked>
+                                    <span class="toggle-slider"></span>
+                                </div>
+                            </label>
+                            <label class="source-toggle-item" title="Whole albums from your Usenet indexers, through Prowlarr and SABnzbd, asked first whenever an album is downloaded. Also the last resort for single tracks in bulk imports, watched playlists and an album's missing tracks: once every other source has failed on a track, a single, EP or CD single of it is fetched from Usenet. Never part of the track search. Needs both set up under Connections.">
+                                <span class="source-toggle-text">Prowlarr (albums, singles last) <i class="fa-solid fa-circle-info source-toggle-help" aria-label="Prowlarr help"></i></span>
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="settingSourceProwlarr">
+                                    <span class="toggle-slider"></span>
+                                </div>
+                            </label>
+                            <label class="source-toggle-item" title="Whole albums from your torrent indexers, through Prowlarr and qBittorrent. Asked after Usenet and Soulseek, because a torrent can take hours; a dead one is given up on within about 20 minutes, a slow one after 3 hours. Tracks are copied out, so everything keeps seeding. Never part of the track search. Needs both set up under Connections.">
+                                <span class="source-toggle-text">Torrents (albums) <i class="fa-solid fa-circle-info source-toggle-help" aria-label="Torrents help"></i></span>
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="settingSourceTorrents">
                                     <span class="toggle-slider"></span>
                                 </div>
                             </label>
@@ -1085,49 +1119,51 @@
                     <label class="settings-label format-selector-wrap">
                         <span>Audio Format</span>
                         <div class="format-btn-group">
-                            <button type="button" id="conversionModeKeep" class="format-option active" onclick="setDefaultConversionMode(false); saveSettings();">Keep source</button>
-                            <button type="button" id="conversionModeConvert" class="format-option" onclick="setDefaultConversionMode(true); saveSettings();">Convert to</button>
+                            <button type="button" id="conversionModeKeep" class="format-option active" data-ui-click="setDefaultConversionModeOff">Keep source</button>
+                            <button type="button" id="conversionModeConvert" class="format-option" data-ui-click="setDefaultConversionModeOn">Convert to</button>
                         </div>
                         <div id="conversionTargetOptions" class="conversion-target-options" style="display:none;">
                             <span class="settings-label-sub">Convert to</span>
                             <div class="format-btn-group">
-                                <button type="button" id="formatBtnFlac" class="format-option" onclick="setAudioFormat('flac'); saveSettings();">FLAC</button>
-                                <button type="button" id="formatBtnAlac" class="format-option" onclick="setAudioFormat('alac'); saveSettings();">ALAC</button>
-                                <button type="button" id="formatBtnOpus" class="format-option active" onclick="setAudioFormat('opus'); saveSettings();">Opus</button>
-                                <button type="button" id="formatBtnMp3"  class="format-option" onclick="setAudioFormat('mp3');  saveSettings();">MP3</button>
+                                <button type="button" id="formatBtnFlac" class="format-option" data-ui-click="setAudioFormatFlac">FLAC</button>
+                                <button type="button" id="formatBtnAiff" class="format-option" data-ui-click="setAudioFormatAiff">AIFF</button>
+                                <button type="button" id="formatBtnAlac" class="format-option" data-ui-click="setAudioFormatAlac">ALAC</button>
+                                <button type="button" id="formatBtnOpus" class="format-option active" data-ui-click="setAudioFormatOpus">Opus</button>
+                                <button type="button" id="formatBtnMp3"  class="format-option" data-ui-click="setAudioFormatMp3">MP3</button>
                             </div>
+                            <span id="aiffFormatNote" style="display:none;" class="mp3-format-note">AIFF (.aiff) stores uncompressed PCM audio. It preserves the source sample rate and known bit depth, but takes more space than FLAC. Converting a lossy source cannot restore lost quality.</span>
                             <span id="alacFormatNote" style="display:none;" class="mp3-format-note">ALAC (.m4a) is lossless. Lower bitrates here actually fall back to AAC inside the same .m4a container, so anything below "Lossless" is lossy.</span>
                             <span id="mp3FormatNote" style="display:none;" class="mp3-format-note">MP3 may cause quality loss if the source is already lossy (e.g. from YouTube).</span>
                             <span id="lossyConversionWarning" style="display:none;" class="lossy-conversion-warning"></span>
                             <div id="mp3QualityRow" style="display:none;margin-top:6px;">
                                 <span class="settings-label-sub">MP3 Quality</span>
                                 <div class="format-btn-group">
-                                    <button type="button" id="mp3QualityBtnV2"  class="format-option active" onclick="setMp3Bitrate('v2');  saveSettings();">V2 ~192k</button>
-                                    <button type="button" id="mp3QualityBtnV0"  class="format-option"        onclick="setMp3Bitrate('v0');  saveSettings();">V0 ~245k</button>
-                                    <button type="button" id="mp3QualityBtn320" class="format-option"        onclick="setMp3Bitrate('320k'); saveSettings();">320k</button>
-                                    <button type="button" id="mp3QualityBtn256" class="format-option"        onclick="setMp3Bitrate('256k'); saveSettings();">256k</button>
-                                    <button type="button" id="mp3QualityBtn192" class="format-option"        onclick="setMp3Bitrate('192k'); saveSettings();">192k</button>
-                                    <button type="button" id="mp3QualityBtn128" class="format-option"        onclick="setMp3Bitrate('128k'); saveSettings();">128k</button>
+                                    <button type="button" id="mp3QualityBtnV2"  class="format-option active" data-ui-click="setMp3BitrateV2">V2 ~192k</button>
+                                    <button type="button" id="mp3QualityBtnV0"  class="format-option"        data-ui-click="setMp3BitrateV0">V0 ~245k</button>
+                                    <button type="button" id="mp3QualityBtn320" class="format-option"        data-ui-click="setMp3Bitrate320k">320k</button>
+                                    <button type="button" id="mp3QualityBtn256" class="format-option"        data-ui-click="setMp3Bitrate256k">256k</button>
+                                    <button type="button" id="mp3QualityBtn192" class="format-option"        data-ui-click="setMp3Bitrate192k">192k</button>
+                                    <button type="button" id="mp3QualityBtn128" class="format-option"        data-ui-click="setMp3Bitrate128k">128k</button>
                                 </div>
                                 <span class="settings-hint settings-hint-full">V0 and V2 are variable bitrate (VBR); the rest are constant bitrate (CBR). VBR is generally better quality per byte.</span>
                             </div>
                             <div id="opusQualityRow" style="display:none;margin-top:6px;">
                                 <span class="settings-label-sub">Opus Bitrate</span>
                                 <div class="format-btn-group">
-                                    <button type="button" id="opusQualityBtn256" class="format-option active" onclick="setOpusBitrate('256k'); saveSettings();">256k</button>
-                                    <button type="button" id="opusQualityBtn192" class="format-option"        onclick="setOpusBitrate('192k'); saveSettings();">192k</button>
-                                    <button type="button" id="opusQualityBtn128" class="format-option"        onclick="setOpusBitrate('128k'); saveSettings();">128k</button>
-                                    <button type="button" id="opusQualityBtn96"  class="format-option"        onclick="setOpusBitrate('96k');  saveSettings();">96k</button>
+                                    <button type="button" id="opusQualityBtn256" class="format-option active" data-ui-click="setOpusBitrate256k">256k</button>
+                                    <button type="button" id="opusQualityBtn192" class="format-option"        data-ui-click="setOpusBitrate192k">192k</button>
+                                    <button type="button" id="opusQualityBtn128" class="format-option"        data-ui-click="setOpusBitrate128k">128k</button>
+                                    <button type="button" id="opusQualityBtn96"  class="format-option"        data-ui-click="setOpusBitrate96k">96k</button>
                                 </div>
                             </div>
                             <div id="alacQualityRow" style="display:none;margin-top:6px;">
                                 <span class="settings-label-sub">ALAC Quality</span>
                                 <div class="format-btn-group">
-                                    <button type="button" id="alacQualityBtnLossless" class="format-option active" onclick="setAlacBitrate('lossless'); saveSettings();">Lossless</button>
-                                    <button type="button" id="alacQualityBtn320"      class="format-option"        onclick="setAlacBitrate('320k');     saveSettings();">320k</button>
-                                    <button type="button" id="alacQualityBtn256"      class="format-option"        onclick="setAlacBitrate('256k');     saveSettings();">256k</button>
-                                    <button type="button" id="alacQualityBtn192"      class="format-option"        onclick="setAlacBitrate('192k');     saveSettings();">192k</button>
-                                    <button type="button" id="alacQualityBtn128"      class="format-option"        onclick="setAlacBitrate('128k');     saveSettings();">128k</button>
+                                    <button type="button" id="alacQualityBtnLossless" class="format-option active" data-ui-click="setAlacBitrateLossless">Lossless</button>
+                                    <button type="button" id="alacQualityBtn320"      class="format-option"        data-ui-click="setAlacBitrate320k">320k</button>
+                                    <button type="button" id="alacQualityBtn256"      class="format-option"        data-ui-click="setAlacBitrate256k">256k</button>
+                                    <button type="button" id="alacQualityBtn192"      class="format-option"        data-ui-click="setAlacBitrate192k">192k</button>
+                                    <button type="button" id="alacQualityBtn128"      class="format-option"        data-ui-click="setAlacBitrate128k">128k</button>
                                 </div>
                                 <span class="settings-hint settings-hint-full">Lossless gives you proper Apple Lossless. The kbps options switch the encoder to AAC inside the same .m4a wrapper, so they are lossy but iPod-friendly.</span>
                             </div>
@@ -1135,15 +1171,15 @@
                                 <label class="settings-label settings-label-wrap" style="margin:0;">
                                     <span>Convert lossless sources only</span>
                                     <div class="toggle-switch">
-                                        <input type="checkbox" id="settingConvertLosslessOnly" onchange="saveSettings();">
+                                        <input type="checkbox" id="settingConvertLosslessOnly" data-ui-change="saveSettings">
                                         <span class="toggle-slider"></span>
                                     </div>
-                                    <span class="settings-hint settings-hint-full">Only re-encodes FLAC, ALAC and WAV sources. A source that's already lossy (MP3, AAC, an existing Opus...) is kept exactly as delivered instead of being hopped into another lossy format for no quality gain.</span>
+                                    <span class="settings-hint settings-hint-full">Only re-encodes lossless sources such as FLAC, AIFF, ALAC, and WAV. A source that's already lossy (MP3, AAC, an existing Opus...) is kept exactly as delivered instead of being hopped into another lossy format for no quality gain.</span>
                                 </label>
                             </div>
                         </div>
                         <span class="settings-hint settings-hint-full"><strong>Keep source</strong> stores the audio in the format supplied by the provider and avoids an unnecessary re-encode. <strong>Convert to</strong> re-encodes each download to your selected format.</span>
-                        <span class="settings-hint settings-hint-full"><strong>Quality note:</strong> FLAC and ALAC can preserve a lossless source, but converting lossy MP3, AAC, Opus, YouTube, or SoundCloud audio to them cannot restore lost quality.</span>
+                        <span class="settings-hint settings-hint-full"><strong>Quality note:</strong> FLAC, AIFF, and ALAC can preserve a lossless source, but converting lossy MP3, AAC, Opus, YouTube, or SoundCloud audio to them cannot restore lost quality.</span>
                         <input type="checkbox" id="settingDefaultConvertAudio" style="display:none;">
                         <input type="text" id="settingAudioFormat" value="opus" style="display:none;">
                         <input type="hidden" id="settingMp3Bitrate" value="v2">
@@ -1156,7 +1192,7 @@
                             <input type="checkbox" id="settingNormaliseLossyAudio">
                             <span class="toggle-slider"></span>
                         </div>
-                        <span class="settings-hint settings-hint-full">Evens out the wild volume differences between YouTube (and other lossy web source) downloads by normalising them to a streaming-standard -14 LUFS as they arrive. Pure gain adjustment, no compression or pumping. Lossless sources (Monochrome, Soulseek) are never touched.</span>
+                        <span class="settings-hint settings-hint-full">Evens out the wild volume differences between YouTube (and other lossy web source) downloads by normalising them to a streaming-standard -14 LUFS as they arrive. Pure gain adjustment, no compression or pumping. Lossless sources, including Soulseek FLAC, are never touched.</span>
                     </label>
                     <label class="settings-label settings-label-wrap">
                         <span>Write ReplayGain Tags</span>
@@ -1256,6 +1292,14 @@
                         </div>
                         <span class="settings-hint settings-hint-full">Hides album browsing for everyone (the Artists tab still follows artists and grabs singles). Handy when you're feeding Navidrome with singles only and don't want family members poking at the album browser. Reload required.</span>
                     </label>
+                    <label class="settings-label settings-label-wrap admin-only">
+                        <span>Albums as individual tracks</span>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="settingAlbumTracksFromLibrary">
+                            <span class="toggle-slider"></span>
+                        </div>
+                        <span class="settings-hint settings-hint-full">For everyone. An album download skips any song already anywhere in your library, the same check a single gets, instead of only looking in the album's own folder. For libraries where beets or another organiser moves tracks after download. New tracks still get the album's tags and track numbers. One copy per song: a track you have from a compilation counts, and an album listing the same title twice gets it once. Dolby Atmos albums are never affected.</span>
+                    </label>
                 </div>
             </div>
 
@@ -1309,7 +1353,7 @@
                     <div class="settings-row admin-only">
                         <label for="settingFilePermissions">Downloaded File Permissions</label>
                         <div class="settings-subdir-flex">
-                            <select id="settingFilePermissions" class="settings-input-path" onchange="saveSettings()">
+                            <select id="settingFilePermissions" class="settings-input-path" data-ui-change="saveSettings">
                                 <option value="666">666 (rw-rw-rw-), default</option>
                                 <option value="777">777 (rwxrwxrwx), NAS/share write access</option>
                             </select>
@@ -1510,11 +1554,93 @@
                 </div>
             </div>
 
+            <div class="settings-section admin-only">
+                <h3 class="settings-section-title">Prowlarr, SABnzbd and qBittorrent</h3>
+                <div class="settings-warning">
+                    <strong>Albums, single tracks only as a last resort, and the download client's folder must be mounted here.</strong>
+                    Turn on Prowlarr (Usenet) and Torrents under Downloads, Search Sources. When an album is downloaded, Prowlarr searches your Usenet indexers first and sends the best release to SABnzbd; once SABnzbd has finished, each track is moved out of its folder and filed like any other download. Torrents come after Soulseek, go to qBittorrent, and are copied out rather than moved, so they keep seeding. MusicGrabber never deletes anything from either client, so the nfo, the artwork and any track the album did not need stay where they are for you to tidy.
+                    <br><br>
+                    <strong>Single tracks, as a last resort:</strong> in bulk imports, watched playlists and an album's missing tracks, once every other source has failed on a track, MusicGrabber looks on Usenet for a single, EP or CD single of it, and takes that track from it, by its title, so you get the radio edit you asked for rather than the extended mix beside it. Never an album for one track, never torrents, and never the Tracks search, which stays quick. It is most use for old CD singles and dance remixes that streaming services never carried. Every one is a grab: fine on an unlimited indexer, worth knowing on one with a daily limit.
+                </div>
+                <div class="settings-form">
+                    <div class="settings-row">
+                        <label for="settingProwlarrUrl">Prowlarr URL</label>
+                        <input type="text" id="settingProwlarrUrl" placeholder="http://192.168.1.100:9696">
+                    </div>
+                    <div class="settings-row">
+                        <label for="settingProwlarrApiKey">Prowlarr API Key</label>
+                        <div class="password-field">
+                            <input type="password" id="settingProwlarrApiKey" placeholder="Settings, General, Security in Prowlarr">
+                            <button type="button" class="password-toggle" data-target="settingProwlarrApiKey">Show</button>
+                        </div>
+                    </div>
+                    <button type="button" class="btn test-btn" id="testProwlarrBtn">Test Prowlarr</button>
+                    <div id="prowlarrTestResult" class="test-result"></div>
+                    <div class="settings-row">
+                        <label for="settingSabnzbdUrl">SABnzbd URL</label>
+                        <input type="text" id="settingSabnzbdUrl" placeholder="http://192.168.1.100:8080">
+                    </div>
+                    <div class="settings-row">
+                        <label for="settingSabnzbdApiKey">SABnzbd API Key</label>
+                        <div class="password-field">
+                            <input type="password" id="settingSabnzbdApiKey" placeholder="Config, General, Security in SABnzbd">
+                            <button type="button" class="password-toggle" data-target="settingSabnzbdApiKey">Show</button>
+                        </div>
+                    </div>
+                    <div class="settings-row">
+                        <label for="settingSabnzbdDownloads">Completed Folder</label>
+                        <input type="text" id="settingSabnzbdDownloads" placeholder="/mnt/downloads/complete">
+                        <span class="settings-hint-sm">SABnzbd's completed downloads folder, as MusicGrabber's container sees it. Easiest is to mount it at the same path SABnzbd uses, so its paths need no translating.</span>
+                    </div>
+                    <button type="button" class="btn test-btn" id="testSabnzbdBtn">Test SABnzbd</button>
+                    <div id="sabnzbdTestResult" class="test-result"></div>
+                    <div class="settings-row">
+                        <label for="settingQbittorrentUrl">qBittorrent URL</label>
+                        <input type="text" id="settingQbittorrentUrl" placeholder="http://192.168.1.100:8080">
+                    </div>
+                    <div class="settings-row">
+                        <label for="settingQbittorrentUser">qBittorrent Username</label>
+                        <input type="text" id="settingQbittorrentUser" placeholder="Leave empty if qBittorrent lets your network in without one">
+                    </div>
+                    <div class="settings-row">
+                        <label for="settingQbittorrentPass">qBittorrent Password</label>
+                        <div class="password-field">
+                            <input type="password" id="settingQbittorrentPass" placeholder="Tools, Options, Web UI in qBittorrent">
+                            <button type="button" class="password-toggle" data-target="settingQbittorrentPass">Show</button>
+                        </div>
+                    </div>
+                    <div class="settings-row">
+                        <label for="settingQbittorrentDownloads">Download Folder</label>
+                        <input type="text" id="settingQbittorrentDownloads" placeholder="/mnt/torrents">
+                        <span class="settings-hint-sm">qBittorrent's download folder, as MusicGrabber's container sees it. Mount it read-only: tracks are only ever copied out, so the torrents keep seeding.</span>
+                    </div>
+                    <button type="button" class="btn test-btn" id="testQbittorrentBtn">Test qBittorrent</button>
+                    <div id="qbittorrentTestResult" class="test-result"></div>
+                </div>
+            </div>
+
+            <!-- SoundCloud device configuration is private to the installation admin. -->
+            <div class="settings-section admin-only">
+                <h3 class="settings-section-title">SoundCloud</h3>
+                <div class="settings-form">
+                    <div class="settings-row">
+                        <label for="settingSoundcloudDeviceFile">Device File</label>
+                        <input type="text" id="settingSoundcloudDeviceFile" placeholder="/data/soundcloud/device.wvd">
+                        <span class="settings-hint">Drop your own <code>device.wvd</code> into a <code>soundcloud</code> folder in your existing data mount. Supported protected tracks become available automatically. For another location, enter its path inside the container. Clear the path to disable protected downloads.</span>
+                        <span class="settings-hint">The file stays on your server, outside the image. Save a changed path before testing. Protected tracks can be downloaded; browser previews remain unavailable for them.</span>
+                    </div>
+                    <button type="button" class="btn test-btn" id="testSoundcloudBtn">Test Downloads</button>
+                    <span class="settings-hint-sm">Checks the device, downloads and verifies a protected track, then deletes the temporary audio.</span>
+                    <div id="soundcloudTestResult" class="test-result"></div>
+                    <div id="soundcloudTestSteps" class="diag-steps" hidden></div>
+                </div>
+            </div>
+
             <!-- Monochrome -->
             <div class="settings-section admin-only">
                 <h3 class="settings-section-title">Monochrome</h3>
                 <div class="settings-warning">
-                    Enable Monochrome under Downloads, Search Sources, to get lossless audio. No account or API key is required: MusicGrabber downloads through Monochrome's own tracks API, as 16-bit FLAC.
+                    Enable Monochrome under Downloads, Search Sources, for 320 kbps MP3. No account or API key is required. MusicGrabber checks the audio's bitrate and full duration. Equivalent JioSaavn results rank higher.
                 </div>
                 <div class="settings-form">
                     <button type="button" class="btn test-btn" id="testMonochromeBtn">Test Downloads</button>
@@ -1659,7 +1785,7 @@
                         </select>
                     </div>
                     <div id="createUserError" style="display:none;" class="user-create-error"></div>
-                    <button onclick="createUser()" class="btn btn-primary user-add-btn">
+                    <button data-ui-click="createUser" class="btn btn-primary user-add-btn">
                         Add User
                     </button>
                 </div>
@@ -1687,7 +1813,7 @@
                     <!-- Change My Password (shown in session mode only) -->
                     <div id="changePasswordSection" style="display:none;">
                         <h4 class="change-password-heading">Change My Password</h4>
-                        <button onclick="showChangePasswordScreen(false)" class="btn btn-ghost change-password-btn">
+                        <button data-ui-click="showChangePasswordScreenOff" class="btn btn-ghost change-password-btn">
                             Change Password
                         </button>
                     </div>
@@ -1699,9 +1825,9 @@
                 <p class="settings-hint settings-hint-full">Database housekeeping only. These tools never delete or move library audio. Preview the counts, then choose exactly what to clean.</p>
                 <div id="maintenancePreview" class="maintenance-preview">Load Settings to preview maintenance.</div>
                 <div class="maintenance-actions">
-                    <button type="button" class="btn btn-ghost" onclick="runMaintenanceAction('purge_orphans')">Remove orphan imports</button>
-                    <button type="button" class="btn btn-ghost" onclick="runMaintenanceAction('reconcile')">Reconcile missing files</button>
-                    <button type="button" class="btn btn-ghost" onclick="runMaintenanceAction('clean_rebuild')">Clean and rebuild index</button>
+                    <button type="button" class="btn btn-ghost" data-ui-click="purgeOrphanedRows">Remove orphan imports</button>
+                    <button type="button" class="btn btn-ghost" data-ui-click="runMaintenanceActionReconcile">Reconcile missing files</button>
+                    <button type="button" class="btn btn-ghost" data-ui-click="cleanRebuildLibrary">Clean and rebuild index</button>
                 </div>
                 <div class="maintenance-history">
                     <span>Queue history to remove:</span>
@@ -1709,7 +1835,7 @@
                     <label><input type="checkbox" value="completed_with_errors"> Completed with issues</label>
                     <label><input type="checkbox" value="failed"> Failed</label>
                     <label><input type="checkbox" value="cancelled"> Cancelled</label>
-                    <button type="button" class="btn btn-danger" onclick="clearSelectedQueueHistory()">Remove selected history</button>
+                    <button type="button" class="btn btn-danger" data-ui-click="clearSelectedQueueHistory">Remove selected history</button>
                 </div>
                 <div id="maintenanceResult" class="save-result"></div>
             </div>
@@ -1718,7 +1844,7 @@
                 <h3 class="settings-section-title">Server networking</h3>
                 <p class="settings-hint settings-hint-full">Configured bind: <code id="serverBindAddress">Unavailable</code> (inside the container). Your browser's host port may differ.</p>
                 <p class="settings-hint settings-hint-full">To change it, set <code>LISTEN_PORT</code> (1 to 65535; default 8080) and optionally <code>LISTEN_ADDR</code> (default 0.0.0.0) in the container environment, then recreate the container. Saving Settings cannot change the running server's port.</p>
-                <p class="settings-hint settings-hint-full">Sharing a VPN container's network? Publish the chosen internal port on the VPN container and allow it through that container's firewall. Remove MusicGrabber's own port mappings and use a port that no other service in that shared network is listening on. See the README's VPN-container networking instructions for Compose and Unraid examples.</p>
+                <p class="settings-hint settings-hint-full">Sharing a VPN container's network? Publish the chosen internal port on the VPN container and allow it through that container's firewall. Remove MusicGrabber's own port mappings and use a port that no other service in that shared network is listening on. See <a href="https://gitlab.com/g33kphr33k/musicgrabber/-/blob/main/guide/networking.md#vpn-container-networking" target="_blank" rel="noopener">VPN-container networking</a> in the guide for Compose and Unraid examples.</p>
             </div>
             </div>
 
@@ -1730,7 +1856,16 @@
     <!-- Floating settings save bar - visible only when settings tab is active -->
     <div id="settingsFloatingBar" class="settings-floating-bar" style="display:none;">
         <div class="settings-floating-bar-inner">
+            <div id="configCheckPanel" class="config-check-panel" hidden>
+                <div class="config-check-header">
+                    <span class="config-check-title">Check my config</span>
+                    <span id="configCheckSummary" class="config-check-summary"></span>
+                    <button type="button" id="configCheckClose" class="modal-close-btn" title="Close">&#x2715;</button>
+                </div>
+                <div id="configCheckList" class="config-check-list"></div>
+            </div>
             <button type="button" class="btn btn-primary save-btn" id="saveSettingsBtn">Save Settings</button>
+            <button type="button" class="btn btn-ghost check-config-btn" id="checkConfigBtn" title="Check that every saved setting actually works"><i class="fa-solid fa-stethoscope floating-bar-icon"></i><span class="floating-bar-label">Check my config</span></button>
             <a
                 class="donation-link"
                 href="https://ko-fi.com/geekphreek"
@@ -1740,7 +1875,7 @@
             >
                 <i class="fa-solid fa-mug-hot"></i> <span class="floating-bar-label">Buy me a coffee</span>
             </a>
-            <button type="button" class="btn btn-ghost release-notes-btn" onclick="showReleaseNotes(serverConfig.version)" title="View release notes and what's new"><i class="fa-solid fa-newspaper floating-bar-icon"></i><span class="floating-bar-label">Release Notes</span></button>
+            <button type="button" class="btn btn-ghost release-notes-btn" data-ui-click="showReleaseNotes" title="View release notes and what's new"><i class="fa-solid fa-newspaper floating-bar-icon"></i><span class="floating-bar-label">Release Notes</span></button>
         </div>
     </div>
 
@@ -1749,13 +1884,13 @@
         <div class="modal-card">
             <div class="modal-header">
                 <h3 id="releaseNotesTitle" class="modal-title"></h3>
-                <button onclick="closeReleaseNotes()" class="modal-close-btn" title="Close">&#x2715;</button>
+                <button data-ui-click="closeReleaseNotes" class="modal-close-btn" title="Close">&#x2715;</button>
             </div>
             <div id="releaseNotesBody" class="modal-body"></div>
             <div class="modal-footer release-notes-footer">
                 <div class="release-notes-nav">
-                    <button type="button" id="releaseNotesOlderBtn" class="release-notes-nav-btn" onclick="showOlderReleaseNotes()" title="Older release notes" aria-label="Older release notes">&#x2039;</button>
-                    <button type="button" id="releaseNotesNewerBtn" class="release-notes-nav-btn" onclick="showNewerReleaseNotes()" title="Newer release notes" aria-label="Newer release notes">&#x203A;</button>
+                    <button type="button" id="releaseNotesOlderBtn" class="release-notes-nav-btn" data-ui-click="showOlderReleaseNotes" title="Older release notes" aria-label="Older release notes">&#x2039;</button>
+                    <button type="button" id="releaseNotesNewerBtn" class="release-notes-nav-btn" data-ui-click="showNewerReleaseNotes" title="Newer release notes" aria-label="Newer release notes">&#x203A;</button>
                 </div>
                 <a
                     class="btn btn-primary release-notes-donate-btn"
@@ -1766,20 +1901,20 @@
                 >
                     <i class="fa-solid fa-mug-hot"></i> Donate a coffee
                 </a>
-                <button onclick="closeReleaseNotes()" class="btn btn-primary modal-confirm-btn">Got it</button>
+                <button data-ui-click="closeReleaseNotes" class="btn btn-primary modal-confirm-btn">Got it</button>
             </div>
         </div>
     </div>
 
     <!-- Report / Blacklist modal -->
     <div id="tagEditorOverlay" style="display:none;" class="modal-overlay">
-        <div class="tag-editor-card" onclick="event.stopPropagation()">
+        <div class="tag-editor-card" data-ui-click="stopPropagation">
             <div class="modal-header">
                 <div>
                     <h3 class="modal-title">Edit Track Tags</h3>
                     <div id="tagEditorMeta" class="tag-editor-meta"></div>
                 </div>
-                <button onclick="closeTagEditor()" class="modal-close-btn" title="Close">&#x2715;</button>
+                <button data-ui-click="closeTagEditor" class="modal-close-btn" title="Close">&#x2715;</button>
             </div>
 
             <div class="tag-editor-body">
@@ -1824,7 +1959,7 @@
                     <button type="button" id="tagEditorResetBtn" class="btn btn-ghost tag-editor-secondary-btn">Reset</button>
                 </div>
                 <div class="tag-editor-actions-right">
-                    <button type="button" onclick="closeTagEditor()" class="btn btn-ghost tag-editor-secondary-btn">Cancel</button>
+                    <button type="button" data-ui-click="closeTagEditor" class="btn btn-ghost tag-editor-secondary-btn">Cancel</button>
                     <button type="button" id="tagEditorSaveBtn" class="btn btn-primary tag-editor-primary-btn">Save Tags</button>
                 </div>
             </div>
@@ -1863,20 +1998,20 @@
             </div>
 
             <div class="report-actions">
-                <button onclick="closeReportDialog()" class="btn btn-ghost report-btn report-cancel-btn">Cancel</button>
-                <button onclick="submitReport()" id="reportSubmitBtn" class="btn warning-btn report-btn report-submit-btn">Report</button>
+                <button data-ui-click="closeReportDialog" class="btn btn-ghost report-btn report-cancel-btn">Cancel</button>
+                <button data-ui-click="submitReport" id="reportSubmitBtn" class="btn warning-btn report-btn report-submit-btn">Report</button>
             </div>
         </div>
     </div>
 
     <div id="missingTrackVersionsOverlay" style="display:none;" class="modal-overlay">
-        <div class="missing-track-modal-card" onclick="event.stopPropagation()">
+        <div class="missing-track-modal-card" data-ui-click="stopPropagation">
             <div class="modal-header">
                 <div>
                     <h3 class="modal-title">Find Versions</h3>
                     <div id="missingTrackVersionsMeta" class="tag-editor-meta"></div>
                 </div>
-                <button onclick="closeMissingTrackVersionsModal()" class="modal-close-btn" title="Close">&#x2715;</button>
+                <button data-ui-click="closeMissingTrackVersionsModal" class="modal-close-btn" title="Close">&#x2715;</button>
             </div>
 
             <div class="missing-track-modal-toolbar">
@@ -1888,42 +2023,42 @@
     </div>
 
     <!-- M3U editor: one playlist file, reorder / remove / add -->
-    <div id="m3uEditorOverlay" style="display:none;" class="modal-overlay" onclick="closeM3uEditor()">
-        <div class="m3u-editor-card" onclick="event.stopPropagation()">
+    <div id="m3uEditorOverlay" style="display:none;" class="modal-overlay" data-ui-click="closeM3uEditor">
+        <div class="m3u-editor-card" data-ui-click="stopPropagation">
             <div class="modal-header">
                 <div>
                     <h3 id="m3uEditorTitle" class="modal-title">Edit Playlist</h3>
                     <div id="m3uEditorMeta" class="tag-editor-meta"></div>
                 </div>
-                <button onclick="closeM3uEditor()" class="modal-close-btn" title="Close">&#x2715;</button>
+                <button data-ui-click="closeM3uEditor" class="modal-close-btn" title="Close">&#x2715;</button>
             </div>
             <div id="m3uEditorNotice" class="m3u-editor-notice" style="display:none;"></div>
             <div id="m3uEditorList" class="m3u-editor-list"></div>
             <div id="m3uEditorError" class="tag-editor-error" style="display:none;"></div>
             <div class="tag-editor-actions">
                 <div class="tag-editor-actions-left">
-                    <button type="button" id="m3uAddBtn" class="btn btn-ghost tag-editor-secondary-btn" onclick="openLibraryPicker({ onPick: addM3uEntryFromLibrary, keepOpen: true })"><i class="fa-solid fa-plus"></i> Add Tracks</button>
-                    <button type="button" id="m3uPruneBtn" class="btn btn-ghost tag-editor-secondary-btn" onclick="removeMissingM3uEntries()">Remove Missing</button>
-                    <button type="button" id="m3uDeleteBtn" class="btn btn-ghost tag-editor-secondary-btn m3u-delete-btn" onclick="deleteM3uFile()">Delete Playlist</button>
+                    <button type="button" id="m3uAddBtn" class="btn btn-ghost tag-editor-secondary-btn" data-ui-click="openLibraryPickerOn"><i class="fa-solid fa-plus"></i> Add Tracks</button>
+                    <button type="button" id="m3uPruneBtn" class="btn btn-ghost tag-editor-secondary-btn" data-ui-click="removeMissingM3uEntries">Remove Missing</button>
+                    <button type="button" id="m3uDeleteBtn" class="btn btn-ghost tag-editor-secondary-btn m3u-delete-btn" data-ui-click="deleteM3uFile">Delete Playlist</button>
                 </div>
                 <div class="tag-editor-actions-right">
-                    <button type="button" onclick="closeM3uEditor()" class="btn btn-ghost tag-editor-secondary-btn">Cancel</button>
-                    <button type="button" id="m3uCopyBtn" class="btn btn-ghost tag-editor-secondary-btn" onclick="saveM3uAsCopy()">Save as Copy</button>
-                    <button type="button" id="m3uSaveBtn" class="btn btn-primary tag-editor-primary-btn" onclick="saveM3uFile()" disabled>Save</button>
+                    <button type="button" data-ui-click="closeM3uEditor" class="btn btn-ghost tag-editor-secondary-btn">Cancel</button>
+                    <button type="button" id="m3uCopyBtn" class="btn btn-ghost tag-editor-secondary-btn" data-ui-click="saveM3uAsCopy">Save as Copy</button>
+                    <button type="button" id="m3uSaveBtn" class="btn btn-primary tag-editor-primary-btn" data-ui-click="saveM3uFile" disabled>Save</button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Library picker: find a file you already own. Used by the M3U editor and missing-track matching. -->
-    <div id="libraryPickerOverlay" style="display:none;" class="modal-overlay" onclick="closeLibraryPicker()">
-        <div class="library-picker-card" onclick="event.stopPropagation()">
+    <div id="libraryPickerOverlay" style="display:none;" class="modal-overlay" data-ui-click="closeLibraryPicker">
+        <div class="library-picker-card" data-ui-click="stopPropagation">
             <div class="modal-header">
                 <div>
                     <h3 id="libraryPickerTitle" class="modal-title">Pick from Your Library</h3>
                     <div id="libraryPickerMeta" class="tag-editor-meta"></div>
                 </div>
-                <button onclick="closeLibraryPicker()" class="modal-close-btn" title="Close">&#x2715;</button>
+                <button data-ui-click="closeLibraryPicker" class="modal-close-btn" title="Close">&#x2715;</button>
             </div>
             <input type="search" id="libraryPickerInput" class="tag-editor-input" placeholder="Artist, title, album or folder" autocomplete="off">
             <div id="libraryPickerResults" class="library-picker-results"></div>
@@ -1931,25 +2066,25 @@
     </div>
 
     <!-- Destination picker modal -->
-    <div id="destPickerOverlay" style="display:none;" class="modal-overlay" onclick="closeDestPicker()">
-        <div class="dest-picker-card" onclick="event.stopPropagation()">
+    <div id="destPickerOverlay" style="display:none;" class="modal-overlay" data-ui-click="closeDestPicker">
+        <div class="dest-picker-card" data-ui-click="stopPropagation">
             <div class="modal-header">
                 <div>
                     <h3 class="modal-title">Choose Destination Folder</h3>
                     <div id="destPickerBreadcrumb" class="dest-picker-breadcrumb"></div>
                 </div>
-                <button onclick="closeDestPicker()" class="modal-close-btn" title="Close">&#x2715;</button>
+                <button data-ui-click="closeDestPicker" class="modal-close-btn" title="Close">&#x2715;</button>
             </div>
             <div class="dest-picker-body">
                 <div id="destPickerList" class="dest-picker-list"></div>
             </div>
             <div class="dest-picker-custom-row">
                 <label class="dest-picker-custom-label" for="destPickerCustomInput">Folder path:</label>
-                <input type="text" id="destPickerCustomInput" class="dest-picker-custom-input" placeholder="e.g. Friends or Discovery/Weekly" oninput="destPickerOnCustomInput(this.value)">
+                <input type="text" id="destPickerCustomInput" class="dest-picker-custom-input" placeholder="e.g. Friends or Discovery/Weekly" data-ui-input="destPickerOnCustomInput">
             </div>
             <div class="modal-footer">
-                <button onclick="closeDestPicker()" class="btn btn-ghost tag-editor-secondary-btn">Cancel</button>
-                <button onclick="confirmDestPicker()" class="btn btn-primary modal-confirm-btn" id="destPickerConfirmBtn">Select</button>
+                <button data-ui-click="closeDestPicker" class="btn btn-ghost tag-editor-secondary-btn">Cancel</button>
+                <button data-ui-click="confirmDestPicker" class="btn btn-primary modal-confirm-btn" id="destPickerConfirmBtn">Select</button>
             </div>
         </div>
     </div>
@@ -1957,10 +2092,22 @@
     <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
     <audio id="previewAudio" preload="none"></audio>
 
-    <script>window.__MUSICGRABBER_ROOT_PATH__ = "__ROOT_PATH__";</script>
     <script src="__ROOT_PATH__/static/release-notes.js?v=__CACHE_BUST__"></script>
     <script src="__ROOT_PATH__/static/quips.js?v=__CACHE_BUST__"></script>
-    <script src="__ROOT_PATH__/static/app.js?v=__CACHE_BUST__"></script>
+    <!-- One file per tab, shared foundations first. Order matters: a file may use
+         what an earlier one declares when it loads, and boot.js starts the app. -->
+    <script src="__ROOT_PATH__/static/js/core.js?v=__CACHE_BUST__"></script>
+    <script src="__ROOT_PATH__/static/js/shared.js?v=__CACHE_BUST__"></script>
+    <script src="__ROOT_PATH__/static/js/destinations.js?v=__CACHE_BUST__"></script>
+    <script src="__ROOT_PATH__/static/js/album-browser.js?v=__CACHE_BUST__"></script>
+    <script src="__ROOT_PATH__/static/js/search.js?v=__CACHE_BUST__"></script>
+    <script src="__ROOT_PATH__/static/js/queue.js?v=__CACHE_BUST__"></script>
+    <script src="__ROOT_PATH__/static/js/bulk.js?v=__CACHE_BUST__"></script>
+    <script src="__ROOT_PATH__/static/js/artists.js?v=__CACHE_BUST__"></script>
+    <script src="__ROOT_PATH__/static/js/watched.js?v=__CACHE_BUST__"></script>
+    <script src="__ROOT_PATH__/static/js/stats.js?v=__CACHE_BUST__"></script>
+    <script src="__ROOT_PATH__/static/js/settings.js?v=__CACHE_BUST__"></script>
+    <script src="__ROOT_PATH__/static/js/boot.js?v=__CACHE_BUST__"></script>
     <!-- musik-monitor:begin (EPIC 9 — bei Upstream-Bump neu einsetzen, s. overlay/README.md) -->
     <script src="__ROOT_PATH__/static/monitor.js?v=__CACHE_BUST__"></script>
     <!-- musik-monitor:end -->

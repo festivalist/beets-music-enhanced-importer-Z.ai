@@ -7,6 +7,283 @@
 // changelog dump.
 
 const RELEASE_NOTES = {
+    "4.5.3": {
+        title: "What's New in v4.5.3",
+        sections: [{
+            heading: "Another way to FLAC",
+            items: ["Zarz joins Search Sources, bringing Tidal's catalogue and CD-quality FLAC. Verification happens automatically in the background, with no account or API key to enter. Hover over a result for a 30-second taster before you commit. The first download can take a little longer; saved sessions keep the next ones moving."]
+        }, {
+            heading: "Every download gets a proper listen",
+            items: ["MusicGrabber now plays each download through to the end before filing it, rather than trusting the label on the tin. A preview clip pretending to be the whole song, a file cut off halfway, or one with no sound in it at all gets turned away and another copy fetched. (Nine Inch Nails fans: Broken's 91 seconds of silence are still allowed, and MusicGrabber now makes them itself, perfectly, rather than searching the internet for nothing.) A good file with a muddled length now keeps its place and shows the right length in your player."]
+        }, {
+            heading: "Watched playlists, renamed",
+            items: ["Press Rename on a watched playlist to give it a name of your own, so three DJs' \"Summer Mix\" playlists stop looking identical. If it makes an M3U, that takes the new name too, so your music player shows it as well. Nothing you've already downloaded moves."]
+        }, {
+            heading: "Small fixes",
+            items: ["The three number boxes under Settings, Downloads, Search Sources (check interval, cooldown, and searches per source) were plain white boxes on a dark page. They now match the rest of Settings.",
+                "The album browser no longer suggests Lidarr for a proper album. Albums have come down whole from Usenet, Soulseek, or torrents for a while now, and the note finally says so.",
+                "The guide has fresh screenshots, and its directions to each setting now match the Settings tabs as they are today."]
+        }]
+    },
+    "4.5.2": {
+        title: "What's New in v4.5.2",
+        sections: [
+            {
+                heading: "AIFF, if you like your audio uncompressed",
+                items: [
+                    "AIFF is now under Settings, Audio, Convert to. It keeps the source sample rate and known bit depth, with tags and artwork included. Files are larger than FLAC; turning an MP3 into AIFF still cannot put the missing quality back.",
+                ]
+            },
+            {
+                heading: "Playlists skip what you already have, straight away",
+                items: [
+                    "Importing or watching a playlist now checks your library for every track before it searches for any. Songs you already have are ticked off at once, instead of each waiting its turn in the Queue only to be told it was already there.",
+                    "When your library has something close but not quite (\"Song (Live)\" for \"Song\", say), the track waits in the Queue as Unsure. Play your copy, then choose Same, keep mine or Different, download it. \"Sort them out\" at the top of the Queue shows them all, with buttons to answer the lot at once.",
+                ]
+            },
+            {
+                heading: "Small fixes",
+                items: [
+                    "Monochrome works again using Indiachrome's free 320 kbps MP3 streams. Results show their real quality, JioSaavn takes priority for equivalent matches, and short previews are still refused.",
+                    "The Queue no longer says \"All caught up\" while a whole album is downloading through Usenet or a torrent. It says \"1 album arriving whole\" instead, which is more honest.",
+                    "Soulseek keeps working after slskd restarts. Before, searches quietly found nothing until an old login ran out, which could take a week.",
+                    "Soulseek files with square brackets in the name, like \"(12) [Artist] Title.flac\", now arrive in your library. Before, they downloaded fine and then MusicGrabber said it couldn't find them.",
+                    "Album tracks with a deliberate stretch of silence before a hidden track (MusicBrainz writes it as \"[silence]\" in the title) now download. Before, every copy was turned away as a fake.",
+                    "Soulseek results lose the vinyl side and disc numbers at the front of their names, so \"A4. Otherside\" is just \"Otherside\". As a bonus, a whole album shared as a vinyl rip can now be picked for an album download, on equal terms with everything else.",
+                ]
+            }
+        ]
+    },
+    "4.5.1": {
+        title: "What's New in v4.5.1",
+        sections: [
+            {
+                heading: "Monochrome has moved house again",
+                items: [
+                    "Monochrome downloads now use Indiachrome's working audio service. Only FLAC is accepted, with checks for the recording's length and any ISRC carried in the file.",
+                    "Test Downloads under Settings, Connections, Monochrome checks a complete track. The old URL overrides have retired: different sites need different playback methods, so a new address alone will not mend one.",
+                ]
+            },
+            {
+                heading: "qBittorrent 5.3 lets us in again",
+                items: [
+                    "Updated qBittorrent and been told your password was wrong? It wasn't. qBittorrent 5.3 changed how it says yes, and MusicGrabber now understands both ways.",
+                ]
+            },
+            {
+                heading: "SoundCloud, with an optional spare key",
+                items: [
+                    "SoundCloud search hides protected tracks by default and leaves out short subscription previews. Ordinary uploads work as before.",
+                    "Have your own provisioned .wvd device file? Drop it into data/soundcloud/device.wvd, then open Settings, Connections, SoundCloud and press Test Downloads. Supported protected tracks can then be downloaded; their browser previews are unavailable. No device file is included with MusicGrabber.",
+                    "SoundCloud results now arrive faster, and with cover art.",
+                    "SoundCloud previews play in Firefox again. They had been going quietly silent there.",
+                ]
+            },
+            {
+                heading: "The UK charts, one tap away",
+                items: [
+                    "New to MusicGrabber and not sure where to start? In Watched, open \"+ UK Official Charts\" and tap the UK Top 40, the Top 100, the End of Year chart, or a Dance, Rock & Metal, or Hip Hop & R&B chart. It keeps the playlist in step with the chart every week.",
+                    "Songs that drop out of the chart stay in your library. Any other Official Charts song chart works too: paste its link like any playlist.",
+                ]
+            },
+            {
+                heading: "Pick the tracks you want",
+                items: [
+                    "Album tracklists now have a tick box beside each missing song. Untick the ones you don't want and Download takes only the rest. Two songs off a 20-track deluxe edition, without the other eighteen.",
+                ]
+            },
+            {
+                heading: "Qobuz links work now",
+                items: [
+                    "Paste a Qobuz playlist into Bulk Import or Watched, or a Qobuz album into Bulk Import. Store links and open.qobuz.com share links both work, and you don't need a Qobuz account.",
+                    "Your own public playlists work as well as Qobuz's featured ones. Reading the name of one of yours takes a few seconds longer, because Qobuz only shows it in a browser.",
+                ]
+            },
+            {
+                heading: "Recommendations from your Plex plays",
+                items: [
+                    "Connected Plex for library scans? Find New Artists on the Artists tab now goes by what you actually play in Plex, the way it already did for Navidrome.",
+                ]
+            },
+            {
+                heading: "Albums as individual tracks",
+                items: [
+                    "Use beets or another tool to file your music after it downloads? An admin can now switch on \"Albums as individual tracks\" under Settings, Library. Album downloads then skip any song you already have anywhere in your library, instead of only checking the album's own folder.",
+                    "Each song is checked again just before it's fetched, so nothing comes down twice while a big album is on its way. It's off unless you switch it on.",
+                ]
+            },
+            {
+                heading: "Music in every alphabet",
+                items: [
+                    "Albums and songs with titles in Cyrillic (and other non-Latin scripts) now match and download properly. Before, MusicGrabber quietly read \"Фильмы\" as a blank, which is no way to treat a song.",
+                    "Russian and Ukrainian artist names now match their romanised spelling, so \"Молчат Дома\" and \"Molchat Doma\" are recognised as the same band.",
+                    "Two different songs with non-Latin titles in the same folder are no longer mistaken for duplicates of each other.",
+                ]
+            },
+            {
+                heading: "Better at spotting the right album",
+                items: [
+                    "Uploads named like \"Artist featuring Guest - Song\" are recognised as that song, instead of being turned away for having too many names in them.",
+                    "Soulseek files named \"Artist - Song\" are no longer turned away as poor matches. The shorter the song's name, the more often it happened.",
+                    "Albums called \"?\" or \"÷\" can be found and downloaded. Yes, those are real albums.",
+                    "If MusicBrainz's best match is the right title by a different artist, you're now asked to pick instead of getting the wrong album.",
+                ]
+            },
+        ]
+    },
+    "4.5.0": {
+        title: "What's New in v4.5.0",
+        sections: [
+            {
+                heading: "Soundtracks MusicBrainz has never heard of",
+                items: [
+                    "Search JioSaavn, click the album name under a result, and you get JioSaavn's own tracklist for it, not MusicBrainz's. That matters for film soundtracks, which MusicBrainz often has under nobody at all (Aashiqui 2 is one).",
+                    "Download Album then takes every track off that very album, tagged with its name, year and composers, instead of searching for each song and hoping.",
+                ]
+            },
+            {
+                heading: "Dolby Atmos, if you can find it",
+                items: [
+                    "Got Prowlarr with Usenet or torrents? The album page now offers the Dolby Atmos version too, if there is one. It lands in its own folder beside the stereo album, untouched, so your music app doesn't list every song twice.",
+                    "Fair warning: Atmos releases are rare, and most are \"Atmos for Headphones\" versions, which sound great on headphones and play on anything.",
+                ]
+            },
+            {
+                heading: "Your database, backed up for you",
+                items: [
+                    "This release changes the database, so before it does, MusicGrabber now copies yours aside in your data folder, named for the version you were running, like music_grabber-v4.4.3.db. If you ever need to go back, it's waiting there. A backup of your own is still a good idea for a big upgrade like this one; that copy lives on the same disk.",
+                ]
+            },
+            {
+                heading: "Albums from your Usenet indexers",
+                items: [
+                    "Got Prowlarr and SABnzbd? Switch Prowlarr on under Search Sources, fill both in under Connections, and album downloads ask your Usenet indexers first. Each release is labelled CD, WEB or Vinyl, and CD-quality FLAC gets first go.",
+                    "MusicGrabber moves the tracks it needs out of SABnzbd's folder and never deletes anything in there. The artwork, the nfo and the bonus disc nobody ordered stay put for you.",
+                    "Old posts often get taken down. When one does, the next release is tried, and after three your other sources take over. A post that has already failed is never grabbed again, so trying an album twice doesn't burn your indexer's daily grabs.",
+                    "Every release is checked before anything is taken: is it really the album you asked for? Fakes, one-file vinyl rips and formats MusicGrabber can't use are passed over, and the Queue tells you what the last one turned out to be.",
+                    "Compilations and DJ mixes are found too, on Usenet, torrents and Soulseek, posted as \"VA\" or under the series name, and a mix by a different DJ with the same title is left alone.",
+                ]
+            },
+            {
+                heading: "Usenet for the songs nobody else has",
+                items: [
+                    "When every other source has failed on a song in a bulk import, a watched playlist or an album, MusicGrabber now looks on Usenet for a single, EP or CD single of it, as a last resort. Great for old CD singles and radio edits that streaming services never carried.",
+                    "It takes the version you asked for off the single, so a radio edit stays a radio edit. It never slows down the search on the Tracks tab.",
+                ]
+            },
+            {
+                heading: "Albums from torrents too",
+                items: [
+                    "Prowlarr can now send albums to qBittorrent as well. Switch Torrents on under Search Sources and fill qBittorrent in under Connections. Torrents are tried after Usenet and Soulseek, because a torrent can take a while.",
+                    "Tracks are copied out, never moved, so everything keeps seeding. MusicGrabber never removes a torrent, not even one it gave up on.",
+                    "No waiting a week: a torrent nobody is sharing is dropped within about 20 minutes, a slow one after 3 hours, and the Queue shows the speed, the seeds and the time left while it works.",
+                ]
+            },
+            {
+                heading: "Studio tracks are studio tracks",
+                items: [
+                    "With live versions switched off, some studio tracks were being thrown away as live recordings, because their fingerprint also matched a bootleg someone had uploaded. MusicGrabber now picks the studio recording when the two look equally likely.",
+                ]
+            },
+            {
+                heading: "Each song once, in stereo",
+                items: [
+                    "Some albums have a Blu-ray edition with Dolby Atmos, 5.1 and stereo mixes of every song, and MusicGrabber liked it best because it had the most tracks. Album downloads now skip Blu-ray, DVD and surround editions, so you get each song once.",
+                ]
+            },
+            {
+                heading: "No more staring at an empty Queue",
+                items: [
+                    "While a whole album is still downloading, the Queue says so at the top, percentage and all, so you can tell it's working rather than sulking.",
+                ]
+            },
+            {
+                heading: "Check my config",
+                items: [
+                    "There's a new button beside Save Settings. Press it and MusicGrabber checks every connection you've set up, your music folder and your notifications, all at once, and lists anything wrong at the top with a Go button that takes you to it.",
+                    "It also spots settings that don't work together, like Prowlarr switched on with SABnzbd not set up, or qBittorrent set up while Torrents is switched off.",
+                    "It never sends a test notification; the Test buttons beside each channel still do that. Saving settings now checks whatever you just changed, too.",
+                    "With more than one account, clearing a shared connection such as Lidarr in your own settings now goes back to the shared one, rather than quietly switching it off just for you.",
+                ]
+            },
+            {
+                heading: "Small fixes",
+                items: [
+                    "Downloading a YouTube playlist with the same name as one you already have now adds to it, instead of replacing it with just the new songs.",
+                    "The Stats tab's Sources bar now counts albums from Usenet and torrents too.",
+                    "Test SABnzbd warns you if SABnzbd is set not to unpack what Prowlarr sends it, before your first album rather than after.",
+                    "Albums MusicBrainz knows by a foreign title, like Kraftwerk's Computerwelt, are searched for by their English name too.",
+                    "Soulseek album folders split into Disc 1 and Disc 2 now count as one album, and a folder missing one track is taken, with the missing one found elsewhere.",
+                    "WavPack, APE, WAV and AIFF files are welcome now, from Soulseek, Usenet and torrents. They end up in the format you convert to, or as FLAC if you keep the original format.",
+                    "Albums that come as one big file with a cue sheet are cut into their tracks now, instead of being passed over.",
+                    "The theme button now has a third setting, System, which goes light or dark when your computer or phone does. If you were on dark, one click gets you there.",
+                    "The instructions have moved out of one enormous README into a proper guide on GitLab, a page per topic, from installing to troubleshooting. The README is now short enough to read before the kettle boils.",
+                    "Songs from JioSaavn keep their album: results show which album and year each song is from, and the download is tagged with them, with the album's own artists so a film soundtrack stays one album in Plex.",
+                    "Edit Tags in the Queue now opens with the track's album artist, year and track numbers already filled in, instead of blank boxes. Change the artist and you can see, and fix, the album artist Plexamp files it under.",
+                    "\"Not this one\" in Bulk Import, and the Spotify cookies warning, can be read in dark mode again.",
+                    "Soulseek searches for rarer songs now come back with what they found, and sooner. They used to be thrown away if the last answers were still trickling in.",
+                    "Test Prowlarr now tells you if Prowlarr is set to send downloads to a client MusicGrabber can't follow, like NZBGet or Transmission. Only SABnzbd and qBittorrent work.",
+                ]
+            },
+        ]
+    },
+    "4.4.3": {
+        title: "What's New in v4.4.3",
+        sections: [
+            {
+                heading: "One quick fix",
+                items: [
+                    "Upgraded from v4.3 and MusicGrabber wouldn't start, complaining it couldn't load \"app\"? Your container was still pointing at the folder MusicGrabber used to live in. It now finds its own way home, whatever the container says.",
+                ]
+            },
+        ]
+    },
+    "4.4.2": {
+        title: "What's New in v4.4.2",
+        sections: [
+            {
+                heading: "One quick fix",
+                items: [
+                    "Album folders named with the year? Monochrome recognises whole albums again, instead of hunting for every track separately and occasionally bringing back the wrong one.",
+                ]
+            },
+        ]
+    },
+    "4.4.1": {
+        title: "What's New in v4.4.1",
+        sections: [
+            {
+                heading: "The whole Queue, not just the top of it",
+                items: [
+                    "The Queue now pages through your entire history, not just the newest 250 jobs. Next keeps going until you run out of jobs, and the sort covers all of them.",
+                    "A computer shows 25 jobs a page, now that the cards fit on one line. Phones keep 10.",
+                ]
+            },
+            {
+                heading: "Bulk Import knows your playlists",
+                items: [
+                    "Ticking Create M3U playlist now suggests the playlists you already have. Pick one to add the import to it, or type a new name, and a line underneath says which you're about to get.",
+                    "Adding to an existing playlist really adds now. It used to replace it with just the new tracks, which was not the plan.",
+                ]
+            },
+            {
+                heading: "A few locks fitted",
+                items: [
+                    "The app now runs as user 1000 by default. If your NAS uses another account, set PUID and PGID to match; the README covers existing mounts and upgrades.",
+                    "Playback credentials stay out of URLs and expire after five minutes, with automatic renewal while you listen. The browser also blocks inline scripts, and the playlist editor refuses symlinked folders.",
+                ]
+            },
+            {
+                heading: "Small fixes",
+                items: [
+                    "Re-downloading a track no longer leaves the old one's lyrics behind to caption the wrong recording.",
+                    "Playlists saved in a custom folder now follow a track when it's upgraded to a better copy.",
+                    "Adding to an older playlist file with accented names in it works again, instead of failing with a warning.",
+                    "Hit the limit changing your password? It now says so, rather than implying you've forgotten how typing works.",
+                ]
+            },
+        ]
+    },
     "4.4.0": {
         title: "What's New in v4.4.0",
         sections: [

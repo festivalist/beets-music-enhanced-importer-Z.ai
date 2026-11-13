@@ -544,8 +544,9 @@ aktualisieren (Zeile oben); Bot antwortet nicht → `journalctl -u musik-bot -n 
 
 ## Phase 9 — MusicGrabber (Beschaffungs-Engine Nr. 2, Docker)
 
-> **Rolle (Nordstern, SCOPE-Change 2026-10-08):** MusicGrabber (GitLab
-> `g33kphr33k/musicgrabber`, Unlicense) ist die zweite Beschaffungs-Engine
+> **Rolle (Nordstern, SCOPE-Change 2026-10-08):** MusicGrabber (Code: GitLab
+> `zarguell/musicgrabber`; Image: Docker Hub `g33kphr33k/musicgrabber`;
+> Unlicense) ist die zweite Beschaffungs-Engine
 > neben spotDL/SomeDL: Multi-Source-Suche (u. a. Monochrome-FLAC = lossless),
 > Watched Playlists (Spotify/YouTube/…), MusicBrainz-Artist-Follow,
 > Track-Upgrades. Sie schreibt **ausschließlich** nach
@@ -608,8 +609,11 @@ unterwegs läuft alles über Telegram-Bot und Plexamp, nicht über MG).
 
 **9.3b Overlay-UI (Story 9.3–9.5, ADR-0001; Flip 4.4.0 = Story 10.1):**
 Das Image ist **gepinnt
-(`g33kphr33k/musicgrabber:4.4.0`; seit 4.4 wohnt die App in
-`/opt/musicgrabber`)**; Updates sind bewusste Tag-Bumps. Die
+(`g33kphr33k/musicgrabber:4.5.3`; seit 4.4 wohnt die App in
+`/opt/musicgrabber`)**; Updates sind bewusste Tag-Bumps mit
+Overlay-Check (seit 4.4.1 ist `app.js` in `js/` gesplittet + CSP —
+unsere Monitor-Stellen liegen in `index.html` + `js/core.js`; Revendor
+aus dem Image, weil das GitLab-Repo 4.5.1–4.5.3 nicht publiziert). Die
 statischen UI-Dateien werden per Bind-Mount
 (`./overlay/static:/opt/musicgrabber/static:ro`) aus dem Repo-Checkout überlagert —
 dort lebt der **Import-Monitor-Tab** (Nav-Eintrag „Monitor"): Laufstatus,

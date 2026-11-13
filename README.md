@@ -96,7 +96,7 @@ Failed tracks are retried automatically; whatever remains is reported.
 ### MusicGrabber — second acquisition engine (Pi, Docker)
 
 Since 2026-10-08 a second acquisition engine runs alongside the pinned
-spotDL/SomeDL chain: self-hosted [MusicGrabber](https://gitlab.com/g33kphr33k/musicgrabber)
+spotDL/SomeDL chain: self-hosted [MusicGrabber](https://gitlab.com/zarguell/musicgrabber)
 (multi-source search incl. lossless, watched playlists, MusicBrainz artist
 follow). It writes **only** into the staging area
 `<library>/_incoming/musicgrabber` — beets/musik stays the only writer of

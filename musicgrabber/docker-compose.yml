@@ -11,11 +11,13 @@
 # EPIC 9) — das Upstream-Backend bleibt unangetastet.
 services:
   musicgrabber:
-    image: g33kphr33k/musicgrabber:4.4.0   # gepinnt; Bump nur mit Overlay-Check
-        # (overlay/README.md). 4.4.0-Flip (Story 10.1, 2026-10-21): Achtung —
-        # seit 4.4 wohnt die App in /opt/musicgrabber, NICHT mehr /app; der
-        # statische Overlay-Mount unten MITGEZOGEN, sonst verschwindet der
-        # Monitor-Tab still (UI läuft upstream weiter, kein Fehler im Log).
+    image: g33kphr33k/musicgrabber:4.5.3   # gepinnt; Bump nur mit Overlay-Check
+        # (overlay/README.md). 4.5.3-Flip (Story 11.2, 2026-11-13): 4.4.1 hat
+        # app.js in js/ (12 Dateien) gesplittet + erzwingt CSP — Overlay neu
+        # vendored AUS DEM IMAGE (GitLab-Repo hat 4.5.1–4.5.3 nicht publiziert,
+        # nur Docker-Hub-Tags), Monitor-Stellen jetzt index.html + js/core.js.
+        # App wohnt seit 4.4 in /opt/musicgrabber (Mount unten unverändert) —
+        # falscher Mount-Pfad lässt den Monitor-Tab STILL verschwinden.
     container_name: musicgrabber
     restart: unless-stopped
     ports:
