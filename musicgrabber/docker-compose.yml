@@ -31,6 +31,13 @@ services:
       - PGID=${PGID:-1000}
       - TZ=${TZ:-Europe/Berlin}
       - MUSIC_DIR=/music
+      # Story 3.1 (2026-11-14): MG watched playlists/artist laden Dateien mit
+      # "missing"-Policy NEU, wenn sie aus dem Staging verschwinden — aber
+      # genau DAS tut unser Ingest (beets/musik verschiebt sie in die
+      # Bibliothek, Staging-Regel). Global aus (Struktur, kein Playlist-Case);
+      # pro Playlist überschreibbar, aber alles andere bricht den Nordstern.
+      # v15/v16: off = fehlender Track bleibt 'downloaded', unresolved-Zähler.
+      - REDOWNLOAD_MISSING_FILES=false
       # KEIN API_KEY setzen: ein gesetzter Key erzwingt Authentifizierung auf
       # ALLEN API-Wegen, während die UI defaultmäßig ohne Login arbeitet —
       # der Browser könnte den Key nie mitschicken (dauerhaft 401 auf

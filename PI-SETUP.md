@@ -654,6 +654,18 @@ Installer (70-musicgrabber) prüft Overlay-Datei und
   Singletons (nicht als VA-Album) und legt automatisch die Plex-Playlist an —
   die echte Reihenfolge liefert aber nur MGs eigene M3U; ohne sie gilt
   alphabetische Sortierung als bester Kompromiss.
+- **Watched Playlists/Artists anlegen (Story 3.1/3.2):** im Watched-Tab
+  bzw. Artists-Tab der MG-UI. Pflichtwerte je Playlist: **„Playlists-
+  Ordner benutzen"** (use_playlists_dir — sonst landen die Tracks in
+  `Singles/` und die 2.2-Playlist-Kette greift nicht) + **„Create M3U"**;
+  Sync-Modus *Append* für wachsende, *Mirror* für kuratierte Listen.
+  **Re-Download fehlender Dateien ist per compose-ENV global AUS**
+  (`REDOWNLOAD_MISSING_FILES=false`) — unser Ingest verschiebt jede
+  geladene Datei in die Bibliothek; mit MGs Default (an) würde jede
+  Playlist bei JEDEM Refresh komplett neu laden. MG zählt die Tracks
+  dann als „unresolved/not on disk" — das ist bei uns der Normalzustand,
+  kein Fehler. Watched Artists: `from_date` = Einrichtungsdatum,
+  „bestehende Alben automatisch hinzufügen" AUS (kein Retro-Download).
 
 **9.5 Erster Test (Akzeptanz Story 1.1):**
 
