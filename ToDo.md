@@ -91,10 +91,37 @@ Stories 4.1/4.3 weitergeführt.*
       Batches von 13.11. sind der Stand VOR dem Refresh — Upgrade-
       Pfad: erneuter Sync (2.3-Qualitätsvergleich ersetzt Alt durch
       Neu) oder 3.3-Report.**
-- [ ] 1.3 Abnahme gegen Testmatrix (musik-testdaten): Single-Suche, Album-Link,
+- [x] 1.3 Abnahme gegen Testmatrix (musik-testdaten): Single-Suche, Album-Link,
       Spotify-Playlist-Link, YouTube-Playlist-Link, 0-day ohne MB-Eintrag —
       jeweils: landet im Staging, Tagging-Qualität, ffprobe-Bitrate; Ergebnis
       protokollieren
+      **ERLEDIGT 2026-11-13/14 (Protokoll: reports/acceptance-1.3.md):**
+      Alle 5 Zeilen gegen den 11.1-Stack (MG 4.5.3→4.5.4, spotdl 4.6.0,
+      yt-dlp 2026.10.26) gefahren. **1 Single-Suche** Turnstile – Never
+      Enough: MG/jiosaavn AAC 317 kbps ✓ (Behauptung 320, Abw. ~1 %),
+      Junk-Tags → 10.3-Guard korrekt im Review → Abschluss via Monitor-
+      Apply accept2 (K2) — **9.5/9.10 erstmals live abgenommen**; Lehre:
+      accept/accept2 liest unit.candidates (Task-Raum), Override mit
+      file_results-Recording-IDs scheitert sauber. **2 Album-Link**
+      Chastity Belt – All My Friends (2026, YT-Music-Link): 11/11 asis
+      AAC 255 kbps (MB kennt 2026 nicht); re-home-Welle „moved 3588
+      items" = regulärer original_year-Fill, Integrität 25.599 Items/
+      0 fehlende Dateien. **3 Spotify-Playlist** „Klare Kante" (75):
+      geladen ✓, durch Nutzer-Restart unterbrochen → 11.6-Recovery ✓,
+      Re-Import ohne Re-Download per `ingest --root` (Timer kennt
+      fetch-dirs nicht); 74/75 als Singletons, Tags gut; Qualität
+      ~130 kbps = Stand vor dem Nutzer-Cookie-Refresh (kein Kette-
+      Defekt — 14.11. 256 kbps live verifiziert); GOTCHA: ingest --root
+      als root macht state.json root-owned → bot_http PermissionError,
+      chown nachziehen/als pi fahren. **4 YouTube-Kette** durch 2
+      abgedeckt (identisches Routing). **5 0-day** QOTSA „Run Away
+      From The Mob" + Album „Perfecth" (2026): Single **auto/direct**
+      (MB war schneller als der 0-day-Gedanke), Album **asis/fetch**
+      („sources don't know these tracks") — damit BEIDE Frisch-Release-
+      Pfade der Matrix abgedeckt; FLAC ~846 kbps, Perfecth 10 Tracks
+      alsis, Bibliothek-Rows verifiziert. Rest offener Punkte: Klare-
+      Kante-256k-Upgrade + Frankie/Spool-Flush laufen (siehe 3.1-Stand
+      + Hintergrund-Wächter), 3.1-Tick nach 24-h-Refresh-Beweis.
 
 ## EPIC 2 — Ingest-Kette MG-Staging → beets → Plexamp
 
