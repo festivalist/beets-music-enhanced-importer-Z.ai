@@ -83,8 +83,14 @@ Stories 4.1/4.3 weitergeführt.*
       „🍪 frisch/⚠️ ABGELAUFEN"; smoke_cookies 4 Cases). Quellen/Bitrate:
       MG-Seite läuft (Monochrome-FLAC seit 4.5.4 robuster). **Rest =
       rein physisch:** frische cookies.txt exportieren und auf den Pi
-      legen (PI-SETUP „Cookie refreshen") — heute ~130 kbps statt 256
-      deutet auf abgelaufene Session.
+      legen (PI-SETUP „Cookie refreshen").
+      **Update 14.11.: cookies.txt wurde 13.11. ~13:00 erneuert —
+      Live-Check „fresh" (volle Premium-Session), somedl End-to-End
+      verifiziert: 256 kbps AAC (itag 141) für denselben Track; der
+      Selektor war nie defekt (bestaudio[ext=m4a]/…). Die ~130-kbps-
+      Batches von 13.11. sind der Stand VOR dem Refresh — Upgrade-
+      Pfad: erneuter Sync (2.3-Qualitätsvergleich ersetzt Alt durch
+      Neu) oder 3.3-Report.**
 - [ ] 1.3 Abnahme gegen Testmatrix (musik-testdaten): Single-Suche, Album-Link,
       Spotify-Playlist-Link, YouTube-Playlist-Link, 0-day ohne MB-Eintrag —
       jeweils: landet im Staging, Tagging-Qualität, ffprobe-Bitrate; Ergebnis
