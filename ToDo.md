@@ -524,6 +524,35 @@ dann 7.4→7.5→7.6 an einem Abend. Rollback bis 7.6: Pi 5 unangetastet.
       Robustheit, manuelle Varianten), 5.1/9.1 Installer-Verweise, README
       (Linux-Absatz + Dateitabelle). Offen vom Epic: nichts — Dell-Tag:
       OMV-Modul erstmalig real, 7.7 Alt-Import, 8.8-Migrationsstory
+- [ ] 8.8 Dell-Tag: One-Shot-Installer auf echter Hardware + Migration
+      Pi→Dell **[ready-for-grilling — vor Ausführung sind Entscheidungen
+      offen]**: (a) Dell-Hardware konkret (Modell/RAM/Disk-Layout,
+      Btrfs-Array-Form), (b) Ziel-OS (Installer-Matrix: Debian-Pfad,
+      OMV nur Debian), (c) neue IP/Hostname, (d) **Plex-Rolle — die
+      größte Frage**: wandert PMS vom Pi mit (PMS 1.43.4 + Watch-State +
+      ~254 GB Medien) oder bleibt der Pi Plex-Host und der Dell wird
+      nur Beschaffung + Bibliothek? Bestimmt Downtime und cutover,
+      (e) 7.7 (108 GB Alt-Kollektion): Import-Zeitpunkt auf dem Dell,
+      NACH der Migration (Erstdrop auf die neuen Disks).
+      Migrations-Inventar (Pi → Dell): /mnt/music-Medien (254,5 GB,
+      ~26.8k Items) + beets-library.db; ~/musik/state (state.json mit
+      Units/Review-Historie, action-spool, ingest.lock); tokens +
+      cookies.txt (telegram_token.json, beatport_token.json,
+      discogs_token.json, cookies.txt — alles gitignored, manuell
+      übertragen!); MG-/data-Volume (sqlite: Index + **Watched-Playlists/
+      Artists-Konfig** + Library-Filesystem-Identity aus 4.5.4); MG-
+      Checkout (git pull); systemd-Einheiten (musik-bot/timer); Plex-DB
+      falls mitwandern.
+      Sonderfälle: **LIBRARY_MOUNT_CHECK=false** für die Umzugsphase
+      (11.8-Guard merkt sich fs-Identität — beim Disk-Wechsel „It moved
+      on purpose" oder Env; danach Guard wieder an), Watched Artists/
+      Playlists ziehen mit /data um (from_date bleibt — KEIN Retro-Re-
+      Download, solange redownload=false und /data mitkommt).
+      Verify-Matrix: Bibliothek-Count 1:1, beet-ls-Stichproben, Plex-
+      Scan, Bot-End-to-End (Spotify- + YT-Link), Watchlist-Refresh
+      ohne Re-Download (3.1-Invariant). Rollback: Pi bleibt bis grüner
+      Verifikation komplett intakt; **kein Doppelnutzen** — Telegram-
+      Long-Polling und MG-Port nur auf EINER Maschine aktiv.
 
 ## EPIC 9 — Import-Monitor (Grilling 2026-10-19; Scope-Change in SCOPE §2 dokumentiert)
 
