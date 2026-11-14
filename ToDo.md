@@ -1243,6 +1243,34 @@ als eigene Story.
   Bot-Restart des Nutzers mitten im Spotify-Job wurde von 11.6 korrekt
   behandelt (error + Telegram-Notice); der fertige Download wurde
   ohne Re-Download per `ingest --root` importiert.
+- [x] 11.8 [ready-for-agent] MG-4.5.4-Flip — **ERLEDIGT 2026-11-14
+  (dae987f, Pi live, Browser-verifiziert)**: Release-Notes diesmal IN
+  DER UPDATE-NOTICE (release-notes.js im Image — weiterhin kein
+  Changelog/GitLab-Tag; Lese-Befehl für künftige Bumps: erst
+  release-notes.js extrahieren, dann revendoren!). Inhalt 4.5.4:
+  Monochrome zurück auf offiziellem FLAC (Indiachrome-MP3-Backup,
+  Auto-Switch, Resume — Nordstern: lossless robuster), Late-NAS-Guard
+  (merkt fs-Typ/Root hinter /music via /proc/self/mountinfo; reiner
+  Filesystem-Vergleich — unser selbstreinigendes Staging triggert ihn
+  NICHT; schützt vor Downloads in den nackten Ordner bei spät
+  mountendem OMV-Disk; Pi-Log bestätigt „remembering /music as btrfs
+  from /dev/sdb"; bei Dell-Umzug „It moved on purpose" oder
+  LIBRARY_MOUNT_CHECK=false), Watched-Playlist „not on disk" + M3U-
+  Speedup (**Design-Notiz für 3.1:** MG-Watched-Playlists tracken
+  Dateien auf Disk — unser Ingest moved sie absichtlich weg; MGs
+  „From Library"-Matching braucht MG-Sicht auf die echte Bibliothek,
+  die unser Staging-Mount bewusst nicht hat → in 3.1 klären, ob
+  Re-Downloads drohen), Artists-Dark-Theme-Fix. Overlay: 7 Dateien
+  aktualisiert (index.html, core.js, artists, search, watched,
+  release-notes, style.css), 21 byte-identisch, Datei-Set 28
+  unverändert; Monitor-Blöcke programmat. aus dem Vorstand extrahiert
+  und eingesetzt (Diff gegen Upstream = exakt Monitor-Passage;
+  core.js-Marker byte-identisch bestätigt). 7 Wrapper-Endpunkte im
+  4.5.4-Backend verifiziert. Flip: git pull → compose pull/up →
+  healthy; Probes 200 (/, js/core.js, monitor.js, settings; app.js
+  404 korrekt); Mount-Guard verankert; Update-Notice zeigt „What's
+  New in v4.5.4", Banner ohne Warnung. Echtlauf-Abnahme (Download
+  über die neue Version) beim nächsten Nutzer-Link.
 
 ## Beim Nutzer anfragen (bei nächster Gelegenheit)
 

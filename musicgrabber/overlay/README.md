@@ -9,17 +9,23 @@ Achtung: **seit 4.4.0 wohnt die App in `/opt/musicgrabber`**, vorher
 `/app` — bei einem Bump den Mount-Pfad im compose MITPRÜFEN, ein falscher
 Pfad lässt den Monitor-Tab STILL verschwinden (UI läuft upstream weiter).
 
-**Basis:** Upstream Image `g33kphr33k/musicgrabber`, Tag **`4.5.3`**
-(Code-Repo: GitLab `zarguell/musicgrabber`; Lizenz: Unlicense). Alle 31
+**Basis:** Upstream Image `g33kphr33k/musicgrabber`, Tag **`4.5.4`**
+(Code-Repo: GitLab `zarguell/musicgrabber`; Lizenz: Unlicense). Alle 28
 statischen Dateien (inkl. `js/` — 12 Dateien, `fonts/`, `images/`,
 `theme.js`, `MusicGrabberIcon.webp`) stammen 1:1 aus diesem Image
-(Stand 2026-11-13); `.gitattributes` hält sie `-text` — byte-identisch,
+(Stand 2026-11-14); `.gitattributes` hält sie `-text` — byte-identisch,
 keine EOL-Konvertierung, saubere Bump-Diffs. Bump-Lehre 10.1: Dateien
 NICHT per Clone-Checkout/`tar` kopieren (autocrlf/MSYS verwandelt LF in
 CRLF). **Lehre 11.2:** seit 4.5.1 publiziert das GitLab-Repo keine Tags
 mehr (public main = v4.5.0) — Revendor-Quelle ist das DOCKER-IMAGE
 selbst (`docker create` + `docker cp <c>:/opt/musicgrabber/static …`,
 docker cp ist byte-exakt; auf dem Pi arbeiten, root ownership beachten).
+**Lehre 11.8 (4.5.4-Flip): die Release-Notes stehen IN DER
+UPDATE-NOTICE (`release-notes.js` im Image) — erst lesen, dann
+revendoren; der Late-NAS-Guard (4.5.4) merkt sich fs-Typ/Root hinter
+/music via /proc/self/mountinfo (kein Marker-File → unser
+selbstreinigendes Staging triggert ihn nicht); bei Disk-Wechsel
+(Dell-Tag) „It moved on purpose" oder LIBRARY_MOUNT_CHECK=false.**
 
 **Unser eigener Diff (Import-Monitor, Story 9.4 + 11.7):** Alle eigenen
 Stellen sind mit `musik-monitor:begin` / `musik-monitor:end` (HTML) bzw.
