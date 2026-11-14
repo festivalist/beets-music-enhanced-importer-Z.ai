@@ -167,9 +167,31 @@ Stories 4.1/4.3 weitergeführt.*
 
 - [ ] 3.1 Watched Playlists in MG (Spotify/YouTube; Append für wachsende,
       Mirror für kuratierte Listen; Intervalle; Cookie für private Listen)
+      **Stand 2026-11-14 (146483f): STRUKTUR LIVE** — die Re-Download-
+      Falle ist geschlossen (MG-Default redownload_missing_files=TRUE
+      hätte jede Watchlist bei jedem Refresh komplett neu geladen, weil
+      unser Ingest die Dateien wegverschiebt): compose-ENV
+      `REDOWNLOAD_MISSING_FILES=false` (global, gelockt — v15/v16:
+      off = Track bleibt 'downloaded' + unresolved-Zähler, M3U ehrlich
+      dünner). Erste Watchlist **„Klare Kante"** (Spotify-Editorial,
+      75 Tracks, append, use_playlists_dir + make_m3u an) registriert
+      und im Initial-Sync (14.11.). Offen bis Tick: Verifikationszyklus
+      — nach Ingest + MG-Refresh prüfen, dass KEIN Re-Download anläuft
+      (Tracks = unresolved/not on disk, Normalzustand); Cookie-Refresh
+      (1.2) bleibt Qualitätshebel (heute ~130k statt 256k).
 - [ ] 3.2 Artist-Watch: MB-Artist-Follow für Kernkünstler (Kandidaten aus
       `musik stats`), from-date = Einrichtungsdatum (kein Retro-Download);
       Rollentrennung dokumentieren (MG handelt, `musik releases` bleibt Report)
+      **Stand 2026-11-14: 13 KERNKÜNSTLER LIVE registriert** (Nutzer-
+      Auswahl aus Top-Albumartisten; MBIDs score-100 aufgelöst, POSTs
+      200): Pearl Jam, Bob Dylan, Bruce Springsteen, Rolling Stones,
+      The Who, Queen, The Kinks, The Strokes, Beastie Boys, Fontaines
+      D.C., Wet Leg, Turnstile, Chastity Belt — from_date 2026-11-14,
+      watch_singles an, auto_add_albums aus (kein Retro-Download),
+      Refresh 24 h. Rollentrennung dokumentiert (PI-SETUP 9.4). Offen
+      bis Tick: erster echter Neuzugangs-Durchlauf (kommt natürlich,
+      wenn ein Artist released — MG lädt ins Albums/<Artist>-Staging,
+      Ingest importiert wie gewohnt).
 - [ ] 3.3 Track-Upgrades lossy→lossless report-first (optional; Apply bleibt
       manuelle Ausnahme, SCOPE §8)
 
