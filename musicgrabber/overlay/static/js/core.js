@@ -14,6 +14,7 @@
             dismissUpdateBanner: function(event, args) { dismissUpdateBanner(); },
             reloadPage: function(event, args) { location.reload(); },
             dismissReloadBanner: function(event, args) { dismissReloadBanner(); },
+            acceptLibraryMount: function(event, args) { acceptLibraryMount(); },
             upgradeAll: function(event, args) { upgradeAll(); },
             exportAudioAuditCsv: function(event, args) { exportAudioAudit('csv'); },
             exportAudioAuditJson: function(event, args) { exportAudioAudit('json'); },
@@ -1232,6 +1233,37 @@
             const banner = document.getElementById('reloadBanner');
             dismissedReloadBuild = banner.dataset.build || '';
             banner.style.display = 'none';
+        }
+
+        // The music library is not the one it was (library/library_mount.py), so
+        // downloads are held. Every tab hears it from the health poll, and the
+        // banner goes by itself once the library is back. No dismiss button: it
+        // is the one thing on the page worth not missing.
+        function noticeLibraryProblem(library) {
+            const banner = document.getElementById('libraryBanner');
+            if (!banner) return;
+            if (!library) {
+                banner.style.display = 'none';
+                return;
+            }
+            document.getElementById('libraryBannerText').textContent = library.message;
+            document.getElementById('libraryBannerAccept').style.display = isAdmin() ? '' : 'none';
+            banner.style.display = 'flex';
+        }
+
+        async function acceptLibraryMount() {
+            if (!confirm('Use what is mounted now as the music library from here on? '
+                + 'Only if you moved it on purpose. If a share has simply not mounted yet, '
+                + 'restart the container instead, or new downloads land on the wrong disk.')) return;
+            try {
+                const resp = await apiFetch('/api/library/mount/accept', { method: 'POST' });
+                if (!resp.ok) throw new Error('accept failed');
+                const data = await resp.json();
+                noticeLibraryProblem(data.library);
+                showToast('Library learned; downloads carry on');
+            } catch {
+                showToast('Could not update the library check', true);
+            }
         }
 
         function escapeHtml(text) {

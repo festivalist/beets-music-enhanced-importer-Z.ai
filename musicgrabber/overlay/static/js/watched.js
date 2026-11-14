@@ -315,7 +315,7 @@
                         ${p.unresolved_tracks > 0 ? `
                         <div class="watched-card-stale-warning">
                             <i class="fa-solid fa-circle-info"></i>
-                            <span><strong>${p.unresolved_tracks} downloaded track${p.unresolved_tracks === 1 ? '' : 's'}</strong> can no longer be found on disk. This playlist's missing-file policy is leaving them alone rather than fetching duplicates, so they will not appear in the M3U. This is what you want if another tool has moved or renamed them; if you deleted them on purpose, use the Missing panel's Retry to fetch one back.</span>
+                            <span><strong>${p.unresolved_tracks} downloaded track${p.unresolved_tracks === 1 ? '' : 's'}</strong> can no longer be found on disk. This playlist's missing-file policy is leaving them alone rather than fetching duplicates, so they will not appear in the M3U. They are listed under Missing: if another tool has moved or renamed them, From Library points the playlist at their new home; if you deleted them on purpose, Retry fetches one back.</span>
                         </div>` : ''}
                         ${p.stale_navidrome_paths > 0 ? `
                         <div class="watched-card-stale-warning">
@@ -330,7 +330,7 @@
                             <button type="button"
                                 data-action="toggle-missing-tracks"
                                 data-playlist-id="${escapeAttr(p.id)}"
-                                class="watched-action-btn" title="Show tracks that failed to download">Missing</button>
+                                class="watched-action-btn" title="Show tracks that failed to download, or whose file has gone">Missing</button>
                             <button type="button"
                                 data-action="toggle-playlist-track-list"
                                 data-playlist-id="${escapeAttr(p.id)}"
@@ -817,6 +817,9 @@
             }
         }
 
+        // Downloaded once, file since vanished; listed under Missing, where it can be relinked.
+        const FILE_GONE_CHIP = '<span class="track-status-chip track-status-fail" title="Downloaded once, but the file can no longer be found. Relink or retry it from Missing.">not on disk</span>';
+
         async function toggleMissingTracks(playlistId) {
             const panel = document.getElementById(`missing-${playlistId}`);
             if (!panel) return;
@@ -845,7 +848,7 @@
                     return `<div id="${trackId}" style="padding: 4px 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
                         <span style="flex: 1; min-width: 0;">${escapeHtml(t.artist)} &ndash; ${escapeHtml(t.title)}${removed}</span>
                         <div style="display: flex; gap: 4px; align-items: center; flex-shrink: 0;">
-                            <span style="font-size: 10px; color: var(--text-secondary); white-space: nowrap;">${t.job_status || 'not attempted'}</span>
+                            <span style="font-size: 10px; color: var(--text-secondary); white-space: nowrap;"${t.file_missing_at ? ' title="Downloaded once, but the file can no longer be found"' : ''}>${t.file_missing_at ? 'not on disk' : (t.job_status || 'not attempted')}</span>
                             <button type="button"
                                 data-action="retry-missing-track"
                                 data-playlist-id="${escapeAttr(playlistId)}"
@@ -1024,7 +1027,7 @@
                 if (sections.downloaded.length) {
                     html += `<div class="track-list-section-header">Downloaded (${sections.downloaded.length})</div>`;
                     html += sections.downloaded.map((t, i) => trackRow(t, `d${i}`, (t, rowId) =>
-                        `<span class="track-status-chip track-status-ok">&#10003;</span>
+                        `${t.file_missing_at ? FILE_GONE_CHIP : '<span class="track-status-chip track-status-ok">&#10003;</span>'}
                          ${t.job_id ? `<button ${uiAction('saveJobToDevice', [t.job_id])} title="Save this track to your device" class="track-action-btn">
                              <i class="fa-solid fa-download"></i></button>` : ''}
                          <button type="button"
@@ -1090,7 +1093,9 @@
                         : `No Longer Upstream, Kept (${sections.removed.length})`;
                     html += `<div class="track-list-section-header">${removedHeading}</div>`;
                     html += sections.removed.map((t, i) => trackRow(t, `r${i}`, (t) =>
-                        `<span class="track-status-chip track-status-removed">${t.downloaded_at ? 'kept' : 'gone'}</span>`
+                        t.file_missing_at && t.downloaded_at
+                            ? FILE_GONE_CHIP
+                            : `<span class="track-status-chip track-status-removed">${t.downloaded_at ? 'kept' : 'gone'}</span>`
                     )).join('');
                 }
 
@@ -2664,8 +2669,15 @@
 
         async function _pickLibraryResult(index, row) {
             const result = libraryPicker.results[index];
-            if (!result || !libraryPicker.onPick) return;
-            const keep = await libraryPicker.onPick(result);
+            if (!result || !libraryPicker.onPick || row?.classList.contains('library-picker-busy')) return;
+            // Say something the moment a row is picked, however long the answer takes.
+            row?.classList.add('library-picker-busy');
+            let keep;
+            try {
+                keep = await libraryPicker.onPick(result);
+            } finally {
+                row?.classList.remove('library-picker-busy');
+            }
             if (keep === false) return;
             if (libraryPicker.keepOpen) {
                 row?.classList.add('library-picker-picked');
@@ -2719,6 +2731,10 @@
                         const tagged = `${result.artist || '?'} - ${result.title || '?'}`;
                         if (!confirm(`That file is tagged "${tagged}", not "${artist} - ${title}". Use it for this playlist anyway?`)) return false;
                     }
+                    const row = document.getElementById(rowId);
+                    const actions = row?.querySelector('.track-list-actions') || row?.lastElementChild;
+                    const before = actions?.innerHTML;
+                    if (actions) actions.innerHTML = '<span class="track-status-chip track-status-pending">linking&hellip;</span>';
                     try {
                         const resp = await apiFetch(
                             `/api/watched-playlists/${encodeURIComponent(playlistId)}/tracks/${encodeURIComponent(trackHash)}/match`,
@@ -2730,13 +2746,16 @@
                         );
                         if (!resp.ok) throw new Error(await _responseDetail(resp));
                     } catch (e) {
+                        if (actions) actions.innerHTML = before;
                         showToast(`Could not match it: ${e.message}`, true);
                         return false;
                     }
+                    // Linked already; the M3U catches up in the background.
                     showToast(`Matched ${artist} – ${title} to a file you already had`);
-                    const row = document.getElementById(rowId);
-                    const actions = row?.querySelector('.track-list-actions') || row?.lastElementChild;
                     if (actions) actions.innerHTML = '<span class="track-status-chip track-status-ok">&#10003; matched</span>';
+                    // The card's "can no longer be found" count comes from the same
+                    // rows, so this is what makes the warning go once the last is done.
+                    loadWatchedPlaylists(false);
                     return true;
                 },
             });

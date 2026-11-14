@@ -43,7 +43,7 @@ ok "Staging + Anker (Singles/Albums/Playlists) als $RUN_USER: $STAGING"
 if [[ ! -s "$MGDIR/overlay/static/index.html" ]]; then
     finish fail "musicgrabber/overlay/static/index.html fehlt — Checkout unvollständig (git pull)? Overlay-Deploy, ADR-0001"
 fi
-ok "Overlay-Static vorhanden (gepinntes Image 4.5.3, ADR-0001)"
+ok "Overlay-Static vorhanden (gepinntes Image 4.5.4, ADR-0001)"
 
 # 3) .env aus dem Example (PUID/PGID vom Run-User; KEIN API_KEY — s. compose)
 if [[ ! -f "$MGDIR/.env" ]]; then

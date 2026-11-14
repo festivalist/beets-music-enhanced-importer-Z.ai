@@ -125,6 +125,14 @@
             </div>
         </header>
 
+        <div id="libraryBanner" class="update-banner library-banner" style="display:none;" role="alert">
+            <i class="fa-solid fa-triangle-exclamation update-banner-icon" aria-hidden="true"></i>
+            <span class="update-banner-text"><strong>Downloads are paused.</strong> <span id="libraryBannerText"></span> Watched playlists and artists wait too. If a network share mounted after the container started, restart the container and everything carries on by itself. <a href="https://gitlab.com/g33kphr33k/musicgrabber/-/blob/main/guide/troubleshooting.md#downloads-paused-because-the-music-library-is-not-the-one-it-was" target="_blank" rel="noopener noreferrer">More in the guide</a></span>
+            <div class="update-banner-actions">
+                <button type="button" id="libraryBannerAccept" class="btn btn-ghost update-banner-btn" data-ui-click="acceptLibraryMount" title="Only if you moved the library on purpose: use what is mounted now as the music library from here on">It moved on purpose</button>
+            </div>
+        </div>
+
         <div id="updateBanner" class="update-banner" style="display:none;" role="status">
             <i class="fa-solid fa-gift update-banner-icon" aria-hidden="true"></i>
             <span class="update-banner-text">MusicGrabber <strong id="updateBannerLatest"></strong> is out; you are on <span id="updateBannerCurrent"></span>. Worth pulling before the next download trips over something already fixed.</span>
@@ -979,7 +987,7 @@
                                     <span class="toggle-slider"></span>
                                 </div>
                             </label>
-                            <label class="source-toggle-item" title="Search Monochrome for full-length 320 kbps MP3 through Indiachrome.">
+                            <label class="source-toggle-item" title="Search Monochrome for official FLAC, with Indiachrome MP3 as backup.">
                                 <span class="source-toggle-text">Monochrome <i class="fa-solid fa-circle-info source-toggle-help" aria-label="Monochrome help"></i></span>
                                 <div class="toggle-switch">
                                     <input type="checkbox" id="settingSourceMonochrome">
@@ -1650,7 +1658,7 @@
             <div class="settings-section admin-only">
                 <h3 class="settings-section-title">Monochrome</h3>
                 <div class="settings-warning">
-                    Enable Monochrome under Downloads, Search Sources, for 320 kbps MP3. No account or API key is required. MusicGrabber checks the audio's bitrate and full duration. Equivalent JioSaavn results rank higher.
+                    Enable Monochrome under Downloads, Search Sources, for official CD-quality FLAC, with Indiachrome MP3 as backup. No account setup is supported. Each route uses its own protocol, the saved file keeps its actual quality, and this test reports both instances.
                 </div>
                 <div class="settings-form">
                     <button type="button" class="btn test-btn" id="testMonochromeBtn">Test Downloads</button>

@@ -11,13 +11,16 @@
 # EPIC 9) — das Upstream-Backend bleibt unangetastet.
 services:
   musicgrabber:
-    image: g33kphr33k/musicgrabber:4.5.3   # gepinnt; Bump nur mit Overlay-Check
-        # (overlay/README.md). 4.5.3-Flip (Story 11.2, 2026-11-13): 4.4.1 hat
-        # app.js in js/ (12 Dateien) gesplittet + erzwingt CSP — Overlay neu
-        # vendored AUS DEM IMAGE (GitLab-Repo hat 4.5.1–4.5.3 nicht publiziert,
-        # nur Docker-Hub-Tags), Monitor-Stellen jetzt index.html + js/core.js.
-        # App wohnt seit 4.4 in /opt/musicgrabber (Mount unten unverändert) —
-        # falscher Mount-Pfad lässt den Monitor-Tab STILL verschwinden.
+    image: g33kphr33k/musicgrabber:4.5.4   # gepinnt; Bump nur mit Overlay-Check
+        # (overlay/README.md). 4.5.4-Flip (2026-11-14): Release-Notes diesmal
+        # IN DER UPDATE-NOTICE (release-notes.js) statt Changelog/GitLab-Tags —
+        # Monochrome wieder offizielles FLAC (+Indiachrome-Backup), Late-NAS-
+        # Guard (merkt fs-Typ/Root hinter /music via /proc/self/mountinfo —
+        # unser selbstreinigendes Staging triggert ihn NICHT; schützt vor
+        # Downloads in den nackten Ordner bei spät mountendem OMV-Disk),
+        # watched-playlist "not on disk"-Handling (relevant für 3.1!).
+        # Overlay byte-exakt auf 4.5.4 + Monitor-Marker (11.7: Panel = Öffnen-
+        # Link, Monitor lebt auf :8283/monitor). App wohnt in /opt/musicgrabber.
     container_name: musicgrabber
     restart: unless-stopped
     ports:

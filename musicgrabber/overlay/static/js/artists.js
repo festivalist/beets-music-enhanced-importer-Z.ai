@@ -670,7 +670,7 @@
                             <span style="font-size:13px;font-weight:600;color:var(--text-primary);">${escapeHtml(a.name)}</span>
                             ${a.disambiguation ? `<span style="font-size:11px;color:var(--text-secondary);margin-left:6px;">${escapeHtml(a.disambiguation)}</span>` : ''}
                         </div>
-                        <button class="action-btn" style="padding:4px 10px;font-size:12px;" ${uiAction('selectArtist', [a.mbid, a.name])}>Select</button>
+                        <button type="button" class="btn btn-sm" ${uiAction('selectArtist', [a.mbid, a.name])}>Select</button>
                     </div>
                 `).join('');
             } catch (e) {

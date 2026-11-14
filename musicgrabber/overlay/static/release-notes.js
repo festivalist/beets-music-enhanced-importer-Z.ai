@@ -7,6 +7,25 @@
 // changelog dump.
 
 const RELEASE_NOTES = {
+    "4.5.4": {
+        title: "What's New in v4.5.4",
+        sections: [{
+            heading: "Coming soon: Plunderfin, for Jellyfin",
+            items: ["Plunderfin is a Jellyfin plugin in the works. Search in Jellyfin, or in Finamp or any other Jellyfin app, and when your library comes up empty, MusicGrabber's best matches appear among the results as songs you can play. Press play and MusicGrabber fetches the track, tags it, and files it into your library. It's pre-alpha, so there's nothing to install just yet (the ship has a name and a hull; the sails are still in the post), but MusicGrabber has already learned to answer quickly enough for searching as you type. Follow along at gitlab.com/g33kphr33k/plunderfin."]
+        }, {
+            heading: "Monochrome is back at its old address",
+            items: ["Monochrome prefers the official FLAC service again and keeps Indiachrome's MP3 route as backup. It switches automatically when a route fails and keeps the saved format and quality honest. Interrupted transfers can resume safely, and Test Downloads reports both instances. Indiachrome currently demands sign-in, so it will remain an unavailable standby until guest access returns."]
+        }, {
+            heading: "No more songs vanishing under a late NAS",
+            items: ["If your music lives on a NAS share that mounts a few seconds after MusicGrabber starts, MusicGrabber used to see the empty folder underneath and happily download into it, where nothing else could find the songs. It now remembers where your library really lives. If it ever finds something else there, downloads and watched playlists pause, a red banner explains, and a container restart once the share is up sets everything going again. Moved your library on purpose? Press \"It moved on purpose\" and carry on. A plain folder on the same disk never trips it."]
+        }, {
+            heading: "Watched playlists stop arguing with themselves",
+            items: ["When a watched playlist says some downloaded tracks can no longer be found on disk, its Missing list now actually shows them, marked \"not on disk\", instead of cheerfully claiming nothing is missing. If another app has moved them, From Library points the playlist at their new home; the match happens the moment you click, and the warning goes away once the last one is sorted. Playlists with a few lost tracks also update their M3U noticeably faster after each download."]
+        }, {
+            heading: "Small fixes",
+            items: ["The Select buttons under Find Artist on the Artists tab were white writing on a pale grey button in the dark theme. They can be read again."]
+        }]
+    },
     "4.5.3": {
         title: "What's New in v4.5.3",
         sections: [{

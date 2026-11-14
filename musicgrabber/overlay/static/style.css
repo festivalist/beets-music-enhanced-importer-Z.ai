@@ -3723,6 +3723,15 @@ h1 {
     font-size: 13px;
 }
 
+/* The music library is not the one it was: the same banner, in red */
+.library-banner {
+    border-color: var(--error);
+}
+
+.library-banner .update-banner-icon {
+    color: var(--error);
+}
+
 /* The settings bar's coffee button, shrunk to banner size */
 .donation-link.update-banner-coffee {
     flex: none;
@@ -6581,6 +6590,21 @@ h1 {
 
 .library-picker-picked::after {
     content: "\2713  added";
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-3);
+    font-size: 11px;
+    color: var(--accent);
+}
+
+.library-picker-busy {
+    opacity: 0.55;
+    border-color: var(--accent);
+    cursor: progress;
+}
+
+.library-picker-busy::after {
+    content: "one moment\2026";
     position: absolute;
     top: var(--space-2);
     right: var(--space-3);

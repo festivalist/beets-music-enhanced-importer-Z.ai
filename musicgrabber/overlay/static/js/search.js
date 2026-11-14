@@ -157,6 +157,7 @@
                 renderSourceHealth(sources);
                 showUnavailableSourcesToast(newlyParked);
                 noticeNewBuild(data.build);
+                noticeLibraryProblem(data.library);
             } catch {
                 // Health is a useful hint, never a reason to break the search page.
             }
