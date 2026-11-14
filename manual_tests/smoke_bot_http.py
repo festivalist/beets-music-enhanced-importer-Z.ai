@@ -129,6 +129,9 @@ def main() -> int:
                 snap["review"][0]["candidates"]
             assert snap["backlog"]["audio_files"] == 2, snap["backlog"]
             assert snap["jobs"]["queued"] == 0, snap["jobs"]
+            # Story 1.2 tooling: Cookie-Status im Snapshot (Cache, nie Netz)
+            assert isinstance(snap.get("cookie"), dict), snap.get("cookie")
+            assert "state" in snap["cookie"], snap["cookie"]
 
             # 1b) Story 11.7: der Monitor wird vom Bot selbst ausgeliefert
             # (MG 4.4.1+ CSP connect-src 'self' macht den Overlay-Tab tot)

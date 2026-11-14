@@ -76,6 +76,15 @@ Stories 4.1/4.3 weitergeführt.*
       SoundCloud + FreeMp3Cloud aktiv, MIN_AUDIO_BITRATE an lossless-first
       anpassen, YouTube-Cookies hinterlegen; Telegram-Notify nur mit separatem
       Bot-Token (Polling/Webhook-Konflikt mit musik-bot) — sonst verzichten
+      **Stand 2026-11-14: Cookie-Überwachung LIVE** (musik/cookies.py:
+      aktive Session-Prüfung alle 6 h — GET youtube.com/account mit dem
+      Jar, 200=fresh / Google-Redirect=stale; Bot sendet bei fresh→stale-
+      Kante Telegram-Warnung an die Allowlist; Monitor-Kopf zeigt
+      „🍪 frisch/⚠️ ABGELAUFEN"; smoke_cookies 4 Cases). Quellen/Bitrate:
+      MG-Seite läuft (Monochrome-FLAC seit 4.5.4 robuster). **Rest =
+      rein physisch:** frische cookies.txt exportieren und auf den Pi
+      legen (PI-SETUP „Cookie refreshen") — heute ~130 kbps statt 256
+      deutet auf abgelaufene Session.
 - [ ] 1.3 Abnahme gegen Testmatrix (musik-testdaten): Single-Suche, Album-Link,
       Spotify-Playlist-Link, YouTube-Playlist-Link, 0-day ohne MB-Eintrag —
       jeweils: landet im Staging, Tagging-Qualität, ffprobe-Bitrate; Ergebnis

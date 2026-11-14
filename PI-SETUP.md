@@ -165,6 +165,24 @@ altersbeschränkte Videos. Datei fehlt/abgelaufen → Warnung im Log und
 anonymer Download mit 128 kbps (nichts bricht). **Neu exportieren** musst
 du nach Logout oder Passwortwechsel — ansonsten halten Cookies lange.
 
+**Cookie refreshen (Story 1.2 tooling, 2026-11-14):** YouTube-Sessions
+sterben serverseitig — die Datei sieht dann noch gut aus, während
+Downloads still auf 128 kbps fallen. Der Bot **prüft deshalb alle 6 h
+aktiv** (GET youtube.com/account mit dem Jar) und schreibt dir bei
+Ablauf eine **Telegram-Warnung**; der Import-Monitor (:8283/monitor)
+zeigt den Status im Kopf („🍪 Cookie frisch" / rot „⚠️ Cookie
+ABGELAUFEN"). Ablauf-Signal im Alltag: Playlist-Kettenlieferungen
+kommen in ~128 kbps statt 256 kbps.
+
+**Refresh-Prozedur (die 5 Schritte oben erneut — ~5 Minuten):**
+1. Im „musik-bot"-Profil (oder Premium-Account-Profil) auf
+   music.youtube.com: Erweiterung **„Get cookies.txt LOCALLY"** →
+   Export **Netscape** → in `cookies.txt` umbenennen.
+2. `scp cookies.txt pi@192.168.50.43:~/musik/cookies.txt`
+3. `ssh pi@192.168.50.43 "chmod 600 ~/musik/cookies.txt"` — fertig;
+   der nächste Download läuft wieder mit 256 kbps (Monitor zeigt
+   „🍪 Cookie frisch").
+
 **Risiko-Hinweis (Kurzfassung, Details im README-Runbook):** Die Pipeline ist
 mit Cookies extra zahm (max. 2 Threads, Request-Pacing, lange Retry-Pausen,
 Bot-Check-Erkennung mit 5-fach verlängerter Pause). Bei persönlichem Volumen

@@ -728,6 +728,36 @@ def _restart_notice(texts: list[str]) -> str:
             f"unterbrochen. Bitte erneut schicken:\n{shown}{more}")
 
 
+async def _cookie_watch(app) -> None:
+    """Story 1.2 tooling: revalidate the YouTube cookie on a timer and
+    notify the allowlist chats on the fresh→stale edge (downloads fall
+    back to 128 kbps when the session is gone)."""
+    from . import cookies as cookies_mod
+    from . import fetch as fetch_mod
+
+    path = fetch_mod._cookie_path(fetch_mod._fetch_config())
+    prev = None
+    while True:
+        try:
+            result = await asyncio.to_thread(cookies_mod.check, path)
+            state = result.get("state")
+            if state == "stale" and prev != "stale":
+                for chat in _allowlist():
+                    try:
+                        await app.bot.send_message(
+                            chat_id=chat, text=(
+                                "⚠️ YouTube-Cookie abgelaufen — Downloads "
+                                "fallen auf 128 kbps zurück. Bitte neue "
+                                "cookies.txt nach ~/musik/cookies.txt legen "
+                                "(Anleitung: PI-SETUP „Cookie refreshen“)."))
+                    except Exception as e:
+                        print(f"bot: cookie-notify failed for chat {chat}: {e}")
+        except Exception:
+            traceback.print_exc()
+        prev = (await asyncio.to_thread(cookies_mod.status)).get("state")
+        await asyncio.sleep(cookies_mod.CHECK_INTERVAL)
+
+
 async def _post_init(app) -> None:
     queue: asyncio.Queue = asyncio.Queue()
     app.bot_data["queue"] = queue
@@ -749,6 +779,7 @@ async def _post_init(app) -> None:
                                              bot_http.DEFAULT_PORT)))
     me = await app.bot.get_me()
     print(f"bot: listening as @{me.username} (long polling, Ctrl+C to stop)")
+    app.create_task(_cookie_watch(app))
     if killed:
         texts = [j.get("text", "") for j in killed if j.get("chat_id")]
         print(f"bot: restart killed {len(killed)} job(s) "

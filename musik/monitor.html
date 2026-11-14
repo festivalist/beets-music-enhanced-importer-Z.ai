@@ -109,10 +109,26 @@
         const retry = (ing.counts || {}).network
             ? `<button class="mon-act" id="monRetry">🔁 ${ing.counts.network} Netz-Unit(s) erneut versuchen</button>`
             : "";
+        // Story 1.2 tooling: YouTube-Cookie-Frische (Cache, same snapshot)
+        const ck = snap.cookie || {};
+        const ckText = {
+            fresh: "🍪 Cookie frisch",
+            stale: "⚠️ Cookie ABGELAUFEN — Downloads nur 128 kbps!",
+            missing: "⚠️ Cookie-Datei fehlt",
+            off: "🍪 kein Cookie (128 kbps)",
+            unknown: "❓ Cookie unklar",
+            unchecked: "🍪 Cookie: noch nicht geprüft"
+        }[ck.state] || "";
+        const ckHot = ck.state === "stale" || ck.state === "missing";
+        const ckAge = ck.file_age_days != null
+            ? ` · ${ck.file_age_days} d alt` : "";
+        const ckSpan = ckText
+            ? `<span${ckHot ? ' style="color:#ff7b72;font-weight:600"' : ""}>` +
+              `${esc(ckText)}${esc(ckAge)}</span>` : "";
         return `<div class="mon-head"><span>${act}</span>` +
             `<span>🗄 <b>${ing.total ?? 0}</b> Unit(s)</span>` +
             `<span>⏱ letzte Änderung ${esc(relAge(ing.last_change))}</span>` +
-            `<span>${blStr}</span>` +
+            `<span>${blStr}</span>${ckSpan}` +
             `<span><button class="mon-act" id="monIngest">🔄 Ingest jetzt</button> ${retry}</span></div>`;
     }
 

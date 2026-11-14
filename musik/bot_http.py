@@ -18,6 +18,8 @@ import asyncio
 import json
 import os
 import threading
+
+from . import cookies as cookies_mod
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import jobs as jobs_mod
@@ -129,6 +131,9 @@ def snapshot() -> dict:
         # Aufträge bis zum ECHTEN Ergebnis (Story 9.6, kein stilles
         # Verfallen mehr)
         "jobs_all": list(reversed(all_jobs)),
+        # Story 1.2 tooling: YouTube-Cookie-Frische (Cache aus dem
+        # Cookie-Watch-Task, kein Netz im Snapshot-Pfad)
+        "cookie": cookies_mod.status(),
         "ingest": {
             "total": sum(counts.values()),
             "counts": counts,
