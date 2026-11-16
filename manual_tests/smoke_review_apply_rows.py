@@ -53,7 +53,7 @@ def main() -> int:
         engine_mod.build_decider = lambda unit, forced=None, lib=None: ("decider", forced)
         engine_mod.run_unit_real = fake_run_unit_real
         engine_mod.netrec = SimpleNamespace(clear=lambda: None)
-        engine_mod._merge_result = lambda unit, outcome: None
+        engine_mod.merge_result = lambda unit, outcome: None  # Story 6.3: public
 
         st = {"meta": {}, "units": {}}
         for path, status, extra in (

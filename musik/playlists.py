@@ -209,9 +209,9 @@ def _youtube_order(job) -> tuple[str, list[dict]] | None:
     url = f"https://www.youtube.com/playlist?list={m.group(1)}"
     cookies = None
     try:
-        from .fetch import _cookie_path, _fetch_config
+        from .fetch import cookie_path, fetch_config
 
-        cookies = _cookie_path(_fetch_config())
+        cookies = cookie_path(fetch_config())
     except Exception:
         pass
     info = _ytdlp_fetch(url, cookies)
