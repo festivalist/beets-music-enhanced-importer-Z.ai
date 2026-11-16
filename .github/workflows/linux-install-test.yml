@@ -1,7 +1,9 @@
 # Tests install.sh on clean Ubuntu VMs — x64 and arm64 (arm64 matches the
 # Raspberry Pi target). Validates the whole Linux install path: apt tools,
 # venv, pip deps (spotdl/somedl), Deno, setup wizard (non-interactive),
-# fetch self-test — then runs the netzfreie smoke suite (Story 6.6).
+# fetch self-test. The netzfreie smoke suite (Story 6.6) runs in its own
+# `smokes` job so it stays green while the install chain waits on the
+# deliberately-open plex/musicgrabber modules (Dell box).
 name: linux-install-test
 
 on:
@@ -17,6 +19,23 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Story 6.6: the netzfreie smoke suite in its OWN job — the install
+  # chain currently ends non-zero on the deliberately-open modules
+  # (plex/musicgrabber, awaiting the Dell box), which would keep the
+  # suite step below from ever running.
+  smokes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: venv + deps
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install -q -r requirements.txt
+
+      - name: Smoke suite (manual_tests, network-free)
+        run: .venv/bin/python manual_tests/run_smokes.py
+
   install:
     strategy:
       fail-fast: false
@@ -61,9 +80,6 @@ jobs:
           assert "bot_allowlist" in cfg and "retry_rounds" in cfg
           print("classify + config template OK")
           EOF
-
-      - name: Smoke suite (manual_tests, network-free)
-        run: .venv/bin/python manual_tests/run_smokes.py
 
       - name: doctor quick run (library bootstrap on Linux)
         run: |
