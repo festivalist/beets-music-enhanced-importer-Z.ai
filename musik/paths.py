@@ -59,8 +59,14 @@ def _config_data() -> dict:
     except OSError:
         mt = None
     if _YAML_CACHE["data"] is None or mt != _YAML_CACHE["mtime"]:
-        with open(CONFIG_FILE, encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
+        try:
+            with open(CONFIG_FILE, encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+        except OSError:
+            # Fehlendes config.yaml (frischer Checkout, CI, Pre-Setup):
+            # Leser arbeiten mit den Defaults; echte CLI-Befehle gate't
+            # cli.main() über das Setup-Wizard (Story 6.6/6.3-Fund).
+            data = {}
         _YAML_CACHE["data"] = data
         _YAML_CACHE["mtime"] = mt
     return _YAML_CACHE["data"]
