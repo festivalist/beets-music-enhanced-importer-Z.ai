@@ -1,7 +1,7 @@
 # Tests install.sh on clean Ubuntu VMs — x64 and arm64 (arm64 matches the
 # Raspberry Pi target). Validates the whole Linux install path: apt tools,
 # venv, pip deps (spotdl/somedl), Deno, setup wizard (non-interactive),
-# fetch self-test.
+# fetch self-test — then runs the netzfreie smoke suite (Story 6.6).
 name: linux-install-test
 
 on:
@@ -9,8 +9,10 @@ on:
     branches: [main]
     paths:
       - "install.sh"
+      - "install.d/**"
       - "requirements.txt"
       - "musik/**"
+      - "manual_tests/**"
       - ".github/workflows/linux-install-test.yml"
   workflow_dispatch:
 
@@ -59,6 +61,9 @@ jobs:
           assert "bot_allowlist" in cfg and "retry_rounds" in cfg
           print("classify + config template OK")
           EOF
+
+      - name: Smoke suite (manual_tests, network-free)
+        run: .venv/bin/python manual_tests/run_smokes.py
 
       - name: doctor quick run (library bootstrap on Linux)
         run: |

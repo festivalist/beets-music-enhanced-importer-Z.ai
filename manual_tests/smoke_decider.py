@@ -148,4 +148,110 @@ assert sess2._singleton_dupe(task5, match5) is False, "live version passes"
 assert sess2.duplicate_losers == []
 print("5) singleton cross-engine dedup OK (Story 2.3)")
 
+# --- Entscheidungsmatrix (Story 6.6) --------------------------------------
+# Die Standard-Pfade von decide_album mit Kandidaten: auto-apply / review /
+# tier-3 asis (Distanz) / tier-3 asis (Kontradiktion) / network / forced-miss.
+import os as _os  # noqa: E402
+import tempfile as _tempfile  # noqa: E402
+
+from musik import scan as scan_mod  # noqa: E402
+
+_tmp = _tempfile.mkdtemp()
+_TAGS: dict[str, dict[str, str]] = {}
+
+
+def fake_tag(f, field):
+    return _TAGS.get(_os.path.normcase(f), {}).get(field, "")
+
+
+scan_mod.tag_of = fake_tag   # scan.tags_complete liest über scan-Globals
+
+
+def tagged_unit(dir_name: str, artist: str, album: str) -> dict:
+    d = _os.path.join(_tmp, dir_name)
+    _os.makedirs(d, exist_ok=True)
+    files = []
+    for n in ("01.mp3", "02.mp3"):
+        fp = _os.path.join(d, n)
+        open(fp, "wb").close()
+        _TAGS[_os.path.normcase(fp)] = {
+            "artist": artist, "albumartist": artist,
+            "album": album, "title": "t" + n,
+        }
+        files.append(fp)
+    return {
+        "path": d, "files": files, "n_files": 2,
+        "singleton": False, "split_into_singletons": False,
+        "guessed": {"artist": artist, "album": album},
+        "hints": [], "artists_seen": [artist.lower()],
+    }
+
+
+# M1) starker Kandidat (Namen ident, Distanz 0.01) -> apply/auto
+dec = Decider(NetworkErrorRecorder(), auto_accept_distance=0.25,
+              unit=tagged_unit("m1", "Some Artist", "Some Album"))
+good = fake_match("Some Artist", "Some Album", "id-good", 0.01)
+action, record = dec.decide_album(fake_task([good]))
+assert action == "apply" and record["status"] == "auto", (action, record)
+print("M1) strong match -> apply/auto OK")
+
+# M2) einziger Kandidat ueber der Auto-Distanz, aber unter dem Tier-3-Floor
+#     -> skip/review ("below auto-accept confidence")
+dec = Decider(NetworkErrorRecorder(), auto_accept_distance=0.25,
+              unit={"files": [], "singleton": False, "guessed": {},
+                    "hints": [], "artists_seen": []})
+weak = fake_match("Some Artist", "Some Album", "id-weak", 0.30)
+action, record = dec.decide_album(fake_task([weak]))
+assert action == "skip" and record["status"] == "review", (action, record)
+assert record["reason"].startswith("below auto-accept confidence"), record
+assert record["candidates"], "review record must carry previews"
+print("M2) weak match -> review with blocker OK")
+
+# M3) alles ueber dem Tier-3-Floor + eigene Tags vollstaendig + Ordner
+#     stimmt -> apply-asis (tier 3, Distanz-Pfad)
+dec = Decider(NetworkErrorRecorder(), auto_accept_distance=0.25,
+              unit=tagged_unit("m3", "Real Artist", "Real Album"))
+garbage = fake_match("Other Band", "Other Record", "id-garbage", 0.50)
+action, record = dec.decide_album(fake_task([garbage],
+                                            artist="Real Artist",
+                                            album="Real Album"))
+assert action == "apply-asis" and record["status"] == "asis", (action, record)
+assert "folder and tags agree" in record["reason"], record
+print("M3) distance-flood -> tier-3 asis OK")
+
+# M4) ALLE Top-Kandidaten widersprechen der Identitaet (Artist/Title-Ebene)
+#     -> apply-asis per Nutzer-Regel (2026-09-17), nicht review
+dec = Decider(NetworkErrorRecorder(), auto_accept_distance=0.25,
+              unit=tagged_unit("m4", "Real Artist", "Real Album"))
+wrong = [fake_match(f"Wrong {i}", f"Also Wrong {i}", f"id-w{i}", 0.01)
+         for i in range(3)]
+action, record = dec.decide_album(fake_task(wrong, artist="Real Artist",
+                                            album="Real Album"))
+assert action == "apply-asis" and record["status"] == "asis", (action, record)
+assert "all top candidates contradict" in record["reason"], record
+print("M4) all top candidates contradict -> asis by user rule OK")
+
+# M5) keine Kandidaten + MusicBrainz-Fehler im Recorder -> skip/network
+#     (NIE "keine Antwort" als unmatched verkaufen)
+recorder = NetworkErrorRecorder()
+recorder.snapshot = lambda: [("musicbrainz.mb2", "HTTP 503: busy")]
+dec = Decider(recorder, auto_accept_distance=0.25,
+              unit={"files": [], "singleton": False, "guessed": {},
+                    "hints": [], "artists_seen": []})
+action, record = dec.decide_album(fake_task([]))
+assert action == "skip" and record["status"] == "network", (action, record)
+assert "MusicBrainz lookup failed" in record["reason"], record
+print("M5) MB error -> network, not unmatched OK")
+
+# M6) forced id kam im Text-Search nicht zurueck und liefert auch per
+#     search_ids nichts -> skip/review ("forced id ... not among candidates")
+dec = Decider(NetworkErrorRecorder(), auto_accept_distance=0.25,
+              forced_album_id="11111111-1111-1111-1111-111111111111")
+S.tag_album_compat = lambda items, **kw: types.SimpleNamespace(candidates=[])
+present = fake_match("Some Artist", "Some Album", "id-other", 0.01)
+action, record = dec.decide_album(fake_task([present]))
+assert action == "skip" and record["status"] == "review", (action, record)
+assert "not among candidates" in record["reason"], record
+print("M6) forced id miss -> clean review skip OK")
+
 print("smoke_decider: all assertions passed")
