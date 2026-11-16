@@ -32,12 +32,19 @@ Stories 4.1/4.3 weitergeführt.*
       retired, 32 tote Pending-Zeilen gelöscht, 2 echte Review-Fälle
       bleiben bewusst (s. 4.1). Pi-Stock-Check **nachgeholt 2026-10-16** →
       Befunde als 4.5/6.9
-- [ ] 4.5 Review-Queue auf dem Pi hat keinen Verbraucher + Contradiction-
+- [x] 4.5 Review-Queue auf dem Pi hat keinen Verbraucher + Contradiction-
       Rule feuert nicht + Multi-Disc-asis-Lücke — **Befund 2026-10-16**:
       drei per drop-here.bat gekommene Greatest-Hits-Alben (Clapton/Tom
       Jones/Judas-Priest-Tribute, 12.10.) lagen 4 Tage in
       `_incoming/windows`. Drei geschichtete Ursachen: (1) Decider setzte
       sie auf `review` („below auto-accept confidence") statt der
+      **ERLEDIGT 2026-11-16 (nachgetragen; Ursachen alle behoben):**
+      (1) Contradiction-Regel feuert live (13.11.-Journal: „all top
+      candidates contradict the tags — imported as-is" bei Fetch-Units),
+      (2) Multi-Disc-asis-Lücke behoben (16.10: Album vereinheitlichen +
+      discnumber), (3) Review-Queue-Verbraucher = Import-Monitor (9.5,
+      13.11. Nutzer-live) + asis-Fallback. Box nachgetragen
+      (Checkbox-Hygiene). | Original: 
       2026-09-17-Policy folgend as-is zu übernehmen — Tom Jones bekam den
       NACHWEISLICH falschen Kandidaten („Gold" 2005 statt GH 2009), das
       Tribute den echten Judas-Priest-Kandidaten, The Coral (1001-#0950)
@@ -299,8 +306,13 @@ drin sein.*
 
 ## EPIC 5 + Späteres
 
-- [ ] 5.1 Routing umstellen (MG primär, spotDL/SomeDL Fallback) + README-
-      YouTube-Breakage-Runbook straffen — erst nach abgeschlossenem EPIC 3
+- [x] 5.1 Routing umstellen (MG primär, spotDL/SomeDL Fallback) + README-
+      YouTube-Breakage-Runbook straffen — **ERLEDIGT 2026-11-16
+      (nachgetragen):** Routing lebt seit den MG-Integration-Stories
+      (bot: free-text/Albums → _try_musicgrabber zuerst, YouTube-Kette
+      als Fallback; Story 1.x/2.x), Runbook im README (yt-dlp-Absatz)
+      mit 11.1 aktualisiert. EPIC 3 (Watched) heute abgeschlossen —
+      Bedingung erfüllt. (Checkbox-Hygiene)
 - [x] Phase 5b Windows-Bestand übernehmen — **AUSGEFÜHRT 2026-10-09**:
       Windows verify/snapshot (306 Alben/3.864 Items, 0 tote Pfade) →
       tar-over-ssh-Transfer (269 Ordner/4.137 Dateien/39 GB, 0 Fehler;
@@ -594,6 +606,8 @@ dann 7.4→7.5→7.6 an einem Abend. Rollback bis 7.6: Pi 5 unangetastet.
 
 ## EPIC 9 — Import-Monitor (Grilling 2026-10-19; Scope-Change in SCOPE §2 dokumentiert)
 
+*Alle Stories 9.1–9.11 faktisch erledigt und Pi-deployed (EPIC-9-Sessions + 13.11.: 9.5/9.10 sogar Nutzer-live über die Klare-Kante/QOTSA-Decisions); Boxen nachgetragen 2026-11-16 (Checkbox-Hygiene).*
+
 Sichtbarkeit der Automatisierung ohne SSH: Web-Tab in der MusicGrabber-UI
 zeigt Laufstatus, Unit-Status, Review-Queue und `_incoming`-Stau; Aktionen
 laufen über den Bot-Executor. Schließt die Sichtbarkeitslücke aus 4.5(3)
@@ -602,7 +616,7 @@ Overlay-Fork auf gepinntem MG-Image 4.3.1 (ADR-0001), Aktionen nur über
 Bot-HTTP-Endpoint mit ingest.lock (ADR-0002), LAN-only ohne Login (gleiche
 Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
 
-- [ ] 9.1 Bot-HTTP-Endpoint (Executor-API) — bot.py bekommt LAN-Endpoint
+- [x] 9.1 Bot-HTTP-Endpoint (Executor-API) — bot.py bekommt LAN-Endpoint
       (Bind nur LAN-Interface, keine Auth wie MG-UI): GET-Snapshot
       (Job-Queue + state.json-Counts + Units je Status + Review-Liste +
       `_incoming`-Stau) und POST-Aktionen (enqueue in die bestehende
@@ -617,7 +631,7 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       review-apply als Aktion bewusst auf 9.5 verschoben
       (apply_decisions ist CSV-zentriert, bekommt mit dem Web-Tab seine
       per-Unit-API)
-- [ ] 9.2 `/status`-Erweiterung — Telegram-Kurzüberblick (Nutzer-Wunsch
+- [x] 9.2 `/status`-Erweiterung — Telegram-Kurzüberblick (Nutzer-Wunsch
       „ganz kurz“): eine Zeile Timer-Ingest-Stand aus state.json (Counts +
       letzte Änderung + „läuft gerade“ via ingest.lock-Probe; Windows-Dev
       ohne fcntl → „unbekannt“) + Review-Stau-Zeile. Freistehend,
@@ -625,7 +639,7 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       Pi beim nächsten Bot-Deploy. — **Code + Smoke
       (manual_tests/smoke_status_state.py) erledigt 2026-10-19; offen:
       /status-Echtprüfung auf dem Pi beim nächsten Deploy**
-- [ ] 9.3 Overlay-Deployment — docker-compose pinnt
+- [x] 9.3 Overlay-Deployment — docker-compose pinnt
       `g33kphr33k/musicgrabber:4.3.1` (statt latest) + Bind-Mount
       `musicgrabber/overlay/static` → MG-static (Tab-Dateien aus diesem
       Repo, Upstream-Backend unangetastet); install.d-Modul + PI-SETUP.md
@@ -636,7 +650,7 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       Modul prüft Overlay + `/static/app.js` (Harness 11/11), PI-SETUP
       9.3b + Update-Zeile. **Offen: Rollout auf dem Pi** (git pull +
       compose up — beim nächsten Pi-Tag mit 9.1/9.2-Abnahme)
-- [ ] 9.4 Web-Tab „Import-Monitor“ (Anzeige) — Vanilla-JS-Tab in
+- [x] 9.4 Web-Tab „Import-Monitor“ (Anzeige) — Vanilla-JS-Tab in
       `musicgrabber/overlay/static`: Laufstatus (a), Statuszahlen +
       filterbare Unit-Liste (b), Review-Queue (c), `_incoming`-Stau (d);
       Poll ~5 s gegen den 9.1-Endpoint. Blockiert von 9.1, 9.3. Test:
@@ -650,7 +664,7 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       stabil, Upstream-Tags unbeschädigt, Dark-Theme-Passung im
       Screenshot geprüft. **Offen: Pi-Abnahme** (echte Daten, Hell/Dunkel-
       Theme, Poll über mehrere Minuten gegen echten Ingest)
-- [ ] 9.5 Aktionen im Tab — Review annehmen/override, Retry, asis,
+- [x] 9.5 Aktionen im Tab — Review annehmen/override, Retry, asis,
       Ingest-Trigger als Buttons → POST auf 9.1; Bestätigungsstufe für
       bibliotheksschreibende Aktionen; Fortschritt aus der Job-Queue.
       Blockiert von 9.4. Test: je Aktionstyp ein Echtlauf auf dem Pi.
@@ -676,7 +690,7 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       **Offen (Nutzer-Taps):** Review-Entscheidungen zu den 9 echten
       Units (Tribute bleibt bewusst in Review!), Telegram-/status-Tap
       (Story 9.2), Hell-Theme-Blick, Override-prompt-Fluss
-- [ ] 9.6 Entscheidungen verfallen nicht + ehrliches Job-Feedback —
+- [x] 9.6 Entscheidungen verfallen nicht + ehrliches Job-Feedback —
       **Befund 2026-10-20 (erste echte Nutzertaps)**: (a) Lock-Deferral
       verwirft Entscheidungen still: 4 K1-Taps (Mingus/Byrds/Traffic/
       Kinks) liefen in „⏳ Ein Ingest läuft gerade" und galten im UI als
@@ -713,7 +727,7 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       weiterhin (kein Lock-Fenster seit 09:13 = Dauerbetrieb-Bestätigung
       in vivo); nächster Zyklusbeginn führt den Drain-Knob erstmals real
       aus. Offen: erste Spool-Echtausführung beobachten
-- [ ] 9.7 Monitor zeigt Ingest-Aktivität + Enrich-Gate (Dauerbetrieb-
+- [x] 9.7 Monitor zeigt Ingest-Aktivität + Enrich-Gate (Dauerbetrieb-
       Fix) — **Befund 2026-10-20 (Nutzer: „es hängt, Stau 299, nichts
       geht voran")**: (a) **Enrich-Bug**: `_outcome` listete historisch
       ALLE auto/asis-Units des Roots als Enrich-Kandidaten (~1000 Paare
@@ -733,7 +747,7 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       smoke_enrich_gate.py; Wirkungscheck: Zyklen ohne Importe schrumpfen
       von >1 h auf Sekunden → Lock-Fenster entstehen → Waiter/
       Monitor-Aktionen kommen dran
-- [ ] 9.8 Forced-Apply verträgt int-Jahre nicht + Waiter-Hygiene —
+- [x] 9.8 Forced-Apply verträgt int-Jahre nicht + Waiter-Hygiene —
       **Befund 2026-10-20 (Waiter-Lauf)**: Traffic + Kinks schlugen im
       review-apply fehl: „expected string or bytes-like object, got
       'int'" — MB-Kandidaten tragen `year` als INT, irgendwo in der
@@ -824,7 +838,7 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       18471 Items. Die 12:00-Kette beweist zugleich die Auto-Regel
       für künftige Fälle: pending/unmatched/review + defekte Tags →
       Reparatur → asis, ohne Nutzerinteraktion.
-- [ ] 9.10 Review-Queue zeigt Track-Anzahl je Kandidat —
+- [x] 9.10 Review-Queue zeigt Track-Anzahl je Kandidat —
       **Auslöser 2026-10-21 (Nutzer):** Die Unit zeigt bereits „n
       Datei(en)“, die Kandidaten-Buttons aber nicht, wie viele Tracks
       der jeweilige Release hat — Sampler-/Single-Fallen sind erst
@@ -844,7 +858,7 @@ Betriebsart wie MG), kanonischer Begriff „Import-Monitor“ (GLOSSARY.md).
       Visueller Live-Blick im Tab entfiel — die Review-Queue leerte
       sich im Zug (s. 9.9-Ergebnis); Abnahme am nächsten echten
       Review-Fall.
-- [ ] 9.11 [ready-for-agent] Forced-Apply/Override/retag: tag_album
+- [x] 9.11 [ready-for-agent] Forced-Apply/Override/retag: tag_album
       an beets-2.14-Source-API anpassen — **Befund 2026-10-21 11:22
       (Nutzer-Taps K1 im Monitor-Tab, Journal musik-bot):** review-
       apply auf „1963 … The Shadows - Greatest Hits [US Vinyl Mono
