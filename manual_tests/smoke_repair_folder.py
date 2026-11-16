@@ -243,6 +243,88 @@ try:
     check("willie: Junk-Artist ersetzt",
           t["artist"] == "Willie Nelson"
           and t["albumartist"] == "Willie Nelson", str(t))
+
+    # --- 10. Serienordner: Mehrheit korroboriert (Story 10.9, Valli) ---
+    # '2019 - Essential Albums - Artist • Album': der Parser findet
+    # keinen Artist (Bullet trennt Artist/Album, Label steht vorn); die
+    # Datei-Mehrheit trägt beide Identitätsteile und der RAW-Ordner
+    # enthält sie als Tokenfolgen → Mehrheit gewinnt, abweichende
+    # Einzeldatei wird auf sie gezogen.
+    folder = os.path.join(
+        tmp, "2019 - Essential Albums - Frankie Valli & The Four Seasons "
+             "• Essential Collection")
+    f1 = os.path.join(folder, "01. Frankie Valli & The Four Seasons - "
+                              "Sherry.mp3")
+    f2 = os.path.join(folder, "02. Frankie Valli & The Four Seasons - "
+                              "Whatever You Say.mp3")
+    mk_mp3(f1, {"artist": "Frankie Valli & The Four Seasons",
+                "albumartist": "Frankie Valli & The Four Seasons",
+                "album": "Essential Collection", "title": "Sherry",
+                "tracknumber": "1", "date": "2019"})
+    mk_mp3(f2, {"artist": "Frankie Valli & The Four Seasons",
+                "albumartist": "Frankie Valli & The Four Seasons",
+                "album": "Rarities (Volume 2)", "title": "Whatever You Say",
+                "tracknumber": "2", "date": "2019"})
+    u = unit(folder, [f1, f2])
+    ok, why = tags_complete(u)
+    check("valli: davor incomplete (Album-Variante)", not ok, why)
+    ok, note = repair_from_folder(u)
+    check("valli: repariert", ok, note)
+    ok, why = tags_complete(u)
+    check("valli: danach complete", ok, why)
+    t1, t2 = read_tags(f1), read_tags(f2)
+    check("valli: Album aus Mehrheit, nicht aus Parse-Rest",
+          t2["album"] == "Essential Collection", str(t2))
+    check("valli: Artist unangetastet",
+          t1["artist"] == "Frankie Valli & The Four Seasons"
+          and t2["artist"] == "Frankie Valli & The Four Seasons",
+          str(t1) + str(t2))
+    check("valli: kein Rarities-Rest",
+          t1["album"] == "Essential Collection", str(t1))
+
+    # --- 11. Junk-Parse wird nie geschrieben (Ray-Comma-Fall) ----------
+    # '2014 - Essential Albums - Ray Charles, The Essential Collection':
+    # der Parse setzt 'Essential Albums' als Artist — die korroborierte
+    # Mehrheit (Artist UND Album als Tokenfolgen im RAW-Ordner) ersetzt
+    # ihn, bevor irgendein Tag geschrieben wird.
+    folder = os.path.join(
+        tmp, "2014 - Essential Albums - Ray Charles, The Essential "
+             "Collection [2CD]")
+    f1 = os.path.join(folder, "01. Ray Charles - What'd I Say.mp3")
+    f2 = os.path.join(folder, "02. Ray Charles - Georgia On My Mind.mp3")
+    mk_mp3(f1, {"artist": "Ray Charles", "albumartist": "Essential Albums",
+                "album": "The Essential Collection",
+                "title": "What'd I Say", "tracknumber": "1",
+                "date": "2014"})
+    mk_mp3(f2, {"artist": "Ray Charles", "albumartist": "Essential Albums",
+                "album": "The Essential Collection",
+                "title": "Georgia On My Mind", "tracknumber": "2"})
+    u = unit(folder, [f1, f2])
+    ok, note = repair_from_folder(u)
+    check("ray: repariert", ok, note)
+    t1, t2 = read_tags(f1), read_tags(f2)
+    check("ray: AA aus Mehrheit statt Junk-Parse",
+          t1["albumartist"] == "Ray Charles"
+          and t2["albumartist"] == "Ray Charles", str(t1) + str(t2))
+    check("ray: kein 'Essential Albums' Rest",
+          "Essential Albums" not in str(t1) + str(t2), str(t1) + str(t2))
+    check("ray: date gefüllt aus Ordnerjahr", t2["date"] == "2014", str(t2))
+
+    # --- 12. Mehrheit NICHT korroboriert → Parse gewinnt ---------------
+    # Ohne Tokenfolgen-Unterstützung im Ordner bleibt es beim Parse
+    # (Willie-Klasse bleibt grün; keine Teil-Korroboration).
+    folder = os.path.join(tmp, "0347. Frankie Valli - Something Else")
+    f1 = os.path.join(folder, "01. Something Else.mp3")
+    mk_mp3(f1, {"artist": "Tom Waits", "albumartist": "Tom Waits",
+                "album": "Something Else", "title": "Something Else",
+                "tracknumber": "1"})
+    u = unit(folder, [f1])
+    ok, note = repair_from_folder(u)
+    check("guard: repariert", ok, note)
+    t = read_tags(f1)
+    check("guard: Parse-Artist, nicht Mehrheit",
+          t["artist"] == "Frankie Valli"
+          and t["albumartist"] == "Frankie Valli", str(t))
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 

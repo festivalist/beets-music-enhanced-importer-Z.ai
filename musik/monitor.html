@@ -125,10 +125,20 @@
         const ckSpan = ckText
             ? `<span${ckHot ? ' style="color:#ff7b72;font-weight:600"' : ""}>` +
               `${esc(ckText)}${esc(ckAge)}</span>` : "";
+        // Story 10.10: Nutzer-Entscheidungen, die auf ihren Ingest-Zyklus
+        // warten (Spool) — sichtbar, bis sie wirklich ausgeführt sind
+        const sp = snap.spool || {};
+        const spSpan = sp.open
+            ? `<span title="Monitor-Aktionen warten auf den nächsten ` +
+              `Ingest-Zyklus">⏳ offene Nutzer-Entscheidungen: <b>` +
+              `${sp.open}</b>${sp.oldest_queued
+                  ? " · älteste " + esc(relAge(sp.oldest_queued)) : ""}` +
+              `</span>`
+            : "";
         return `<div class="mon-head"><span>${act}</span>` +
             `<span>🗄 <b>${ing.total ?? 0}</b> Unit(s)</span>` +
             `<span>⏱ letzte Änderung ${esc(relAge(ing.last_change))}</span>` +
-            `<span>${blStr}</span>${ckSpan}` +
+            `<span>${blStr}</span>${ckSpan}${spSpan}` +
             `<span><button class="mon-act" id="monIngest">🔄 Ingest jetzt</button> ${retry}</span></div>`;
     }
 

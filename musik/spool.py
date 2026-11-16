@@ -10,10 +10,16 @@ bekommen das echte Ergebnis statt einer Deferral.
 
 Datei: state/action-spool.json; Einträge
   {"kind": "review"|"asis"|"retry", "job_id": "...", "payload": {...},
-   "queued": <epoch>}
+   "queued": <epoch>, "attempts": <int>}
 Nur der Bot-Prozess schreibt Einträge (threading.Lock + atomarer
 Replace); nur der Ingest entnimmt (Rename + Exists-Check gegen die
 Clobber-Falle, wenn während der Entnahme ein neuer Eintrag landet).
+
+Story 10.10: Aktionen, deren VORAUSSETZUNG beim Flush noch nicht erfüllt
+ist (Unit noch nicht im State / pending — transient), kehren begrenzt
+in den Spool zurück statt lautlos zu verfallen; in einem End-Status
+(asis/auto/ignored/duplicate/error …) ist die Entscheidung moot und der
+Eintrag wird verbraucht. MAX_ATTEMPTS begrenzt die Zyklen.
 """
 
 import json
@@ -25,6 +31,12 @@ import time
 from .paths import state_dir
 
 _lock = threading.Lock()
+
+MAX_ATTEMPTS = 5
+
+# Statusse, in denen eine gespoolte Aktion (noch) nicht ausführbar war,
+# die Unit-Entscheidung aber überlebt haben soll (transient).
+_OPEN_STATUSES = ("review", "pending", "unmatched", "network")
 
 
 def _file() -> str:
@@ -39,11 +51,12 @@ def _load() -> list:
         return []
 
 
-def add(kind: str, job_id: str, payload: dict) -> None:
+def add(kind: str, job_id: str, payload: dict, attempts: int = 0) -> None:
     with _lock:
         entries = _load()
         entries.append({"kind": kind, "job_id": job_id,
-                        "payload": payload, "queued": time.time()})
+                        "payload": payload, "queued": time.time(),
+                        "attempts": attempts})
         d = state_dir()
         os.makedirs(d, exist_ok=True)
         fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
@@ -55,6 +68,19 @@ def add(kind: str, job_id: str, payload: dict) -> None:
             if os.path.exists(tmp):
                 os.remove(tmp)
             raise
+
+
+def open_actions() -> dict:
+    """Lese-Sicht für den Snapshot (bot_http): wie viele Nutzer-
+    Entscheidungen liegen offen und wie alt ist die älteste."""
+    entries = _load()
+    return {
+        "open": len(entries),
+        "oldest_queued": min((e.get("queued") or 0 for e in entries),
+                             default=None) or None,
+        "max_attempts": max((e.get("attempts") or 0 for e in entries),
+                            default=0),
+    }
 
 
 def take() -> list:
@@ -109,7 +135,14 @@ def flip_retry(paths: list[str]) -> int:
 def drain_and_execute(log=print) -> int:
     """Vom Ingest bei ZYKLUSBEGINN aufrufen (wir stehen unter dem
     ingest.lock): alle gespoolten Aktionen ausführen und die zugehörigen
-    Job-Records mit dem echten Ergebnis fortschreiben."""
+    Job-Records mit dem echten Ergebnis fortschreiben.
+
+    Story 10.10: Aktionen mit unerfüllter Voraussetzung (Unit noch
+    unbekannt oder pending — transient) kehren mit attempts+1 in den
+    Spool zurück, bis zu MAX_ATTEMPTS Zyklen; danach verfallen sie mit
+    explizitem Hinweis. End-Statusse (importiert/ignored/error …)
+    verbrauchen die Entscheidung — dort ist sie moot oder bereits
+    ausgeführt."""
     entries = take()
     if not entries:
         return 0
@@ -117,37 +150,108 @@ def drain_and_execute(log=print) -> int:
     from . import asis as asis_mod
     from . import jobs as jobs_mod
     from . import review as review_mod
+    from . import state as state_mod
 
+    def respool(e, open_items, key):
+        """Teil des Eintrags mit unerfüllter Voraussetzung zurücklegen.
+        Liefert (versuch, verfall-hinweis)."""
+        attempts = (e.get("attempts") or 0) + 1
+        if attempts > MAX_ATTEMPTS:
+            return None, (
+                f"verfällt nach {MAX_ATTEMPTS} Zyklen ohne Ausführung — "
+                "im Monitor erneut auslösen")
+        payload = dict(e.get("payload") or {})
+        payload[key] = open_items
+        add(e.get("kind"), e.get("job_id"), payload, attempts=attempts)
+        return attempts, None
+
+    retried = 0
     for e in entries:
         kind = e.get("kind")
         job_id = e.get("job_id")
         payload = e.get("payload") or {}
         try:
             if kind == "review":
-                applied, msgs = review_mod.apply_decisions_rows(
-                    payload.get("decisions") or [])
+                rows = payload.get("decisions") or []
+                applied, msgs = review_mod.apply_decisions_rows(rows)
                 summary = (f"📋 Review (nachgereicht): {applied} "
                            f"angewandt\n" + "\n".join(msgs[:10]))
-                status = "done"
+                job_status = "done"
+                # Row-Level: Rows für unbekannte/pending Units waren noch
+                # nicht ausführbar (transient) — zurücklegen. Rows, die
+                # der Apply bearbeitet hat (inkl. "nicht reviewbar" in
+                # einem End-Status), sind konsumiert: ihr Ergebnis ist
+                # das apply-Ergebnis, kein Retry (der Forced-Pfad ist
+                # deterministisch).
+                st = state_mod.load()
+                open_rows = [
+                    r for r in rows
+                    if (lambda u: u is None
+                        or u.get("status") == "pending")(
+                        state_mod.get_unit(st, r.get("unit_path") or ""))]
+                if open_rows:
+                    attempts, decay = respool(e, open_rows, "decisions")
+                    if decay:
+                        summary += (f"\n⚠️ {len(open_rows)} Entscheidung(en) "
+                                    f"{decay}")
+                        if not applied:
+                            job_status = "error"
+                    else:
+                        retried += 1
+                        summary += (f"\n⏳ {len(open_rows)} Entscheidung(en) "
+                                    f"zurück in den Spool "
+                                    f"(Versuch {attempts}/{MAX_ATTEMPTS})")
+                        job_status = "queued"
             elif kind == "asis":
-                lines, failed = asis_mod.import_units(
-                    payload.get("unit_paths") or [])
+                paths = payload.get("unit_paths") or []
+                lines, failed = asis_mod.import_units(paths)
                 summary = "\n".join(lines)[:1500] or "fertig"
-                status = "error" if failed else "done"
+                job_status = "error" if failed else "done"
+                # Pfad-Level: Units, die das tags_complete/State-Gate
+                # noch abweist (weiterhin review/pending/… oder unbekannt),
+                # leben als Entscheidung weiter — genau der Befund aus
+                # Story 10.10 (Valli): der Import griff nie, die
+                # Entscheidung verfiel lautlos. Importierte Units und
+                # End-Statusse sind konsumiert.
+                st = state_mod.load()
+                open_paths = [
+                    p for p in paths
+                    if (lambda u: u is None
+                        or u.get("status") in _OPEN_STATUSES)(
+                        state_mod.get_unit(st, p))]
+                done_paths = len(paths) - len(open_paths)
+                if open_paths:
+                    attempts, decay = respool(e, open_paths, "unit_paths")
+                    if decay:
+                        summary += (f"\n⚠️ {len(open_paths)} Unit(s) {decay}")
+                        if not done_paths and job_status == "done":
+                            job_status = "error"
+                    else:
+                        retried += 1
+                        summary += (f"\n⏳ {len(open_paths)} Unit(s) zurück "
+                                    f"in den Spool "
+                                    f"(Versuch {attempts}/{MAX_ATTEMPTS})")
+                        if done_paths == 0:
+                            job_status = "queued"
             elif kind == "retry":
                 n = flip_retry(payload.get("unit_paths") or [])
                 summary = (f"🔁 {n} Unit(s) auf pending — dieser Lauf "
                            "versucht sie erneut.")
-                status = "done"
+                job_status = "done"
             else:
                 summary = f"unbekannte Spool-Aktion {kind!r}"
-                status = "error"
+                job_status = "error"
         except Exception as exc:
             summary = (f"❌ Spool-Aktion fehlgeschlagen: "
                        f"{type(exc).__name__}: {str(exc)[:200]}")
-            status = "error"
+            job_status = "error"
         if job_id:
-            jobs_mod.update_job(job_id, status=status,
-                                finished=time.time(), summary=summary)
-        log(f"spool: [{status}] {summary.splitlines()[0][:100]}")
+            fields = {"status": job_status, "summary": summary}
+            if job_status != "queued":
+                fields["finished"] = time.time()
+            jobs_mod.update_job(job_id, **fields)
+        log(f"spool: [{job_status}] {summary.splitlines()[0][:100]}")
+    if retried:
+        log(f"spool: [retry] {retried} Aktion(en) zurück in den Spool "
+            f"(Versuchszähler gegen {MAX_ATTEMPTS})")
     return len(entries)

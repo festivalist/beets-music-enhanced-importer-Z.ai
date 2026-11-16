@@ -648,7 +648,15 @@ im Bot-Jobs-Block. **Aktionen laufen nie ins Leere (Story 9.6):** Ist der
 ingest.lock durch den Dauerbetrieb des Ingest-Timers belegt, landet die
 Aktion im Spool (`state/action-spool.json`) und der Ingest führt sie
 beim **nächsten Zyklusbeginn** selbst aus — der Job-Record bekommt das
-echte Ergebnis, das Tab zeigt es unter „Meine Aufträge". Das
+echte Ergebnis, das Tab zeigt es unter „Meine Aufträge".
+**Entscheidungen verfallen nicht mehr lautlos (Story 10.10, 2026-11-16):**
+Scheitert die Ausführung nur an einer noch nicht erfüllten Voraussetzung
+(Unit noch unbekannt/pending, oder As-is-Unit noch nicht tag-complete),
+kehrt die Aktion **begrenzt in den Spool zurück** (5 Zyklen ≈ 75 min,
+dann Verfall mit Hinweis im Job) — die Kopfzeile zeigt solange
+„⏳ offene Nutzer-Entscheidungen: N". Importierte/erledigte Units
+verbrauchen die Entscheidung; ein Review-Apply, das deterministisch
+wieder in Review landet, wird nicht erneut versucht. Das
 Upstream-Backend bleibt unangetastet; unsere
 UI-Stellen sind mit `musik-monitor`-Markern geflaggt. Bump-Prozedur mit
 Overlay-Verträglichkeitscheck: `musicgrabber/overlay/README.md`. Der

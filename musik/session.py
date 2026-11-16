@@ -212,12 +212,11 @@ class Decider:
     @staticmethod
     def _token_seq(text: str) -> list[str]:
         """Ordered token variant of _tokens (contiguous-subsequence
-        checks need the order a set throws away)."""
-        import re
+        checks need the order a set throws away). Gemeinsame Quelle mit
+        asis.repair_from_folder (Story 10.9): asis.token_seq."""
+        from .asis import token_seq
 
-        return [
-            t for t in re.split(r"[^a-z0-9]+", (text or "").lower()) if t
-        ]
+        return token_seq(text)
 
     _UUID_RE = re.compile(
         r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I

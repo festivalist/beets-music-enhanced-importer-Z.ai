@@ -23,6 +23,7 @@ from . import cookies as cookies_mod
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import jobs as jobs_mod
+from . import spool as spool_mod
 from . import state as state_mod
 
 DEFAULT_PORT = 8283
@@ -145,6 +146,9 @@ def snapshot() -> dict:
         },
         "review": review,
         "backlog": {"audio_files": backlog, "by_root": by_root},
+        # Story 10.10: offene Nutzer-Entscheidungen im Spool — das Tab
+        # zeigt den Zähler, bis der Ingest sie geflusht hat
+        "spool": spool_mod.open_actions(),
     }
 
 

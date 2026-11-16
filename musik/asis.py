@@ -12,6 +12,7 @@ everything is logged.
 import os
 import re
 import time
+from collections import Counter
 
 import mutagen
 
@@ -471,6 +472,37 @@ def _folder_identity(name: str) -> dict:
     return ident
 
 
+def token_seq(text: str) -> list[str]:
+    """Ordered token sequence (lowercase, non-alphanumeric trennt) —
+    Grundlage der kontiguierlichen Subsequenz-Checks. Eine Quelle für
+    asis.repair_from_folder (Story 10.9) und session._token_seq
+    (Story 10.7-Korroboration)."""
+    return [t for t in re.split(r"[^a-z0-9]+", (text or "").lower()) if t]
+
+
+def token_seq_in(hay_text: str, needle: str) -> bool:
+    """True, wenn needle als kontinuierliche Tokenfolge in hay_text
+    liegt (Story 10.7: Ordner korroboriert Artist/Album-Kandidaten)."""
+    hay = token_seq(hay_text)
+    n = token_seq(needle)
+    if not n or len(n) > len(hay):
+        return False
+    return any(hay[i:i + len(n)] == n
+               for i in range(len(hay) - len(n) + 1))
+
+
+def _majority_identity(infos: list[dict]) -> tuple[str, str]:
+    """Häufigster echter Artist + häufigstes Album über die Datei-Tags
+    (Story 10.9). Leere/Junk-Artists (artist_present) zählen nicht;
+    Mehrheit = Modalwert, nicht Konsens."""
+    artists = Counter(
+        (i["artist"] or i["aartist"]) for i in infos
+        if artist_present(i["artist"] or i["aartist"]))
+    albums = Counter(i["album"] for i in infos if i["album"])
+    return (artists.most_common(1)[0][0] if artists else "",
+            albums.most_common(1)[0][0] if albums else "")
+
+
 def _split_disc_suffix(album: str) -> tuple[str, int | None]:
     """'…Greatest Hits CD1' → (Basis, 1); '…(LP2).' → (Basis, 2)."""
     m = _DISC_SUFFIX_RE.search(album)
@@ -516,8 +548,11 @@ def repair_from_folder(unit: dict, dry_run: bool = False) -> tuple[bool, str]:
     echte Datei-Artists ohne Treffer auf den Ordner-Artist → Various
     Artists (Tribute-/Sampler-Fall, Datei-Artists bleiben erhalten).
     Fehlende Titel/Tracknummern kommen aus dem Dateinamen bzw. werden
-    fortlaufend nummeriert; Discs aus CD/LP-Suffixen. Ein Trockenlauf
-    plant nur und schreibt nichts. Liefert (erfolg, hinweis).
+    fortlaufend nummeriert; Discs aus CD/LP-Suffixen. Story 10.9: bei
+    Serien-/Label-Ordnern gewinnt die korroborierte Datei-Mehrheit
+    (Artist UND Album als Tokenfolgen im RAW-Ordnernamen) gegen fehlenden
+    oder Junk-Parse. Ein Trockenlauf plant nur und schreibt nichts.
+    Liefert (erfolg, hinweis).
     """
     if not unit.get("files"):
         return False, "no files"
@@ -552,6 +587,23 @@ def repair_from_folder(unit: dict, dry_run: bool = False) -> tuple[bool, str]:
         os.path.basename((unit.get("path") or "").rstrip("\\/")))
     folder_artist = ident.get("artist", "")
     album = ident.get("album", "")
+
+    # Story 10.9 (Serienordner): Label-/Serien-Konventionen wie
+    # '2019 - Essential Albums - Artist • Album' zerlegt der Parser nicht
+    # zuverlässig (Artist fehlt, oder das Serien-Label wird zum Artist).
+    # Trägt die Datei-Mehrheit eine saubere Identität und enthält der
+    # RAW-Ordnername Artist UND Album als kontinuierliche Tokenfolgen
+    # (10.7-Korroboration), gewinnt die Mehrheit — gegen fehlenden wie
+    # gegen Junk-Parse. Ohne korroborierte Mehrheit (leere Vinyl-Tags,
+    # Tom-Waits/Willie-Fall) gilt unverändert der Parse.
+    folder = os.path.basename((unit.get("path") or "").rstrip("\\/"))
+    major_artist, major_album = _majority_identity(infos)
+    if (major_artist and major_album
+            and token_seq_in(folder, major_artist)
+            and token_seq_in(folder, major_album)
+            and (token_seq(folder_artist) != token_seq(major_artist)
+                 or token_seq(album) != token_seq(major_album))):
+        folder_artist, album = major_artist, major_album
     if not album:
         return False, "keine Album-Identität im Ordnernamen"
 
