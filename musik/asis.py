@@ -308,10 +308,16 @@ def va_gate_unit(unit: dict, lib, dry_run: bool = False) -> tuple[str, str]:
     written unless dry_run) and import; ('pass', '') — the gate does
     not apply (not va_like, no library, too few tagged files, or
     identity not resolvable)."""
+    from .paths import musik_config
     from .session import Decider, NetworkErrorRecorder
 
+    # auto_accept_distance aus der Config (6.5-Drift-Fix): der Wert wird
+    # im Gate-Pfad selbst nicht für Auto-Entscheidungen genutzt, aber
+    # ein hartkodierter Abweichler erzeugt Phantom-Drift zur Doku.
     decider = Decider(
-        NetworkErrorRecorder(), auto_accept_distance=0.25,
+        NetworkErrorRecorder(),
+        auto_accept_distance=float(
+            musik_config().get('auto_accept_distance', 0.25)),
         unit=unit, lib=lib,
     )
     if not decider._va_like():

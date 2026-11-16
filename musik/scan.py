@@ -621,7 +621,12 @@ def cmd_scan(root: str) -> int:
         u = existing[k]
         if not (k.startswith(root_key + os.sep) or k == root_key):
             continue
-        if u.get("status") not in ("review", "unmatched", "network"):
+        # Story 6.9: error-Units gehören dazu — ohne Dateien ist ihr Retry
+        # sinnlos (nichts zu importieren) und sie lärmern für immer als
+        # error im Monitor (Live-Fall: 1001-Albums-Unit, deren Dateien der
+        # Mega-Zyklus importiert hatte, während der alte IndexError-Status
+        # stehen blieb).
+        if u.get("status") not in ("review", "unmatched", "network", "error"):
             continue
         files = u.get("files") or []
         if files and not any(os.path.isfile(openable(f)) for f in files):

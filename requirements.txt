@@ -1,6 +1,7 @@
 beets>=2.14  # Pi-Paritaet (EPIC 11.3): beetscompat-Shim erwartet 2.14-API
 beets-beatport4
 pyacoustid
+mutagen>=1.48  # asis/scan tags direkt (nicht nur via beets)
 discogs-client
 PyYAML
 requests
