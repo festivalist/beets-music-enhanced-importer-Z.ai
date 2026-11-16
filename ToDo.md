@@ -1142,6 +1142,35 @@ Ingest-Kette; alle 7 Wrapper-Endpunkte in musik/musicgrabber.py sind in
   nicht — Item.move nötig!), leere Ordner gepingt, Plex-Scan angestoßen.
   **Endstand: 0 Junk-Credits, Bibliothek 19.506 Items, alle Essentials
   korrekt unter echten Artists bzw. Various Artists.**
+- [ ] 10.9 [ready-for-agent] asis-Folder-Reparatur versteht Serienordner
+  nicht: `repair_from_folder` wirft „keine Artist-Identität im
+  Ordnernamen" für das Pattern `YYYY - Label - Artist • Album`
+  (Bullet-•-Separator + Serien-Label wie „Essential Albums"). Befund
+  2026-11-16 (Frankie Valli • Essential Collection): Decider-Korrobo-
+  ration (10.7) kannte den Ordner, der asis-eigene Reparatur-Parser
+  NICHT → bei inkonsistenten Tags bleibt der Unit totdeterministisch in
+  review (Decider: d=0.485 unter Auto-Confidence; asis: tags_complete
+  failt; Repair: Parser failt). 27 von 28 Dateien hatten korrekte Tags,
+  1 Datei trug Fremdalbum „Rarities (Volume 2)" — die Reparatur hätte
+  exakt diesen einen Wert aus der Ordner-Identität glattziehen können.
+  Fix: Parser-Logik aus 10.7 (Tokenfolgen-Korroboration inkl. • als
+  Trenner, Toleranz für Serien-Labels vor dem Artist) in
+  repair_from_folder wiederverwenden statt dort zu duplizieren. Test-
+  matrix: Valli-Ordner-Nachbildung (dry-run), Skynyrd-Fall, VA-Serie,
+  Normalordner. [10.7-Klasse]
+- [ ] 10.10 [ready-for-agent] Spool-Aktionen verfallen lautlos, wenn der
+  Eligibility-Check sie nicht ausführt: Befund 2026-11-16 — Nutzer
+  klickte 14.11. as-is auf den Valli-Unit, 6 Spool-Einträge; alle 6
+  wurden geflusht und als „[done] ⚠️ … Status jetzt review" gemeldet,
+  KEINER erzeugte einen Import oder einen neuen Spool-Eintrag. Der
+  Nutzer-Entscheid war damit verzehrt, ohne je ausgeführt zu werden
+  (Import lief erst 2 Tage später per Hand, nachdem der Tag-Fix die
+  Eligibility herstellte). Gewünschtes Verhalten: Apply-Aktionen, die
+  am tags_complete/Eligibility-Gate scheitern, bleiben retrybar
+  (flip_retry-Semantik wie bei error-Units) bzw. kehren in den Spool
+  zurück, und der Monitor-Tab zeigt den Zähler „offene Nutzer-Entscheid-
+  dungen" solange > 0. Testmatrix: asis auf tags-inkonsistenten Unit,
+  accept auf erledigten Unit, Spool-Zähler im Snapshot. [9.6-Klasse]
 
 ## EPIC 11 — Dependency-Updates (Audit 2026-11-13)
 
