@@ -21,7 +21,8 @@ playlists._youtube_order mit toten fetch-Privatnamen (fc77271). **Echt offen:** 
 Musik-Tool läuft WEITER auf dem Pi mit Plex; Wunsch: beide Maschinen
 Ubuntu-Server-kompatibel halten → 8.8-Ziel-OS wäre Ubuntu-Pfad, kein
 OMV/Debian)**, 6.7/6.8 (bewusst später), optional 2.6/3.3,
-Nutzer-Seite: PI-SETUP-Phase-8-Testfälle.
+Nutzer-Seite: PI-SETUP-Phase-8-Testfälle (KK-256er-Re-Sync: ✓ erledigt
+16.11. — Playlist abgenommen + 17 128k-Tracks auf ≥250k/FLAC ersetzt).
 **Passiv laufend:** 3.1/3.2-Refresh-Verifikation, 4.5.4-Echtlauf-Abnahme
 beim nächsten Link, Spool-Retry-Echtlauf beim nächsten Monitor-Klick.
 Erledigt und entfernt: .nfo/.txt-Anreicherung bei fehlendem Match
@@ -261,6 +262,14 @@ als Stories 4.1/4.3 weitergeführt.*
   Jupiter Jones, Haller/Lumpenpack u. a.). Upgrade-„los" steht beim Nutzer;
   Mechanik wäre Watchlist-Re-Download → beets-Qualitätsvergleich →
   Verlierer nach _trash (2.3/3.1-Maschinerie, kein Eingriff nötig).
+  **ERLEDIGT 16.11. Abend („los"): 17/17 ersetzt** — MG-Downloads
+  (12× jiosaavn AAC 320k, 5× zarz FLAC), Import über asis-Singleton-
+  Pfad (MG schrieb Unknown-Artist → Credits aus den Bestands-Rows
+  nachgetragen, Junk/Redundanz separat getrasht), Paar-Dupes manuell
+  per Qualitätsvergleich aufgelöst (asis-Lücke → Story 2.8), Störtebeker-
+  Credit kanonisiert (Multi-Credit → In Extremo, FLAC bleibt).
+  **Endstand: 53 FLAC / 16 m4a ≥250k / 4 opus ≥250k / 2 opus 200–249k,
+  0× <200k, 0 Paar-Dupes; Playlist 75/75 in Plexamp.**
 
 - [x] 3.1 Watched Playlists in MG (Spotify/YouTube; Append für wachsende,
       Mirror für kuratierte Listen; Intervalle; Cookie für private Listen)
@@ -351,6 +360,21 @@ drin sein.*
       smoke_scan Fall 4 dokumentiert das); scene-Parse lässt Dump-Präfix
       im Artist („2HOT2PLAY…"), FOLDER_NAME_TOLERANCE schluckt das
       downstream.
+      **Nachtrag 16.11. Abend: die 6.3-Import-Zusammenführung
+      riss 2× Namen aus cmd_asis' engine-Import (setup_beets, open_library)
+      → NameError im asis-Fallback JEDES Ingest-Zyklus mit eligible Units —
+      live am 16.11.-Timer gefunden (KK-Upgrade lief zufällig drüber),
+      gefixt 2adb9df+df286eb. Lehre: function-level Import-Zusammenführungen
+      mit AST-Check gegen die Body-Namen absichern; compileall/Smokes sehen
+      Runtime-NameErrors nicht.**
+- [ ] 2.8 [ready-for-agent] asis-Singleton-Lücken: (a) choose_item's
+      apply-asis-Zweig ruft _singleton_dupe NICHT auf → Qualitäts-Upgrades
+      über den asis-Pfad erzeugen still Paar-Dupes (KK-Fall 16.11.: 17
+      Paare, Auflösung manuell per Qualitätsvergleich). Fix: Dupe-Check
+      auch im apply-asis-Zweig (nach fill_artist), Smoke: asis-Singleton-
+      Upgrade ersetzt den Verlierer. (b) Fetch-Playlists nach Datei-Ersatz:
+      m3u-Pfade altern, wenn Upgrade-Kopien alte Pfade ersetzen — Playlist
+      nach solchen Läufen neu bauen/uploaden (16.11. manuell gemacht).
 - [x] 6.4 Zyklus session↔asis auflösen — **ERLEDIGT 2026-11-16
       (fb104a1)**: scan bekommt die Datei-/Text-Ebene (from_fetch,
       tags_complete, artist_present+_UNKNOWN_ARTISTS, enrich_from_meta_
