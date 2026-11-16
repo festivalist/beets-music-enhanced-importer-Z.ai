@@ -5,10 +5,19 @@ Run:  python manual_tests/smoke_ingest_roots.py
 Pure logic: beets config is set in-process, _ingest_one and the MG
 layout healing are monkeypatched — no library, no network.
 
-Covers: default root when the config key is absent (backward compat),
+Covers: default root when the config key is unset (backward compat),
 config list honored and normalized, ad-hoc --root override (exactly one
 root, never auto-created), configured roots auto-created, iteration
 order preserved.
+
+Story 10.4 (2026-11-16): confuse's ConfigView hat in der beets-2.14-
+Kette KEIN __delitem__ — der alte Trick „Key löschen, um 'nicht
+gesetzt' zu simulieren" scheiterte lautlos (AttributeError im try/except)
+und ließ den REALen Config-Wert in den Default-Fall leaken (jede
+Maschine, deren config.yaml den Key trägt — live nur der Pi). Der Fix
+emuliert Unset stattdessen über eine LEERE Liste: _configured_roots'
+Produktionszweig `if not roots:` ist für fehlenden UND leeren Key
+identisch, und setitem funktioniert zuverlässig.
 """
 
 import os
@@ -26,16 +35,12 @@ from beets import config as beets_config   # noqa: E402
 
 
 def set_roots(v) -> None:
-    if v is None:
-        try:
-            del beets_config["musik"]["ingest"]["roots"]
-        except Exception:
-            pass
-    else:
-        beets_config["musik"]["ingest"]["roots"] = v
+    # v is None = "unwirksam/abwesend" emulieren (leere Liste — NICHT
+    # del: confuse hat kein __delitem__, siehe Story 10.4 oben).
+    beets_config["musik"]["ingest"]["roots"] = [] if v is None else v
 
 
-# 1) no config key -> default MG staging root (normpath'd)
+# 1) config key unset/empty -> default MG staging root (normpath'd)
 set_roots(None)
 roots = ingest_mod._configured_roots()
 assert len(roots) == 1 and roots[0].endswith(os.sep + "musicgrabber"), roots

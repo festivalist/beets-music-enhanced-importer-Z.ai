@@ -16,8 +16,9 @@ Checkout/CI) → jetzt configless-tolerant (CLI-Gate bleibt, d1b24ea);
 = Uptime — auf frisch gebooteten Maschinen (<60 s) wurde die erste
 Progress-Zeile lautlos verworfen → Start bei -60 (82c1c24); dazu
 playlists._youtube_order mit toten fetch-Privatnamen (fc77271). **Echt offen:** 7.7 Alt-Kollektion (wartet auf „los"),
-8.8 Dell-Tag (vertagt, grilling-ready), 10.4 (wontfix-Kandidat,
-Nutzer-Entscheid), 6.7/6.8 (bewusst später), optional 2.6/3.3,
+**8.8 Dell-Tag AKTIV — Stack läuft lt. Nutzer 16.11. bereits auf
+einem Dell OptiPlex (Server-Linux); offen: Dell-Zugang/IP, Plex-Rolle,
+Verifikations-Matrix**, 6.7/6.8 (bewusst später), optional 2.6/3.3,
 Nutzer-Seite: PI-SETUP-Phase-8-Testfälle.
 **Passiv laufend:** 3.1/3.2-Refresh-Verifikation, 4.5.4-Echtlauf-Abnahme
 beim nächsten Link, Spool-Retry-Echtlauf beim nächsten Monitor-Klick.
@@ -668,8 +669,15 @@ dann 7.4→7.5→7.6 an einem Abend. Rollback bis 7.6: Pi 5 unangetastet.
       (Linux-Absatz + Dateitabelle). Offen vom Epic: nichts — Dell-Tag:
       OMV-Modul erstmalig real, 7.7 Alt-Import, 8.8-Migrationsstory
 - [ ] 8.8 Dell-Tag: One-Shot-Installer auf echter Hardware + Migration
-      Pi→Dell **[ready-for-grilling — vor Ausführung sind Entscheidungen
-      offen]**: (a) Dell-Hardware konkret (Modell/RAM/Disk-Layout,
+      Pi→Dell **[AKTIV 2026-11-16 — Nutzer: Stack läuft bereits auf
+      einem Dell OptiPlex mit Server-Linux (nicht mehr auf dem Pi).
+      Damit beantwortet: (a) Hardware = Dell OptiPlex (Modell/RAM/Disk
+      weiterhin offen), (b) OS = Server-Linux (Distro offen). Weiter
+      offen: (c) IP/Hostname/Zugang für Deploy+Verifikation, (d)
+      Plex-Rolle (PMS mitgewandert oder noch auf Pi?), (e) 7.7-Timing,
+      f) Rollback-Regime: wird der Pi als Backup weiter gepullt?
+      Grilling der Restfragen beim nächsten Schritt.]**
+      Ursprüngliche Offen-Liste: (a) Dell-Hardware konkret (Modell/RAM/Disk-Layout,
       Btrfs-Array-Form), (b) Ziel-OS (Installer-Matrix: Debian-Pfad,
       OMV nur Debian), (c) neue IP/Hostname, (d) **Plex-Rolle — die
       größte Frage**: wandert PMS vom Pi mit (PMS 1.43.4 + Watch-State +
@@ -1114,12 +1122,18 @@ Ingest-Kette; alle 7 Wrapper-Endpunkte in musik/musicgrabber.py sind in
     mit der (falschen) Quelle überein. Erkannt werden kann das nur per
     AcoustID-Vorabprüfung → als spätere Story-Option notiert, hier
     bewusst nicht umgesetzt (kein Pseudo-Guard).
-  - [ ] 10.4 [wontfix-Kandidat→prüfen] smoke_ingest_roots schlägt auf dem
-    Pi fehl (beets-2.14-confit: `del beets_config[...]` entfernt den
-    Key nicht → Config-Roots leaken in den Default-Case). Vor-devist
-    seit ≥144fecf (nicht durch 10.x), Test-Harness-Problem, kein
-    Produktionscode. Entweder Harness fixen (dict-Kopie testen) oder
-    als Umgebungabhängig markieren.
+  - [x] 10.4 smoke_ingest_roots-Harness — **ERLEDIGT 2026-11-16
+    (fix, nicht wontfix)**: Wurzel exakt verifiziert — confuse's
+    ConfigView hat in der beets-2.14-Kette kein `__delitem__`
+    (AttributeError), das „Key löschen" des Smokes scheiterte lautlos
+    im try/except → der reale Config-Wert leakte in den Default-Fall
+    (nur Maschinen MIT dem Key = der Pi; Win hat den Key nicht, CI
+    keine config.yaml). Fix: `set_roots(None)` emuliert Unset über
+    eine LEERE Liste — `_configured_roots` nimmt für fehlenden UND
+    leeren Key denselben `if not roots:`-Zweig, und confuse-setitem
+    funktioniert zuverlässig (Pi-verifiziert). Smoke-Verifikation in
+    BEIDEN Welten auf Win (ohne Key / mit temporär gesetztem Key =
+    exakte Pi-Situation) + Pi live. Erwartung: Pi-Suite jetzt 27/27.
 - [x] 10.5 [ready-for-agent] VA-Kompilations-Redundanzguard: Album-Units
   mit va_like-Identität, die den Auto-Accept nicht schaffen, gegen die
   beets-Bibliothek prüfen (normalisiertes Artist+Title-Set); Überlappung
