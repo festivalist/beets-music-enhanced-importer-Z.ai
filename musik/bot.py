@@ -612,8 +612,11 @@ def _execute_album(job: dict, send) -> None:
         send(f"⬇️ Album-Download läuft: {album_title[:80]} — "
              f"{total} Track(s) via MusicGrabber")
 
-        # one progress line per minute, not per 10-second poll
-        last_note = [0.0]
+        # one progress line per minute, not per 10-second poll. Start
+        # "expired", not at 0: monotonic() is UPTIME — on a freshly
+        # booted machine (<60 s) the first progress line would otherwise
+        # be silently dropped (CI-Fund 2026-11-16, Story 6.6).
+        last_note = [-60.0]
 
         def _progress(st: dict) -> None:
             now = time.monotonic()
