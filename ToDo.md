@@ -16,9 +16,11 @@ Checkout/CI) → jetzt configless-tolerant (CLI-Gate bleibt, d1b24ea);
 = Uptime — auf frisch gebooteten Maschinen (<60 s) wurde die erste
 Progress-Zeile lautlos verworfen → Start bei -60 (82c1c24); dazu
 playlists._youtube_order mit toten fetch-Privatnamen (fc77271). **Echt offen:** 7.7 Alt-Kollektion (wartet auf „los"),
-**8.8 Dell-Tag AKTIV — Stack läuft lt. Nutzer 16.11. bereits auf
-einem Dell OptiPlex (Server-Linux); offen: Dell-Zugang/IP, Plex-Rolle,
-Verifikations-Matrix**, 6.7/6.8 (bewusst später), optional 2.6/3.3,
+8.8 Dell-Tag vertagt — **Dell-Fakten 16.11.: Dell OptiPlex =
+192.168.50.171, Ubuntu Server 24.04.5 (Immich/Mealie/Audiobookshelf),
+Musik-Tool läuft WEITER auf dem Pi mit Plex; Wunsch: beide Maschinen
+Ubuntu-Server-kompatibel halten → 8.8-Ziel-OS wäre Ubuntu-Pfad, kein
+OMV/Debian)**, 6.7/6.8 (bewusst später), optional 2.6/3.3,
 Nutzer-Seite: PI-SETUP-Phase-8-Testfälle.
 **Passiv laufend:** 3.1/3.2-Refresh-Verifikation, 4.5.4-Echtlauf-Abnahme
 beim nächsten Link, Spool-Retry-Echtlauf beim nächsten Monitor-Klick.
@@ -669,14 +671,18 @@ dann 7.4→7.5→7.6 an einem Abend. Rollback bis 7.6: Pi 5 unangetastet.
       (Linux-Absatz + Dateitabelle). Offen vom Epic: nichts — Dell-Tag:
       OMV-Modul erstmalig real, 7.7 Alt-Import, 8.8-Migrationsstory
 - [ ] 8.8 Dell-Tag: One-Shot-Installer auf echter Hardware + Migration
-      Pi→Dell **[AKTIV 2026-11-16 — Nutzer: Stack läuft bereits auf
-      einem Dell OptiPlex mit Server-Linux (nicht mehr auf dem Pi).
-      Damit beantwortet: (a) Hardware = Dell OptiPlex (Modell/RAM/Disk
-      weiterhin offen), (b) OS = Server-Linux (Distro offen). Weiter
-      offen: (c) IP/Hostname/Zugang für Deploy+Verifikation, (d)
-      Plex-Rolle (PMS mitgewandert oder noch auf Pi?), (e) 7.7-Timing,
-      f) Rollback-Regime: wird der Pi als Backup weiter gepullt?
-      Grilling der Restfragen beim nächsten Schritt.]**
+      Pi→Dell **[STATUS 2026-11-16 (Nutzer, nach Selbstkorrektur): der
+      Dell läuft SEITENFREMD — 192.168.50.171, Ubuntu Server 24.04.5,
+      Dienste Immich/Mealie/Audiobookshelf; das Musik-Tool läuft
+      WEITER auf dem Pi mit Plex. Damit: (a) Hardware = Dell OptiPlex
+      (Modell/RAM/Disk offen), (b) OS = Ubuntu Server 24.04.5 ✓
+      (Nutzer-Wunsch: beide Maschinen Ubuntu-Server-kompatibel halten —
+      falls 8.8 EINMAL kommt: Installer-Ubuntu-Pfad, OMV/Debian entfällt;
+      Ubuntu-Pfad ist dauerhaft abgesichert via CI ubuntu-latest +
+      ubuntu-24.04-arm und EPIC-8-QEMU-Matrix), (c) SSH-Zugang Dell
+      unbekannt (ED25519-Hostkey erfasst), (d) Plex-Rolle: bleibt
+      erstmal auf dem Pi, (e) 7.7-Timing offen. Story bleibt vertagt/
+      grilling-ready bis der Nutzer die Migration anstoßen will.]**
       Ursprüngliche Offen-Liste: (a) Dell-Hardware konkret (Modell/RAM/Disk-Layout,
       Btrfs-Array-Form), (b) Ziel-OS (Installer-Matrix: Debian-Pfad,
       OMV nur Debian), (c) neue IP/Hostname, (d) **Plex-Rolle — die
