@@ -228,7 +228,27 @@ als Stories 4.1/4.3 weitergeführt.*
       keep_root schont Top-Level-Ordner, `ensure_staging_layout()` heilt
       vor jedem Download/nach jedem Ingest, Angebot jetzt engine-
       unabhängig (auch im Fallback-Pfad); smoke_cleanup_staging.py neu
-- [ ] 2.6 (optional) Album-Angebot auch für Spotify/YouTube-TRACK-Links
+- [ ] 2.7 [ready-for-agent] Fetch-Playlist-Recovery + echte Spotify-Playlist-Namen
+  — **Befund 16.11. (Klare-Kante-Prüfung, Nutzer sah die Playlist nicht):**
+  (a) Der KK-Bot-Job (13.11.) wurde vom manuellen Bot-Restart getötet
+  (11.6-Markierung error) — die Re-Importe danach (flock-ingest/Timer)
+  bringen nur AUDIO, nie den Playlist-Build/-Upload: der hängt allein an
+  einem NORMAL abgeschlossenen Bot-Job (fetch._import_job-Kette). Kein
+  Wiederaufhol-Pfad → Playlist existierte nie in Plex (Notlösung 16.11.:
+  M3U aus MG-Watchlist `watched_playlist_tracks` (75/75) gegen beets
+  gematcht, `_playlists/Klare Kante.m3u` geschrieben, upload_playlist —
+  **75/75 live**; GOTCHA: Titel-Fallback-Matches auf STALE beets-Rows mit
+  toten Staging-Pfaden prüfen → nur Items mit existierender Datei).
+  (b) Spotify-Playlists heißen in Plex „spotify-37i9d…" statt Klare Kante
+  (Bestand: spotify-2mLk…, spotify-102Wv…): der echte Name wird nur für
+  YouTube aufgelöst (_youtube_order), für Spotify nie — Namensquelle
+  existiert aber: MG `watched_playlists.name` bzw. Spotify-API/yt-dlp.
+  Umsetzung: (1) Recovery — nach 11.6-Interrupt den Playlist-Build
+  nachholen, sobald die Units importiert sind (Job-Bounce statt „Link
+  erneut schicken", ohne Re-Download); (2) Namen — Spotify-Playlist-Titel
+  vor dem Upload auflösen (MG-Watchlist-Zuordnung per URL oder yt-dlp/Spotify-oEmbed),
+  Upload-Titel daraus statt „spotify-<id>"; Smoke-Matrix: Spotify/YT-Link,
+  Interrupt+Recovery, Umbenennung idempotent (Re-Upload ersetzt).
       (Kandidatensuche dann aus den importierten Tags) und Freitext-
       Album-Intent („artist - albumname" direkt als Album-Anfrage)
 
