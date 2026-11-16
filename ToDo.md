@@ -367,6 +367,18 @@ drin sein.*
       gefixt 2adb9df+df286eb. Lehre: function-level Import-Zusammenführungen
       mit AST-Check gegen die Body-Namen absichern; compileall/Smokes sehen
       Runtime-NameErrors nicht.**
+- [x] **Dedupe-Nachlauf 16.11. Abend (Nutzer-„los"):** Album-Level-Dedupe
+      (default apply) löste 2 Album-Dubletten (42 Dateien → _trash,
+      reversibel) — Mothers-Keeper (20T) blieb, die 38T-Expanded-Edition
+      auf Nutzer-Wunsch als eigenständiges Album (Suffix „(Expanded
+      Edition)", eigener Dedupe-Schlüssel) per asis zurückgeholt (38/38
+      Items, Genre „Other" vermerkt). Fingerprint-Dedupe `--apply`: **130
+      Case-Varianten-Paare aus der Migration aufgeräumt** (130 Dateien →
+      _trash/duplicate, 4 suspicious groups bewusst übersprungen). Rest-
+      Konsolidierung: 7 Geist-Album-Rows (0 Items) entfernt, Case-Split-
+      Dirs zusammengeführt, 0 tote Item-Rows. **Bibliothek 34218 Items,
+      0 Multi-Row-Album-Keys, KK-Playlist heil.** Verbleibend bekannt:
+      Mothers-Genre „Other" (doctor --fix-Kandidat).
 - [ ] 2.8 [ready-for-agent] asis-Singleton-Lücken: (a) choose_item's
       apply-asis-Zweig ruft _singleton_dupe NICHT auf → Qualitäts-Upgrades
       über den asis-Pfad erzeugen still Paar-Dupes (KK-Fall 16.11.: 17
