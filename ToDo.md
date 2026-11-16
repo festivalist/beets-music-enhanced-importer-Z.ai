@@ -254,6 +254,14 @@ als Stories 4.1/4.3 weitergeführt.*
 
 ## EPIC 3 — Beschaffung ohne Nutzerinteraktion
 
+- **3.3-Report-Fall 1 (16.11., Klare Kante):** Playlist vom Nutzer abgenommen
+  (Plexamp ✓ abspielbar, 75/75). Qualitätsverteilung aus beets: 38 FLAC,
+  20 ≥200k (256er-Stand), 2 opus 200–249k, **17 m4a 128–132k = Vor-Cookie-
+  Refresh-Restbestand** (Upgrade-Kandidaten: Jennifer Rostock, ZSK, Pascow,
+  Jupiter Jones, Haller/Lumpenpack u. a.). Upgrade-„los" steht beim Nutzer;
+  Mechanik wäre Watchlist-Re-Download → beets-Qualitätsvergleich →
+  Verlierer nach _trash (2.3/3.1-Maschinerie, kein Eingriff nötig).
+
 - [x] 3.1 Watched Playlists in MG (Spotify/YouTube; Append für wachsende,
       Mirror für kuratierte Listen; Intervalle; Cookie für private Listen)
       **Stand 2026-11-14 (146483f): STRUKTUR LIVE** — die Re-Download-
