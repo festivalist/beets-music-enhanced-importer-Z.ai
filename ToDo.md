@@ -4,10 +4,13 @@
 (Dependency-Updates) komplett, 10.9+10.10 heute deployed (f702a88:
 Serienordner-Reparatur + Spool-Retry), 1.3-Abnahme 5/5 Zeilen ✓,
 Bibliothek ~25,6k Items, Review-Queue 1 Unit (Heretics — Forced-Apply-
-Fallback-Fall aus 9.11). **Echt offen:** 7.7 Alt-Kollektion (wartet auf
-„los"), 8.8 Dell-Tag (vertagt, grilling-ready), 10.4 (wontfix-Kandidat,
-Nutzer-Entscheid), Code-Health 6.3/6.4/6.6 (+6.5-Mikropunkte, 6.7/6.8
-später), optional 2.6/3.3, Nutzer-Seite: PI-SETUP-Phase-8-Testfälle.
+Fallback-Fall aus 9.11). **16.11. nm.: Code-Health-Sweep 6.3/6.4/6.6 +
+6.5-Mikropunkte komplett** (fb104a1/586037e/cf2da90 — Zyklus session↔asis
+aufgelöst, 14 Library-Factories→1, STATUSES-Guard, Smokes-Suite in CI;
+27/27 lokal). **Echt offen:** 7.7 Alt-Kollektion (wartet auf „los"),
+8.8 Dell-Tag (vertagt, grilling-ready), 10.4 (wontfix-Kandidat,
+Nutzer-Entscheid), 6.7/6.8 (bewusst später), optional 2.6/3.3,
+Nutzer-Seite: PI-SETUP-Phase-8-Testfälle.
 **Passiv laufend:** 3.1/3.2-Refresh-Verifikation, 4.5.4-Echtlauf-Abnahme
 beim nächsten Link, Spool-Retry-Echtlauf beim nächsten Monitor-Klick.
 Erledigt und entfernt: .nfo/.txt-Anreicherung bei fehlendem Match
@@ -284,14 +287,50 @@ drin sein.*
       Singleton-Override-Guard in apply, per-unit-Guard in interactive
       `_run_forced`, plex `_num`-Fallbacks + weitere Exception-Typen;
       smoke_quality.py (Long-Path-Routing)
-- [ ] 6.3 Redundanz-Dedup: engine.open_library() (13→1), asis._tag→
-      scan.tag_of, state.norm_key/path_under, _cand_id, engine.apply_forced,
-      original_year-Fill + MBID-Extraktion entdoubleln, Totcode raus
-      (engine._item_paths, jobs.get_job, fetch._OPEN_STATUSES, state.STATUSES→
-      wahr+Guard), Privat-Zugriffe public, fetch._unit_label-Rename,
-      scan.junk_files privat
-- [ ] 6.4 Zyklus session↔asis auflösen (from_fetch/tags_complete → scan,
-      enrich_from_meta_files → scan); smoke_tier3 anpassen
+- [x] 6.3 Redundanz-Dedup — **ERLEDIGT 2026-11-16 (586037e)**:
+      engine.open_library() als EINZIGE Factory (14 baugleiche
+      Konstruktionen + 4 identische _open_library-Kopien weg),
+      asis._tag entfällt mit dem 6.4-Move (Rest-asis nutzt scan.tag_of),
+      state.norm_key/path_under ersetzen ~26 normcase/normpath- und
+      Prefix-Stellen, review.cand_id public — interactive erbt damit
+      den Story-9.8-String-Fix (latenter Discogs-int-Bug im interaktiven
+      Pfad geschlossen), original_year-Fill → engine.
+      fill_empty_original_years (asis-Loop entfällt), MBID-Extraktion →
+      engine.first_mbid (bot/releases/similar), Totcode: engine.
+      _item_paths + fetch._OPEN_STATUSES raus; **jobs.get_job bleibt** —
+      der 10.08-Audit-Verdacht galt nur Produktionscode, smoke_spool
+      (9.6/10.10) ist legitimer Konsument (Read-API des Job-Stores);
+      state.STATUSES als Single-Truth um die reale Wertedomäne ergänzt
+      (+„asis"/„review-apply" fehlten!) mit set_status-Guard (ValueError
+      bei Fremd-Status), Privat-Zugriffe public: engine.merge_result/
+      release_kind/trash_unreadable, fetch.fetch_config/cookie_path/
+      prepare_units/enrich_albums (Aufrufer ingest/bot), fetch._unit_label
+      →_imported_label (Semantik trennt sich von engine/review-Varianten),
+      scan.junk_files → _junk_files + junk_files()-Accessor. **Nebenbefund
+      (bewusst nicht behandelt):** scan-„loose"-Kind wird nie erzeugt
+      (1-Track-Ordner = 1-Track-Alben, Singleton-Split kommt später —
+      smoke_scan Fall 4 dokumentiert das); scene-Parse lässt Dump-Präfix
+      im Artist („2HOT2PLAY…"), FOLDER_NAME_TOLERANCE schluckt das
+      downstream.
+- [x] 6.4 Zyklus session↔asis auflösen — **ERLEDIGT 2026-11-16
+      (fb104a1)**: scan bekommt die Datei-/Text-Ebene (from_fetch,
+      tags_complete, artist_present+_UNKNOWN_ARTISTS, enrich_from_meta_
+      files, token_seq/token_seq_in), session die VA-Entscheidungs- und
+      Apply-Logik (va_like_unit, plan_artist_fill/apply_artist_fill,
+      plan_va_normalize/apply_va_plan/apply_va_normalize_files,
+      va_gate_unit); session importiert asis NICHT mehr, es bleibt genau
+      eine Abwärts-Kante asis→session. **Wichtig:** Der Audit-Rezept-
+      Klammerzusatz allein hätte den Zyklus nicht gelöst — der war vom
+      08.10., und 10.5/10.6/11.5 hatten die session→asis-Kante über die
+      VA-Helfer NEU aufgebaut; vollständig heißt daher beides: Gates nach
+      scan, VA-Domäne nach session (Entscheidungsebene gehört zum
+      Decider-Modul). Schichten jetzt: scan (Dateien/Tags) ← session
+      (Entscheidungen) ← asis (Befehl/Bot-Aktionen). Aufrufer umgestellt
+      (engine/bot/interactive + smoke_tier3/va_guard/artist_fill/
+      repair_folder + tools/va_asis_prepare lokal); smoke_tier3 patcht
+      nur noch scan.tag_of. Smokes: Smokes patchen tag_of jetzt
+      modulgenau (scan-Funktionen über scan-Globals, session-Funktionen
+      über session-Globals — seit dem Move verbindliche Konvention).
 - [x] 6.5 Config/Doku/Installer-Drift: auto_accept_distance-Fallback 0.25,
       scripts/ tracken (pretag_from_folder, va_asis_prepare; beatport_refresh-
       Verweis auf Automatik umstellen), PNGs löschen, --get-playlist-Wortlaut,
@@ -305,10 +344,29 @@ drin sein.*
       tier3 grün. **Verifiziert-ohne-Befund:** scripts/ existiert nicht
       mehr (Punkt entfällt), beatport_refresh-Verweis im README bereits
       Automatik-korrekt, --get-playlist-Wortlaut im README 204 korrekt.
-      **Offen als Mikropunkte:** install.ps1-Self-Test/install.sh-fpcalc-
-      Label-Detailvergleich + SCOPE §4.5-Zeile (nicht tief verifiziert).
-- [ ] 6.6 Tests/CI: manual_tests in CI wiren; smoke_scan.py (Klassifizierung)
-      + smoke_decider.py erweitern (Entscheidungsmatrix)
+      **Mikropunkte ERLEDIGT 2026-11-16:** SCOPE §4.5-Zeile an die
+      gelebte Realität angepasst (asis hieß „never automatic, always
+      user-invoked" — seit 9.6 läuft der Automatic-Fallback; jetzt mit
+      Gates korrekt beschrieben, datiert). Installer-Parität tief
+      verifiziert, KEINE Drift: fpcalc-Label sitzt korrekt in
+      install.d/10-base.sh (libchromaprint-tools, „6.5-Drift-Label"-
+      Kommentar), Self-Test in install.d/60-musik.sh — bewusste
+      Divergenz dokumentiert: Unix fatal mit --resume-Flow (EPIC 8,
+      headless), Windows warning-only (interaktiv). Story 6.5 damit
+      VOLLSTÄNDIG geschlossen.
+- [x] 6.6 Tests/CI — **ERLEDIGT 2026-11-16 (cf2da90)**:
+      manual_tests/run_smokes.py als Einstiegspunkt (alle smoke_*.py als
+      Subprozesse, utf-8 erzwungen, Fail-Tails, 27/27 in ~16 s lokal);
+      CI: linux-install-test.yml führt die Suite nach install.sh auf
+      x64+arm64 aus, Trigger-Pfade um manual_tests/** + install.d/**
+      erweitert; smoke_scan.py NEU (12-Fall-Klassifizierungsmatrix:
+      Album/Multidisc-Collapse/Nested-Bonus/1-Track-Album/Playlist-
+      Verpackung+Missing/Split-Hint/VA-Ganzheit/Szene-Parse/Hidden-Dirs
+      10.1/Junk-Zählung/Corrupt-Exclusion/Empty), smoke_decider um
+      Entscheidungsmatrix M1–M6 erweitert (apply/auto, review mit
+      Blocker, tier-3-Distanz, tier-3-Kontradiktion/Nutzer-Regel,
+      network-statt-unmatched, forced-id-Miss). Die Suite ist netzfrei
+      und bibliotheksfrei — gleicher Lauf auf dem Pi möglich.
 - [ ] 6.7/6.8 später: smoke_gapfill (Temp-Beets-DB für _prepare_units),
       engine↔review/report + fetch↔playlists entflechten, gapfill-Modul,
       beatport-Rename, Decider-Konstanten nach oben, systemd-Template,

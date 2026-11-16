@@ -187,12 +187,12 @@ of parking in review.*
 - A rate-limited or failed lookup **never** results in an as-is import. Affected items are queued for retry within the same run.
 - Long runs are resumable (progress state + beets import log); a crash does not restart from zero. Batching is sized to survive network errors.
 
-### 4.5 Review flow (CSV + apply, interactive review, explicit as-is)
+### 4.5 Review flow (CSV + apply, interactive review, own-tags fallback)
 
 - Everything below auto-accept confidence lands in a generated `review.csv` (best-guess candidates, scores, reasons) — no interactive popups during the run.
-- The user edits the CSV at their leisure; a follow-up command applies the decisions in batch (accept candidate / apply override / leave unmatched).
+- The user edits the CSV at their leisure; a follow-up command applies the decisions in batch (accept candidate / apply override / leave unmatched). Since the Import-Monitor (2026-10-20) the same decisions apply per row over the LAN HTTP API.
 - **`musik review` (interactive, on demand)**: after a run, walk the queue per unit with beets-style choices — accept candidate 1/2/3, override search, apply a MusicBrainz/Discogs ID directly, import as-is, skip, ignore forever, abort the rest.
-- **`musik asis` (explicit opt-in)**: for review/unmatched units whose files already carry complete, consistent artist/album/title tags (typical for scene rips), this command files them using their own tags — never automatic, always user-invoked. Duplicates still resolve by quality, art and genres are still fetched, units are marked `asis` in the state.
+- **`musik asis` (own-tags import)**: for review/unmatched units whose files already carry complete, consistent artist/album/title tags (typical for scene rips), this command files them using their own tags. Originally explicit opt-in only; since the Import-Monitor (2026-10-20, Story 9.6) the ingest runs it as the AUTOMATIC fallback after the autotag pass — gated on tags_complete + folder corroboration + the VA redundancy/survivor guards (Stories 10.5/10.6), with folder-identity repair (Story 9.9) in front. Duplicates still resolve by quality, art and genres are still fetched, units are marked `asis` in the state. (Absatz 2026-11-16 an die gelebte Realität angeglichen — der Audit-Drift aus ToDo 6.5.)
 - **Drag & drop entry** (`import-here.bat`): scan → import → interactive review → report for any folder dropped onto it.
 
 ### 4.6 Unmatched files
