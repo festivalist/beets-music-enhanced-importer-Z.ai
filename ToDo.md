@@ -1,9 +1,19 @@
 # ToDo — offene Punkte & Story-Backlog
 
-*Stand 2026-10-08. Erledigt und entfernt: .nfo/.txt-Anreicherung bei fehlendem
-Match (umgesetzt mit commit 2faed82) und beets-Abweichungsanalyse
-(BEETS-DEVIATION.md, 2026-09-17). Die beiden restlichen Alt-Items sind als
-Stories 4.1/4.3 weitergeführt.*
+*Stand 2026-11-16.* **Live:** EPIC 9 (Import-Monitor) komplett, EPIC 11
+(Dependency-Updates) komplett, 10.9+10.10 heute deployed (f702a88:
+Serienordner-Reparatur + Spool-Retry), 1.3-Abnahme 5/5 Zeilen ✓,
+Bibliothek ~25,6k Items, Review-Queue 1 Unit (Heretics — Forced-Apply-
+Fallback-Fall aus 9.11). **Echt offen:** 7.7 Alt-Kollektion (wartet auf
+„los"), 8.8 Dell-Tag (vertagt, grilling-ready), 10.4 (wontfix-Kandidat,
+Nutzer-Entscheid), Code-Health 6.3/6.4/6.6 (+6.5-Mikropunkte, 6.7/6.8
+später), optional 2.6/3.3, Nutzer-Seite: PI-SETUP-Phase-8-Testfälle.
+**Passiv laufend:** 3.1/3.2-Refresh-Verifikation, 4.5.4-Echtlauf-Abnahme
+beim nächsten Link, Spool-Retry-Echtlauf beim nächsten Monitor-Klick.
+Erledigt und entfernt: .nfo/.txt-Anreicherung bei fehlendem Match
+(umgesetzt mit commit 2faed82) und beets-Abweichungsanalyse
+(BEETS-DEVIATION.md, 2026-09-17). Die beiden restlichen Alt-Items sind
+als Stories 4.1/4.3 weitergeführt.*
 
 ## EPIC 4 — Review-Friktion senken (parallel, unabhängig von MusicGrabber)
 
@@ -79,25 +89,21 @@ Stories 4.1/4.3 weitergeführt.*
       generiertem API-Key (PUID 1000), Container Up + HTTP 200, Mounts
       verifiziert (nur Staging + /data). Offen aus 9.5: erster UI-Download
       + ffprobe-Check (Nutzer), Settings-Tab-Feinkonfiguration (= 1.2)
-- [ ] 1.2 Quellen & Qualität konfigurieren: Monochrome (FLAC) + YouTube +
+- [x] 1.2 Quellen & Qualität konfigurieren: Monochrome (FLAC) + YouTube +
       SoundCloud + FreeMp3Cloud aktiv, MIN_AUDIO_BITRATE an lossless-first
       anpassen, YouTube-Cookies hinterlegen; Telegram-Notify nur mit separatem
       Bot-Token (Polling/Webhook-Konflikt mit musik-bot) — sonst verzichten
-      **Stand 2026-11-14: Cookie-Überwachung LIVE** (musik/cookies.py:
-      aktive Session-Prüfung alle 6 h — GET youtube.com/account mit dem
-      Jar, 200=fresh / Google-Redirect=stale; Bot sendet bei fresh→stale-
-      Kante Telegram-Warnung an die Allowlist; Monitor-Kopf zeigt
-      „🍪 frisch/⚠️ ABGELAUFEN"; smoke_cookies 4 Cases). Quellen/Bitrate:
-      MG-Seite läuft (Monochrome-FLAC seit 4.5.4 robuster). **Rest =
-      rein physisch:** frische cookies.txt exportieren und auf den Pi
-      legen (PI-SETUP „Cookie refreshen").
-      **Update 14.11.: cookies.txt wurde 13.11. ~13:00 erneuert —
-      Live-Check „fresh" (volle Premium-Session), somedl End-to-End
-      verifiziert: 256 kbps AAC (itag 141) für denselben Track; der
-      Selektor war nie defekt (bestaudio[ext=m4a]/…). Die ~130-kbps-
-      Batches von 13.11. sind der Stand VOR dem Refresh — Upgrade-
-      Pfad: erneuter Sync (2.3-Qualitätsvergleich ersetzt Alt durch
-      Neu) oder 3.3-Report.**
+      **ERLEDIGT (Stand 2026-11-16):** Quellen aktiv + Monochrome-FLAC
+      (seit MG 4.5.4 robuster); Cookie-Überwachung LIVE seit 14.11.
+      (musik/cookies.py: Session-Prüfung alle 6 h — GET youtube.com/
+      account mit dem Jar, 200=fresh / Google-Redirect=stale;
+      Telegram-Warnung an die Allowlist bei fresh→stale-Kante;
+      Monitor-Kopf „🍪 frisch/⚠️ ABGELAUFEN"; smoke_cookies 4 Cases).
+      cookies.txt vom Nutzer 13.11. erneuert — Live-Check „fresh",
+      somedl End-to-End 256 kbps AAC (itag 141) verifiziert; die
+      ~130-kbps-Batches von 13.11. waren Stand VOR dem Refresh.
+      **Optionaler Mikrorest (parkt):** MIN_AUDIO_BITRATE-Tuning —
+      gehört thematisch zu 3.3 (Upgrade-Report).
 - [x] 1.3 Abnahme gegen Testmatrix (musik-testdaten): Single-Suche, Album-Link,
       Spotify-Playlist-Link, YouTube-Playlist-Link, 0-day ohne MB-Eintrag —
       jeweils: landet im Staging, Tagging-Qualität, ffprobe-Bitrate; Ergebnis
@@ -1162,7 +1168,7 @@ Ingest-Kette; alle 7 Wrapper-Endpunkte in musik/musicgrabber.py sind in
   Regeln damit global: Valli (fehlender Parse-Artist) ✓, Ray-Comma-Klasse
   (Junk-Parse-Artist „Essential Albums" wird NIE geschrieben) ✓,
   Willie/Vinyl-Klasse ohne korroborierte Mehrheit unverändert Parse ✓.
-  smoke_repair_folder 12 Sektionen grün (Win; Pi-Smoke im Deploy),
+  smoke_repair_folder 12 Sektionen grün (Win + Pi, f702a88 deployed),
   12 weitere Smokes der betroffenen Module grün.
 - [x] 10.10 [ready-for-agent] Spool-Aktionen verfallen lautlos, wenn der
   Eligibility-Check sie nicht ausführt: Befund 2026-11-16 — Nutzer
@@ -1184,7 +1190,9 @@ Ingest-Kette; alle 7 Wrapper-Endpunkte in musik/musicgrabber.py sind in
   zurück, Job zeigt Teil-Ergebnis. Snapshot-Key `spool`
   (`open_actions()`: open/oldest_queued/max_attempts), Monitor-Kopfzeile
   „⏳ offene Nutzer-Entscheidungen: N · älteste X" solange N>0.
-  smoke_spool 10 Sektionen grün (Win; Pi-Smoke im Deploy).
+  smoke_spool 10 Sektionen grün (Win + Pi, f702a88 deployed; Bot-Restart
+  jobfrei, spool-Key live im Snapshot (0 offen), Monitor-Marker served).
+  **Offen: Echtlauf des Retry-Pfads beim nächsten Monitor-Klick.**
 
 ## EPIC 11 — Dependency-Updates (Audit 2026-11-13)
 
@@ -1216,8 +1224,12 @@ keinem Upstream-Fix zu rechnen; beets-2.14.1-Plugin-Fixes (month/day-
 Erhalt) mildern. Beobachten; falls Discogs bricht, Wrapper/Plugin-Bypass
 als eigene Story.
 
-- [ ] 11.1 [ready-for-agent] yt-dlp → 2026.10.26 + spotdl → 4.6.0
+- [x] 11.1 [ready-for-agent] yt-dlp → 2026.10.26 + spotdl → 4.6.0
   koordiniert heben (Pi-venv zuerst, dann Win)
+  **ERLEDIGT 2026-11-13 (e59fc26):** Deps überall auf dem Zielstand
+  (Pi + Win: yt-dlp 2026.10.26, spotdl ~=4.6.0, beets 2.14.1,
+  beatport4 1.4.0); spotdl-4.6-CLI-Syntax verifiziert; Echtlaufdecke =
+  1.3-Abnahme (Single + Album + Playlist über den neuen Stack).
   Warum wichtig: (a) Security — brotli 1.2.1/curl-cffi 0.17.0 schließen
   einen certifi-MITM-Vektor (2026.10.21/26) — relevant für die
   Download-Maschine; (b) YouTube-Robustheit — neuer Default-Player-Client
