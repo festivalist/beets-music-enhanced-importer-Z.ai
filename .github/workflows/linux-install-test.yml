@@ -28,13 +28,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pi parity (the Pi runs 3.13): pin instead of the runner's moving
+      # default (ubuntu-latest = 26 now, newer python than some deps built)
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
       - name: venv + deps
         run: |
           python3 -m venv .venv
           .venv/bin/pip install -q -r requirements.txt
 
       - name: Smoke suite (manual_tests, network-free)
-        run: .venv/bin/python manual_tests/run_smokes.py
+        run: |
+          set -o pipefail
+          if .venv/bin/python manual_tests/run_smokes.py 2>&1 | tee smokes.log; then
+            exit 0
+          fi
+          # job logs need repo-admin; surface the failure tails as
+          # error annotations (public check-runs API, max 10/step)
+          grep -A 20 "^FAIL" smokes.log | while IFS= read -r line; do
+            printf '::error::%s\n' "${line//'%'/'%25'}"
+          done
+          tail -n 10 smokes.log | while IFS= read -r line; do
+            printf '::error::%s\n' "${line//'%'/'%25'}"
+          done
+          exit 1
 
   install:
     strategy:
