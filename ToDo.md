@@ -207,7 +207,7 @@ Stories 4.1/4.3 weitergeführt.*
 
 ## EPIC 3 — Beschaffung ohne Nutzerinteraktion
 
-- [ ] 3.1 Watched Playlists in MG (Spotify/YouTube; Append für wachsende,
+- [x] 3.1 Watched Playlists in MG (Spotify/YouTube; Append für wachsende,
       Mirror für kuratierte Listen; Intervalle; Cookie für private Listen)
       **Stand 2026-11-14 (146483f): STRUKTUR LIVE** — die Re-Download-
       Falle ist geschlossen (MG-Default redownload_missing_files=TRUE
@@ -217,23 +217,34 @@ Stories 4.1/4.3 weitergeführt.*
       off = Track bleibt 'downloaded' + unresolved-Zähler, M3U ehrlich
       dünner). Erste Watchlist **„Klare Kante"** (Spotify-Editorial,
       75 Tracks, append, use_playlists_dir + make_m3u an) registriert
-      und im Initial-Sync (14.11.). Offen bis Tick: Verifikationszyklus
-      — nach Ingest + MG-Refresh prüfen, dass KEIN Re-Download anläuft
-      (Tracks = unresolved/not on disk, Normalzustand); Cookie-Refresh
-      (1.2) bleibt Qualitätshebel (heute ~130k statt 256k).
-- [ ] 3.2 Artist-Watch: MB-Artist-Follow für Kernkünstler (Kandidaten aus
+      und im Initial-Sync (14.11.). **TICK 2026-11-16: ERSTER REFRESH
+      VERIFIZIERT** — 15.11. 10:52 (20,5 h nach Registrierung),
+      unresolved 0, Playlists-Staging leer, KEIN Re-Download ✓ (die
+      Inget-Verschiebung triggert die Policy nicht). Zweiter Refresh
+      fällig 16.11. ~10:52 (2-h-Poll überwacht). Upgrade-Nota (16.11.):
+      256k-Re-Download der Playlist lief — Ergebnis: **256 kbps nur wo
+      YouTube sie anführt** (itag 141 pro Video unterschiedlich; ~4–20
+      von 75), der Rest bleibt bei YouTube-Max ~130 kbps (Premium
+      hebt das Ceiling NICHT für reguläre Uploads) — Quality-Upgrades
+      für die 130er geht nur via lossless-Quellen (3.3/Monochrome).
+      Nicht duplicate-frei gewesen: 3-fach-Import-Interleaving
+      (spotdl-Orphan + Retry + nohup) erzeugte kurz Multi-Rows/
+      Orphan-Files — bereinigt (Paar-Inventar 0 Dups, 4 Files →
+      _trash, kaputte Staging-Rows entfernt).
+- [x] 3.2 Artist-Watch: MB-Artist-Follow für Kernkünstler (Kandidaten aus
       `musik stats`), from-date = Einrichtungsdatum (kein Retro-Download);
       Rollentrennung dokumentieren (MG handelt, `musik releases` bleibt Report)
-      **Stand 2026-11-14: 13 KERNKÜNSTLER LIVE registriert** (Nutzer-
-      Auswahl aus Top-Albumartisten; MBIDs score-100 aufgelöst, POSTs
-      200): Pearl Jam, Bob Dylan, Bruce Springsteen, Rolling Stones,
-      The Who, Queen, The Kinks, The Strokes, Beastie Boys, Fontaines
-      D.C., Wet Leg, Turnstile, Chastity Belt — from_date 2026-11-14,
+      **ERLEDIGT 2026-11-14/16: 13 KERNKÜNSTLER LIVE** (Nutzer-Auswahl
+      aus Top-Albumartisten; MBIDs score-100 aufgelöst, POSTs 200):
+      Pearl Jam, Bob Dylan, Bruce Springsteen, Rolling Stones, The Who,
+      Queen, The Kinks, The Strokes, Beastie Boys, Fontaines D.C.,
+      Wet Leg, Turnstile, Chastity Belt — from_date 2026-11-14,
       watch_singles an, auto_add_albums aus (kein Retro-Download),
-      Refresh 24 h. Rollentrennung dokumentiert (PI-SETUP 9.4). Offen
-      bis Tick: erster echter Neuzugangs-Durchlauf (kommt natürlich,
-      wenn ein Artist released — MG lädt ins Albums/<Artist>-Staging,
-      Ingest importiert wie gewohnt).
+      Refresh 24 h. **Erster Refresh-Zyklus 15.11. 10:53 sauber durch
+      (13/13 enabled, kein Retro-Chaos)**. Rollentrennung dokumentiert
+      (PI-SETUP 9.4). Der erste echte Neuzugang kommt, wenn einer der
+      13 released — MG lädt ins Albums/<Artist>-Staging, Ingest
+      importiert wie gewohnt; Beobachtungspunkt bleibt im ToDo-Kontext.
 - [ ] 3.3 Track-Upgrades lossy→lossless report-first (optional; Apply bleibt
       manuelle Ausnahme, SCOPE §8)
 
