@@ -12,15 +12,29 @@ import time
 from . import paths
 
 STATUSES = (
-    "pending",      # scanned, not yet attempted
-    "auto",         # auto-accepted and imported
-    "review",       # low confidence; waiting in review.csv for a decision
-    "unmatched",    # lookups answered, nothing found; left in place
-    "network",      # lookup failed (rate limit / network); retry candidate
-    "duplicate",    # lost a quality comparison; source moved to _trash
-    "ignored",      # excluded by user decision (apply command)
-    "error",        # unexpected processing error; see reason
+    "pending",       # scanned, not yet attempted
+    "auto",          # auto-accepted and imported
+    "review",        # low confidence; waiting in review.csv for a decision
+    "review-apply",  # successful forced apply (monitor/review); success state
+    "unmatched",     # lookups answered, nothing found; left in place
+    "network",       # lookup failed (rate limit / network); retry candidate
+    "duplicate",     # lost a quality comparison; source moved to _trash
+    "ignored",       # excluded by user decision (apply command)
+    "error",         # unexpected processing error; see reason
+    "asis",          # imported with the files' own tags (no MB match)
 )
+
+
+def norm_key(path: str) -> str:
+    """The state key for a path: normcase + normpath (Windows-safe).
+    Eine Quelle (Story 6.3) für die zuvor ~26 verteilten Aufrufe."""
+    return os.path.normcase(os.path.normpath(path))
+
+
+def path_under(key: str, root: str) -> bool:
+    """True when key is root itself or lives underneath it (both expected
+    to be norm_keys already)."""
+    return key == root or key.startswith(root + os.sep)
 
 
 def state_file() -> str:
@@ -54,14 +68,19 @@ def units(state: dict) -> dict:
 
 
 def get_unit(state: dict, path: str) -> dict | None:
-    return units(state).get(os.path.normcase(os.path.normpath(path)))
+    return units(state).get(norm_key(path))
 
 
 def put_unit(state: dict, unit: dict) -> None:
-    units(state)[os.path.normcase(os.path.normpath(unit["path"]))] = unit
+    units(state)[norm_key(unit["path"])] = unit
 
 
 def set_status(unit: dict, status: str, reason: str = "") -> None:
+    if status not in STATUSES:
+        raise ValueError(
+            f"unknown unit status {status!r} — STATUSES is the single "
+            "source of truth (Story 6.3)"
+        )
     unit["status"] = status
     unit["reason"] = reason
     unit["updated"] = time.time()

@@ -54,13 +54,6 @@ def _ask_choice(unit: dict) -> str:
         return "q"
 
 
-def _cand_id(unit: dict, n: int) -> str:
-    cands = unit.get("candidates") or []
-    if len(cands) >= n:
-        return cands[n - 1].get("id", "") or ""
-    return ""
-
-
 def _run_forced(lib, unit: dict, forced: dict) -> str:
     """Run the unit with forced decisions; returns the new status.
     A per-unit guard: one failing unit must not abort the whole review
@@ -74,7 +67,7 @@ def _run_forced(lib, unit: dict, forced: dict) -> str:
         outcome = engine.run_unit_real(lib, unit, decider)
     except Exception as exc:
         outcome = {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
-    engine._merge_result(unit, outcome)
+    engine.merge_result(unit, outcome)
     state_mod.set_status(unit, outcome["status"], outcome.get("reason", ""))
     return outcome["status"]
 
@@ -88,15 +81,15 @@ def cmd_review(only: str | None = None) -> int:
 
     engine.setup_beets()
     st = state_mod.load()
-    want = os.path.normcase(os.path.normpath(only)) if only else None
+    want = state_mod.norm_key(only) if only else None
 
     selected = []
     for u in state_mod.units(st).values():
         if u.get("status") != "review":
             continue
         if want:
-            upath = os.path.normcase(os.path.normpath(u["path"]))
-            if want != upath and not upath.startswith(want + os.sep):
+            upath = state_mod.norm_key(u["path"])
+            if not state_mod.path_under(upath, want):
                 continue
         selected.append(u)
     selected.sort(key=lambda u: u["path"])
@@ -107,13 +100,7 @@ def cmd_review(only: str | None = None) -> int:
     print(f"review: {len(selected)} unit(s) need a decision"
           " — Q aborts and leaves the rest for later")
 
-    from beets import config as beets_config
-    from beets.library import Library
-
-    lib = Library(
-        beets_config["library"].as_filename(),
-        beets_config["directory"].as_filename(),
-    )
+    lib = engine.open_library()
 
     done = aborted = 0
     for idx, unit in enumerate(selected, 1):
@@ -175,7 +162,7 @@ def cmd_review(only: str | None = None) -> int:
 
             if choice in ("a", "1", "2", "3"):
                 n = 1 if choice in ("a", "1") else int(choice)
-                cid = _cand_id(unit, n)
+                cid = review_mod.cand_id(unit, n)
                 if not cid:
                     print(f"  no candidate {n} recorded")
                     continue

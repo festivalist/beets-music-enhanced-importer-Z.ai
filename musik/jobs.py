@@ -68,6 +68,9 @@ def update_job(job_id: str, **fields) -> dict | None:
 
 
 def get_job(job_id: str) -> dict | None:
+    """Einen Job per Id lesen (Read-API des Stores; Konsument u. a.
+    smoke_spool — der 6.3-Audit-"Totcode"-Verdacht galt nur Produktions-
+    code)."""
     for job in load_jobs():
         if job["id"] == job_id:
             return job

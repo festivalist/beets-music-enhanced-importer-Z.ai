@@ -22,6 +22,7 @@ import os
 import re
 import time
 
+from . import state as state_mod
 from .paths import (
     bootstrap,
     incoming_dir,
@@ -375,13 +376,9 @@ def _match_entries(entries: list[dict], items: list[dict]) -> None:
 # --------------------------------------------------------------------------
 
 def _lib():
-    from beets import config as beets_config
-    from beets.library import Library
+    from .engine import open_library
 
-    return Library(
-        beets_config["library"].as_filename(),
-        beets_config["directory"].as_filename(),
-    )
+    return open_library()
 
 
 def snapshot_ids() -> set[int] | None:
@@ -606,7 +603,7 @@ def rebuild(unit_paths: list[str]) -> list[dict]:
     """Re-resolve playlist entries whose tracks appeared later (typically a
     /asis import of parked review units). Returns the touched states; a
     state belongs to the job dir its unit paths live under."""
-    roots = [os.path.normcase(os.path.normpath(p)) for p in unit_paths if p]
+    roots = [state_mod.norm_key(p) for p in unit_paths if p]
     out: list[dict] = []
     try:
         for name in sorted(os.listdir(_playlists_state_dir())):
@@ -617,10 +614,10 @@ def rebuild(unit_paths: list[str]) -> list[dict]:
                 continue
             # unit paths live inside the job dir (old states carry only
             # the job id = basename under the incoming root)
-            job_root = os.path.normcase(os.path.normpath(
+            job_root = state_mod.norm_key(
                 pl.get("job_dir")
-                or os.path.join(incoming_dir(), pl.get("job_id", ""))))
-            if not any(r == job_root or r.startswith(job_root + os.sep)
+                or os.path.join(incoming_dir(), pl.get("job_id", "")))
+            if not any(state_mod.path_under(r, job_root)
                        for r in roots):
                 continue
             if all(t.get("dest") for t in pl.get("tracks", [])):

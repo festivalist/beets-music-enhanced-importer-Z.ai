@@ -10,19 +10,7 @@ from datetime import datetime
 from collections import Counter
 
 from .paths import reports_dir
-
-
-def _open_library():
-    from .engine import setup_beets
-
-    setup_beets()
-    from beets import config as beets_config
-    from beets.library import Library
-
-    return Library(
-        beets_config["library"].as_filename(),
-        beets_config["directory"].as_filename(),
-    )
+from . import engine
 
 
 def _fmt_duration(seconds: float) -> str:
@@ -33,7 +21,7 @@ def _fmt_duration(seconds: float) -> str:
 
 
 def cmd_stats() -> int:
-    lib = _open_library()
+    lib = engine.open_library()
     items = list(lib.items())
     albums = list(lib.albums())
 

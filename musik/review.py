@@ -190,11 +190,11 @@ def apply_decisions_rows(rows: list[dict]) -> tuple[int, list[str]]:
 
         forced = {}
         if d["decision"] == "accept":
-            forced["album_id"] = _cand_id(unit, 1)
-            forced["track_id"] = _cand_id(unit, 1)
+            forced["album_id"] = cand_id(unit, 1)
+            forced["track_id"] = cand_id(unit, 1)
         elif d["decision"] == "accept2":
-            forced["album_id"] = _cand_id(unit, 2)
-            forced["track_id"] = _cand_id(unit, 2)
+            forced["album_id"] = cand_id(unit, 2)
+            forced["track_id"] = cand_id(unit, 2)
         elif d["decision"] == "override":
             if d.get("override_mbid"):
                 forced["album_id"] = d["override_mbid"]
@@ -228,18 +228,12 @@ def apply_decisions_rows(rows: list[dict]) -> tuple[int, list[str]]:
             continue
 
         engine.setup_beets()
-        from beets import config as beets_config
-        from beets.library import Library
-
-        lib = Library(
-            beets_config["library"].as_filename(),
-            beets_config["directory"].as_filename(),
-        )
+        lib = engine.open_library()
         decider = engine.build_decider(unit, forced=forced, lib=lib)
         engine.netrec.clear()
         try:
             outcome = engine.run_unit_real(lib, unit, decider)
-            engine._merge_result(unit, outcome)
+            engine.merge_result(unit, outcome)
             state_mod.set_status(unit, outcome["status"], outcome.get("reason", ""))
             msg = (f"angewandt [{unit['status']}] "
                    f"{os.path.basename(unit['import_path'])}")
@@ -263,7 +257,7 @@ def apply_decisions_rows(rows: list[dict]) -> tuple[int, list[str]]:
     return applied, messages
 
 
-def _cand_id(unit: dict, n: int) -> str:
+def cand_id(unit: dict, n: int) -> str:
     cands = unit.get("candidates") or []
     if len(cands) >= n:
         # Discogs-Kandidaten tragen int-Ids (Story 9.8) — der Forced-Pfad

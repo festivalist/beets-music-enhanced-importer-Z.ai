@@ -27,12 +27,12 @@ def _outcome(root: str,
     waren — deren Alben zählen nicht (Enrich-Gate, Story 9.7-Befund)."""
     from . import state as state_mod
 
-    rk = os.path.normcase(os.path.normpath(root))
+    rk = state_mod.norm_key(root)
     counts: dict[str, int] = {}
     albums: list[tuple[str, str]] = []
     for key, u in sorted(state_mod.units(state_mod.load()).items()):
-        k = os.path.normcase(os.path.normpath(key))
-        if k != rk and not k.startswith(rk + os.sep):
+        k = state_mod.norm_key(key)
+        if not state_mod.path_under(k, rk):
             continue
         counts[u.get("status", "?")] = counts.get(u.get("status", "?"), 0) + 1
         if u.get("status") in ("auto", "asis") and not u.get("singleton") \
@@ -191,7 +191,7 @@ def _mg_playlist_plans(root: str) -> list[dict]:
     changed = False
     dirs: dict[str, str] = {}
     for key, u in state_mod.units(st).items():
-        k = os.path.normcase(os.path.normpath(key))
+        k = state_mod.norm_key(key)
         if not k.startswith(norm_marker + os.sep):
             continue
         if not (u.get("singleton") or u.get("split_into_singletons")):
@@ -251,12 +251,12 @@ def _ingest_one(root: str) -> int:
     # unprocessed; gap-fill discards re-downloads of known tracks.
     from . import state as state_mod
     from .scan import openable
-    rk = os.path.normcase(os.path.normpath(root))
+    rk = state_mod.norm_key(root)
     st = state_mod.load()
     reopened = 0
     for key, u in state_mod.units(st).items():
-        k = os.path.normcase(os.path.normpath(key))
-        if k != rk and not k.startswith(rk + os.sep):
+        k = state_mod.norm_key(key)
+        if not state_mod.path_under(k, rk):
             continue
         if u.get("status") not in ("asis", "auto", "duplicate", "review-apply"):
             continue
@@ -274,7 +274,7 @@ def _ingest_one(root: str) -> int:
 
     # Gap-aware pre-pass: album already in the library -> only missing
     # tracks stay; one-track units become singletons (Singles\ path).
-    for note in fetch_mod._prepare_units(root):
+    for note in fetch_mod.prepare_units(root):
         print(f"ingest: {note}")
 
     # Enrich-Gate (Befund 2026-10-20): _outcome listete historisch ALLE
@@ -284,10 +284,10 @@ def _ingest_one(root: str) -> int:
     # Monitor-Aktionen und Waiter). Nur Units, die DIESEN Lauf entscheiden,
     # werden angereichert.
     pre_decided = {
-        os.path.normcase(os.path.normpath(k))
+        state_mod.norm_key(k)
         for k, u in state_mod.units(state_mod.load()).items()
         if u.get("status") in ("auto", "asis")
-        and (k == rk or k.startswith(rk + os.sep))
+        and state_mod.path_under(k, rk)
     }
 
     # Story 2.2: MusicGrabber playlist dirs — singleton split + specs
@@ -338,7 +338,7 @@ def _ingest_one(root: str) -> int:
     if albums:
         print("ingest: enriching art/genre for imported albums")
         _activity("enrich", f"{len(albums)} Album/-e")
-        fetch_mod._enrich_albums(albums)
+        fetch_mod.enrich_albums(albums)
 
     print("ingest outcome:", ", ".join(f"{k}={v}" for k, v in sorted(counts.items())))
     ok, msg = plex_mod.refresh_library()

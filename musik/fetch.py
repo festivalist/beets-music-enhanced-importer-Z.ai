@@ -48,12 +48,12 @@ FETCH_DEFAULTS = {
 }
 
 
-def _fetch_config() -> dict:
+def fetch_config() -> dict:
     cfg = (musik_config().get("fetch") or {})
     return {k: (cfg.get(k, d)) for k, d in FETCH_DEFAULTS.items()}
 
 
-def _cookie_path(rcfg: dict) -> str | None:
+def cookie_path(rcfg: dict) -> str | None:
     """Resolved cookies file or None. Relative paths resolve against the
     project dir (the bot may run from anywhere)."""
     raw = str(rcfg.get("cookies_file") or "").strip()
@@ -478,8 +478,8 @@ def run_fetch(inputs: list[str], timeout_s: float | None = DOWNLOAD_TIMEOUT,
         # provider-specific. Failed tracks are retried targeted, with a
         # cooldown, lower thread count and alternate audio providers.
         # Existing files in the job dir are skipped, so this is idempotent.
-        rcfg = _fetch_config()
-        cookies = _cookie_path(rcfg)
+        rcfg = fetch_config()
+        cookies = cookie_path(rcfg)
         if cookies:
             print(f"  using YouTube cookies: {cookies} "
                   f"(threads<={rcfg['auth_threads']}, paced)")
@@ -563,11 +563,7 @@ def cmd_fetch(inputs: list[str], self_test: bool = False,
 # import chain (fetch --import, and the bot's job worker)
 # --------------------------------------------------------------------------
 
-# statuses that mean "a human should look at this eventually"
-_OPEN_STATUSES = {"review", "unmatched", "network", "error", "pending"}
-
-
-def _unit_label(u: dict) -> str:
+def _imported_label(u: dict) -> str:
     """Human label for an imported unit, preferring what the decider chose."""
     seen: list[str] = []
     for r in u.get("file_results") or []:
@@ -664,13 +660,13 @@ def _insert_gap_tracks(files: list[str], target, lib) -> tuple[list[str], list[s
                     )
                 except subprocess.TimeoutExpired:
                     # tracks are imported and stored; only the analysis
-                    # backfill is skipped (same contract as _enrich_albums)
+                    # backfill is skipped (same contract as enrich_albums)
                     print(f"import: gap backfill {args[0]} timed out for "
                           f"track {tn} (album_id:{target.id})")
     return inserted, failed
 
 
-def _prepare_units(root: str) -> list[str]:
+def prepare_units(root: str) -> list[str]:
     """Pre-import pass over this job's pending units (state must be saved
     afterwards by the caller):
 
@@ -685,20 +681,16 @@ def _prepare_units(root: str) -> list[str]:
     Returns human-readable notes for the job summary.
     """
     from . import state as state_mod
-    from .engine import setup_beets
+    from .engine import open_library, setup_beets
     from .scan import tag_of
     from .trash import trash_files
 
     st = state_mod.load()
     units = state_mod.units(st)
-    root_key = os.path.normcase(os.path.normpath(root))
+    root_key = state_mod.norm_key(root)
 
     setup_beets()
-    from beets import config as beets_config
-    from beets.library import Library
-
-    lib = Library(beets_config["library"].as_filename(),
-                  beets_config["directory"].as_filename())
+    lib = open_library()
     lib_albums = list(lib.albums())
 
     def find_album(artist: str, album: str):
@@ -714,8 +706,8 @@ def _prepare_units(root: str) -> list[str]:
     notes: list[str] = []
     changed = False
     for key, u in units.items():
-        k = os.path.normcase(os.path.normpath(key))
-        if k != root_key and not k.startswith(root_key + os.sep):
+        k = state_mod.norm_key(key)
+        if not state_mod.path_under(k, root_key):
             continue
         if u.get("status") != "pending" or u.get("split_into_singletons"):
             continue
@@ -806,7 +798,7 @@ def _import_job(job: FetchJob) -> list[tuple[str, str]]:
     print(f"import: scanning {root}")
     # Playlist context: sidecar order/name from the (still present)
     # staging files, item-id snapshot before anything touches the DB —
-    # gap-fill in _prepare_units writes to beets too, so this comes first.
+    # gap-fill in prepare_units writes to beets too, so this comes first.
     pl_specs = playlists_mod.prepare(job)
     ids_before = playlists_mod.snapshot_ids()
     scan_mod.cmd_scan(root)
@@ -814,7 +806,7 @@ def _import_job(job: FetchJob) -> list[tuple[str, str]]:
     # Gap-aware pre-pass: album already in the library -> only missing
     # tracks stay in the unit; single-track units (no such album) become
     # singletons -> Singles\ path, not a one-track "album" folder.
-    prep_notes = _prepare_units(root)
+    prep_notes = prepare_units(root)
     job.prep_notes = prep_notes
     for note in prep_notes:
         print(f"import: {note}")
@@ -833,10 +825,10 @@ def _import_job(job: FetchJob) -> list[tuple[str, str]]:
     root_key = os.path.normcase(root)
     albums: list[tuple[str, str]] = []
     for key, u in sorted(state_mod.units(st).items()):
-        k = os.path.normcase(os.path.normpath(key))
-        if k != root_key and not k.startswith(root_key + os.sep):
+        k = state_mod.norm_key(key)
+        if not state_mod.path_under(k, root_key):
             continue
-        outcomes.append((u.get("status", "?"), _unit_label(u)))
+        outcomes.append((u.get("status", "?"), _imported_label(u)))
         if u.get("status") in ("auto", "asis") and not u.get("singleton"):
             # as-is units carry identity in `guessed`/`candidates` (chosen
             # is null); auto album units in file_results->chosen.
@@ -855,7 +847,7 @@ def _import_job(job: FetchJob) -> list[tuple[str, str]]:
     # wants genres and a cover file. Both backfills only fill gaps.
     if albums:
         print("import: enriching art/genre for imported albums")
-        _enrich_albums(albums)
+        enrich_albums(albums)
 
     counts: dict[str, int] = {}
     for status, _ in outcomes:
@@ -870,7 +862,7 @@ def _import_job(job: FetchJob) -> list[tuple[str, str]]:
     return outcomes
 
 
-def _enrich_albums(albums: list[tuple[str, str]]) -> None:
+def enrich_albums(albums: list[tuple[str, str]]) -> None:
     """Targeted lastgenre + fetchart backfill for freshly imported albums."""
     # bootstrap() (not yet run when called standalone) puts bin/ with
     # ffmpeg on PATH; without it replaygain dies at plugin init and beets

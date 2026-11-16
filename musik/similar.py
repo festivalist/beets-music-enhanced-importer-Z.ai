@@ -16,6 +16,7 @@ import uuid
 import requests
 
 from . import state as state_mod
+from . import engine
 from .paths import reports_dir
 
 # Labs endpoint; `algorithm` must be one of its fixed enum values. This is
@@ -46,10 +47,9 @@ def _library_artists(lib) -> tuple[dict[str, str], set[str]]:
         for name in (it.albumartist or "", it.artist or ""):
             if name and not VA_RE.match(name):
                 names.add(_norm_name(name))
-        aid = (it.mb_artistid or "").strip()
         # multi-artist rows join ids with ';'; only clean single UUIDs are
         # usable for the API (beatport4 stores plain numeric ids there)
-        first = aid.split(";")[0].strip()
+        first = engine.first_mbid(it.mb_artistid)
         if (UUID_RE.match(first) and first != VA_MBID
                 and not VA_RE.match(it.artist or "")):
             by_mbid.setdefault(first, (it.artist or "?").strip())
@@ -98,7 +98,7 @@ def _fetch_similar(mbids: list[str]) -> dict[str, list[dict]]:
 
 
 def cmd_similar(top: int = 30, refresh: bool = False) -> int:
-    lib = _open_library()
+    lib = engine.open_library()
     by_mbid, lib_names = _library_artists(lib)
     if not by_mbid:
         print("no artists with MusicBrainz IDs in the library — nothing to do")
@@ -179,14 +179,3 @@ def _report_path() -> str:
     return os.path.join(reports_dir(), "similar-artists.md")
 
 
-def _open_library():
-    from .engine import setup_beets
-
-    setup_beets()
-    from beets import config as beets_config
-    from beets.library import Library
-
-    return Library(
-        beets_config["library"].as_filename(),
-        beets_config["directory"].as_filename(),
-    )

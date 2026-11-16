@@ -35,7 +35,14 @@ MULTIDISC_RE = re.compile(
 VINYL_HINT_RE = re.compile(r"(?i)(side\s*[ab]|vinyl|[abcd][1-9]\b)")
 ONETOONE_LONG_SECONDS = 1200  # a single file this long is likely a live dump
 
-junk_files: list[str] = []
+_junk_files: list[str] = []
+
+
+def junk_files() -> list[str]:
+    """Non-audio files recorded during the LAST classify() run
+    (Story 6.3: das Modul-Global ist intern; Leser gehen über den
+    Accessor)."""
+    return list(_junk_files)
 
 
 def is_audio(name: str) -> bool:
@@ -566,7 +573,7 @@ def classify(root: str) -> tuple[list[dict], list[str]]:
     root = os.path.abspath(root)
     notes: list[str] = []
     units: list[dict] = []
-    junk_files.clear()
+    _junk_files.clear()
 
     def visit(d: str) -> None:
         files = audio_files_in(d)
@@ -672,7 +679,7 @@ def note_side_files(d: str, units: list[dict], notes: list[str]) -> None:
         elif ext and ext not in AUDIO_EXTS and name.lower() not in (
             "desktop.ini", "thumbs.db",
         ):
-            junk_files.append(full)
+            _junk_files.append(full)
 
 
 def walk_visible(d: str):
@@ -748,16 +755,16 @@ def cmd_scan(root: str) -> int:
     # Drop stale pending/ignored units under the scanned root that the
     # new classification no longer produces (e.g. after a rule change)
     # and whose files are covered by new units or gone from disk.
-    root_key = os.path.normcase(os.path.normpath(root))
-    new_keys = {os.path.normcase(os.path.normpath(u["path"])) for u in new_units}
+    root_key = state_mod.norm_key(root)
+    new_keys = {state_mod.norm_key(u["path"]) for u in new_units}
     covered = {
-        os.path.normcase(f)
+        state_mod.norm_key(f)
         for u in new_units for f in u.get("files", [])
     }
     removed = 0
     for k in list(existing.keys()):
         u = existing[k]
-        if not (k.startswith(root_key + os.sep) or k == root_key):
+        if not state_mod.path_under(k, root_key):
             continue
         if u.get("status") not in ("pending", "ignored"):
             continue
@@ -765,7 +772,7 @@ def cmd_scan(root: str) -> int:
             continue
         # Superseded: its files are now owned by new units — or gone.
         superseded = any(
-            os.path.normcase(f) in covered for f in u.get("files", [])
+            state_mod.norm_key(f) in covered for f in u.get("files", [])
         )
         gone = u.get("files") and not all(
             os.path.isfile(openable(f)) for f in u["files"]
@@ -782,7 +789,7 @@ def cmd_scan(root: str) -> int:
     retired = 0
     for k in list(existing.keys()):
         u = existing[k]
-        if not (k.startswith(root_key + os.sep) or k == root_key):
+        if not state_mod.path_under(k, root_key):
             continue
         # Story 6.9: error-Units gehören dazu — ohne Dateien ist ihr Retry
         # sinnlos (nichts zu importieren) und sie lärmern für immer als
@@ -799,7 +806,7 @@ def cmd_scan(root: str) -> int:
 
     kept, added, reopened = 0, 0, 0
     for u in new_units:
-        key = os.path.normcase(os.path.normpath(u["path"]))
+        key = state_mod.norm_key(u["path"])
         outcome = merge_unit(existing, key, u)
         if outcome == "kept":
             kept += 1
@@ -811,7 +818,7 @@ def cmd_scan(root: str) -> int:
     st.setdefault("meta", {})["last_scan"] = {
         "root": os.path.normpath(root),
         "notes": notes,
-        "junk_count": len(junk_files),
+        "junk_count": len(_junk_files),
     }
     state_mod.save(st)
 
@@ -824,8 +831,8 @@ def cmd_scan(root: str) -> int:
     print("unit status counts:", ", ".join(f"{k}={v}" for k, v in sorted(c.items())))
     for n in notes:
         print("note:", n)
-    if junk_files:
-        print(f"non-audio files recorded: {len(junk_files)} (see scan report)")
+    if _junk_files:
+        print(f"non-audio files recorded: {len(_junk_files)} (see scan report)")
     corrupt = sum(
         1 for u in existing.values() for f in (u.get("unreadable_files") or [])
         if os.path.isfile(f)

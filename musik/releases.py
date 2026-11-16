@@ -32,11 +32,12 @@ def _artist_mbids(lib) -> dict[str, str]:
     import re
     import uuid as _uuid
 
+    from . import engine
     from .similar import VA_RE
 
     by_mbid: dict[str, str] = {}
     for it in lib.items():
-        aid = (it.mb_artistid or "").strip().split(";")[0].strip()
+        aid = engine.first_mbid(it.mb_artistid)
         name = (it.artist or "").strip()
         if re.fullmatch(
             r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
@@ -56,16 +57,10 @@ def _parse_since(since: str | None, state: dict) -> datetime:
 
 
 def cmd_releases(since: str | None = None) -> int:
-    from .engine import setup_beets
+    from .engine import open_library, setup_beets
 
     setup_beets()
-    from beets import config as beets_config
-    from beets.library import Library
-
-    lib = Library(
-        beets_config["library"].as_filename(),
-        beets_config["directory"].as_filename(),
-    )
+    lib = open_library()
     artists = _artist_mbids(lib)
     if not artists:
         print("no artists with MusicBrainz IDs in the library — nothing to do")

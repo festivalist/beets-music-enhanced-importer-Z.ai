@@ -108,9 +108,9 @@ assert action4 == "apply" and record4["status"] == "review-apply", \
     (action4, record4)
 
 u_int = {"candidates": [{"id": 2516185}, {"id": None}, {"album": "no id"}]}
-assert R._cand_id(u_int, 1) == "2516185", R._cand_id(u_int, 1)
-assert R._cand_id(u_int, 2) == ""
-assert R._cand_id(u_int, 3) == ""
+assert R.cand_id(u_int, 1) == "2516185", R.cand_id(u_int, 1)
+assert R.cand_id(u_int, 2) == ""
+assert R.cand_id(u_int, 3) == ""
 print("4) int candidate ids tolerated end-to-end OK (Story 9.8)")
 
 # 5) Story 2.3: singleton cross-engine dedup — same normalized

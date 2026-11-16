@@ -10,6 +10,7 @@ import shutil
 import time
 
 from . import paths
+from . import state as state_mod
 
 MANIFEST_HEADER = [
     "timestamp", "reason", "original_path", "trash_path", "detail",
@@ -61,7 +62,7 @@ def trash_files(files: list[str], reason: str, detail: str = "",
 
 def prune_empty_dirs(files: list[str], stop_at: str) -> None:
     """Remove now-empty directories above the moved files, up to stop_at."""
-    stop_at = os.path.normcase(os.path.normpath(stop_at))
+    stop_at = state_mod.norm_key(stop_at)
     seen = set()
     for f in files:
         d = os.path.dirname(os.path.abspath(f))

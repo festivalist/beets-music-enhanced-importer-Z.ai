@@ -286,16 +286,10 @@ def verify(state: dict, fix: bool = False) -> dict:
     m3u-referenced files later archived by cleanup) are removed from the
     DB (the files are already lost, so nothing is deleted on disk).
     """
-    from .engine import setup_beets
+    from .engine import open_library, setup_beets
 
     setup_beets()
-    from beets import config as beets_config
-    from beets.library import Library
-
-    lib = Library(
-        beets_config["library"].as_filename(),
-        beets_config["directory"].as_filename(),
-    )
+    lib = open_library()
     out = {
         "albums": 0,
         "items": 0,

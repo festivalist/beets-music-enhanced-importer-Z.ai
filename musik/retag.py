@@ -39,15 +39,10 @@ def cmd_retag(limit: int | None = None, max_distance: float = 0.10) -> int:
     from .engine import setup_beets
 
     setup_beets()
-    from beets import config as beets_config
-    from beets.library import Library
-
     from .beetscompat import tag_album_compat
+    from .engine import open_library
 
-    lib = Library(
-        beets_config["library"].as_filename(),
-        beets_config["directory"].as_filename(),
-    )
+    lib = open_library()
     albums = _asis_albums(lib)
     if limit:
         albums = albums[:limit]

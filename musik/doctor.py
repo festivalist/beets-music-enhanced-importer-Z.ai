@@ -19,25 +19,13 @@ import time
 from . import state as state_mod
 from .paths import BIN_DIR, FPCALC, PROJECT_DIR, reports_dir
 from .scan import openable
+from . import engine
 
 FLAC_EXE = os.path.join(BIN_DIR, "flac.exe") if os.name == "nt" else (
     shutil.which("flac") or ""
 )
 LONG_PATH_LIMIT = 240
 BEETS_ENV = {**os.environ, "BEETSDIR": PROJECT_DIR}
-
-
-def _open_library():
-    from .engine import setup_beets
-
-    setup_beets()
-    from beets import config as beets_config
-    from beets.library import Library
-
-    return Library(
-        beets_config["library"].as_filename(),
-        beets_config["directory"].as_filename(),
-    )
 
 
 def _decode_test(exe: str, args: list[str], path: str) -> str | None:
@@ -163,7 +151,7 @@ def cmd_doctor(fix: bool = False, quick: bool = False, limit: int | None = None)
     for name, ver in tools.items():
         print(f"fetch tool {name}: {ver if ver else 'MISSING'}")
 
-    lib = _open_library()
+    lib = engine.open_library()
     items = list(lib.items())
     albums = list(lib.albums())
 

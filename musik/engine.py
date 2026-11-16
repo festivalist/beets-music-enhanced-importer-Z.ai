@@ -37,6 +37,46 @@ def setup_beets() -> None:
     _BEETS_READY = True
 
 
+def open_library():
+    """Open the beets library DB + directory — the ONE library factory
+    (Story 6.3: zuvor 14 baugleiche Konstruktionen in 10 Modulen). Callers
+    that must not pay the plugin load can call setup_beets() themselves;
+    open_library is idempotent in that regard."""
+    setup_beets()
+    from beets import config as beets_config
+    from beets.library import Library
+
+    return Library(
+        beets_config["library"].as_filename(),
+        beets_config["directory"].as_filename(),
+    )
+
+
+def fill_empty_original_years(lib) -> int:
+    """As-is imports have no MB data: derive original_year from year so
+    the `$original_year` path templates work. Only fills empty fields.
+    (Story 6.3: eine Quelle statt baugleicher Loops in engine und asis.)"""
+    fixed = 0
+    for album in lib.albums():
+        if not album.original_year and album.year:
+            album.original_year = album.year
+            album.store()
+            fixed += 1
+    for item in lib.items():
+        if not item.original_year and item.year:
+            item.original_year = item.year
+            item.store()
+            fixed += 1
+    return fixed
+
+
+def first_mbid(value: str) -> str:
+    """beets speichert Mehrfach-IDs semikolongetrennt; der erste Eintrag
+    ist der primäre Credit (Story 6.3: eine Quelle statt dreier Split-
+    Ketten in bot/releases/similar)."""
+    return (value or "").strip().split(";")[0].strip()
+
+
 def preflight() -> dict:
     """Check MusicBrainz reachability and the Discogs token.
 
@@ -143,11 +183,7 @@ def build_decider(unit: dict | None = None, forced: dict | None = None,
     )
 
 
-def _item_paths(items) -> list[str]:
-    return [os.fsdecode(i.path) for i in items]
-
-
-def _trash_unreadable(unit: dict, context: str) -> int:
+def trash_unreadable(unit: dict, context: str) -> int:
     """Archive corrupt files the scan excluded from this unit."""
     bad = [f for f in (unit.get("unreadable_files") or []) if os.path.isfile(f)]
     if not bad:
@@ -200,7 +236,7 @@ def run_unit_real(lib, unit: dict, decider: Decider) -> dict:
 
     # Corrupt files the scan excluded never import; archive them now so
     # their folder can empty out and cleanup can remove it.
-    _trash_unreadable(unit, "import")
+    trash_unreadable(unit, "import")
 
     # New files that lost a duplicate comparison go to _trash.
     if session.duplicate_losers:
@@ -272,7 +308,7 @@ def _protocol_lines(unit: dict, results: list[dict]) -> tuple[list[str], str]:
     return lines, summary
 
 
-def _release_kind(unit: dict, outcome: dict | None = None) -> str:
+def release_kind(unit: dict, outcome: dict | None = None) -> str:
     """Album / ep / single / compilation / mix for the session summary.
     Matched releases report their own albumtype; own-tag imports use a
     track-count heuristic."""
@@ -310,11 +346,11 @@ def _decision_type(unit: dict, outcome: dict) -> str:
     return "failed"
 
 
-def _merge_result(unit: dict, outcome: dict) -> None:
+def merge_result(unit: dict, outcome: dict) -> None:
     unit["status"] = outcome["status"]
     unit["reason"] = outcome.get("reason", "")
     unit["updated"] = time.time()
-    unit["decision_kind"] = _release_kind(unit, outcome)
+    unit["decision_kind"] = release_kind(unit, outcome)
     unit["decision_type"] = _decision_type(unit, outcome)
     if outcome.get("unmapped_files"):
         unit["unmapped_files"] = outcome["unmapped_files"]
@@ -340,19 +376,7 @@ def _rehome_after_asis(lib) -> None:
     move affected items to their now-correct destinations."""
     from beets.util import MoveOperation
 
-    from . import trash as trash_mod
-
-    fixed = 0
-    for album in lib.albums():
-        if not album.original_year and album.year:
-            album.original_year = album.year
-            album.store()
-            fixed += 1
-    for item in lib.items():
-        if not item.original_year and item.year:
-            item.original_year = item.year
-            item.store()
-            fixed += 1
+    fixed = fill_empty_original_years(lib)
     if not fixed:
         return
 
@@ -390,26 +414,19 @@ def _rehome_after_asis(lib) -> None:
 
 def _select(state: dict, statuses: list[str] | None, limit: int | None,
             only: str | None, excludes: list[str] | None = None) -> list[dict]:
-    excl = [
-        os.path.normcase(os.path.normpath(e))
-        for e in (excludes or []) if e
-    ]
+    excl = [state_mod.norm_key(e) for e in (excludes or []) if e]
     sel = []
-    want = os.path.normcase(os.path.normpath(only)) if only else None
+    want = state_mod.norm_key(only) if only else None
     for u in state_mod.units(state).values():
-        upath = os.path.normcase(os.path.normpath(u["path"]))
+        upath = state_mod.norm_key(u["path"])
         if want:
-            ipath = os.path.normcase(
-                os.path.normpath(u.get("import_path") or u["path"])
-            )
+            ipath = state_mod.norm_key(u.get("import_path") or u["path"])
             # Exact unit match, or any unit underneath a given folder.
-            if want not in (upath, ipath) and not upath.startswith(
-                want + os.sep
+            if want not in (upath, ipath) and not state_mod.path_under(
+                upath, want
             ):
                 continue
-        if any(
-            upath == e or upath.startswith(e + os.sep) for e in excl
-        ):
+        if any(state_mod.path_under(upath, e) for e in excl):
             continue
         if statuses and u.get("status") not in statuses:
             continue
@@ -485,13 +502,7 @@ def cmd_import(dry_run: bool = False, statuses: list[str] | None = None,
 
     lib = None
     if not dry_run:
-        from beets import config as beets_config
-        from beets.library import Library
-
-        lib = Library(
-            beets_config["library"].as_filename(),
-            beets_config["directory"].as_filename(),
-        )
+        lib = open_library()
 
     done = 0
     for i, unit in enumerate(selected, 1):
@@ -522,7 +533,7 @@ def cmd_import(dry_run: bool = False, statuses: list[str] | None = None,
                         print(f"[{i}/{len(selected)}] nfo      {label}: "
                               f"{n} file(s) completed from .nfo/.txt tracklist")
                 outcome = run_unit_real(lib, unit, decider)
-                _merge_result(unit, outcome)
+                merge_result(unit, outcome)
                 state_mod.set_status(unit, outcome["status"],
                                      outcome.get("reason", ""))
         except KeyboardInterrupt:
@@ -567,7 +578,7 @@ def cmd_import(dry_run: bool = False, statuses: list[str] | None = None,
                 decider = build_decider(unit, lib=lib)
                 try:
                     outcome = run_unit_real(lib, unit, decider)
-                    _merge_result(unit, outcome)
+                    merge_result(unit, outcome)
                     state_mod.set_status(unit, outcome["status"],
                                          outcome.get("reason", ""))
                 except Exception as exc:

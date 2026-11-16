@@ -267,23 +267,6 @@ def repair_from_folder(unit: dict, dry_run: bool = False) -> tuple[bool, str]:
     return True, f"Tags repariert aus Ordner-Identität: {label}"
 
 
-def _fill_empty_original_years(lib) -> int:
-    """As-is imports have no MB data: derive original_year from year so
-    the `$original_year` path templates work. Only fills empty fields."""
-    fixed = 0
-    for album in lib.albums():
-        if not album.original_year and album.year:
-            album.original_year = album.year
-            album.store()
-            fixed += 1
-    for item in lib.items():
-        if not item.original_year and item.year:
-            item.original_year = item.year
-            item.store()
-            fixed += 1
-    return fixed
-
-
 def import_units(paths: list[str], progress=None) -> tuple[list[str], bool]:
     """Mehrere Units as-is importieren — gemeinsamer Kern der Telegram-
     /asis-Aktion und der Monitor-Aktion (Story 9.6). Pro Unit cmd_asis +
@@ -338,7 +321,7 @@ def cmd_asis(only: str | None = None, dry_run: bool = False,
              include_pending: bool = False) -> int:
     from . import state as state_mod
     from . import trash as trash_mod
-    from .engine import restrict_sources, setup_beets
+    from .engine import fill_empty_original_years, restrict_sources
     from .session import MusikSession, va_gate_unit
 
     # as-is imports perform no lookups — never load metadata source
@@ -347,19 +330,15 @@ def cmd_asis(only: str | None = None, dry_run: bool = False,
     restrict_sources([])
     setup_beets()
     st = state_mod.load()
-    want = os.path.normcase(os.path.normpath(only)) if only else None
+    want = state_mod.norm_key(only) if only else None
     statuses = ("review", "unmatched", "network")
     if include_pending:
         statuses += ("pending",)
 
     from beets import config as beets_config
     from beets.importer.session import ImportSession
-    from beets.library import Library
 
-    lib = Library(
-        beets_config["library"].as_filename(),
-        beets_config["directory"].as_filename(),
-    )
+    lib = open_library()
 
     selected = []
     repaired: dict[str, str] = {}
@@ -367,8 +346,8 @@ def cmd_asis(only: str | None = None, dry_run: bool = False,
         if u.get("status") not in statuses:
             continue
         if want:
-            upath = os.path.normcase(os.path.normpath(u["path"]))
-            if want != upath and not upath.startswith(want + os.sep):
+            upath = state_mod.norm_key(u["path"])
+            if not state_mod.path_under(upath, want):
                 continue
         # stale entries (files already imported by a earlier partial run
         # of this unit) must not block the remaining files
@@ -476,9 +455,9 @@ def cmd_asis(only: str | None = None, dry_run: bool = False,
 
             from . import engine as _engine
 
-            _engine._trash_unreadable(unit, "asis")
+            _engine.trash_unreadable(unit, "asis")
 
-            unit["decision_kind"] = _engine._release_kind(unit)
+            unit["decision_kind"] = _engine.release_kind(unit)
             unit["decision_type"] = "own-tags"
             rnote = repaired.get(unit["path"])
             state_mod.set_status(
@@ -492,7 +471,7 @@ def cmd_asis(only: str | None = None, dry_run: bool = False,
         for k, v in saved_paths.items():
             paths_view[k] = v
 
-    fixed = _fill_empty_original_years(lib)
+    fixed = fill_empty_original_years(lib)
     if fixed:
         print(f"filled empty original_year on {fixed} album(s)/item(s)")
     print(f"asis: {done} unit(s) imported with their own tags")

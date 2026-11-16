@@ -18,16 +18,9 @@ def _album_score(album) -> tuple:
 
 def cmd_dedupe(dry_run: bool = False,
                fingerprint: bool = False, apply: bool = False) -> int:
-    from .engine import setup_beets
+    from .engine import open_library
 
-    setup_beets()
-    from beets import config as beets_config
-    from beets.library import Library
-
-    lib = Library(
-        beets_config["library"].as_filename(),
-        beets_config["directory"].as_filename(),
-    )
+    lib = open_library()
 
     if fingerprint:
         return _dedupe_fingerprint(lib, apply=apply)

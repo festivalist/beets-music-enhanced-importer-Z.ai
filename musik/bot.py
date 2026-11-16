@@ -35,6 +35,7 @@ from telegram.ext import (
 )
 
 from . import asis as asis_mod
+from . import engine
 from . import fetch
 from . import jobs as jobs_mod
 from . import plex as plex_mod
@@ -483,17 +484,6 @@ _ALBUM_SEQ = [0]
 _ALBUM_OFFER_MAX = 30  # forget ancient offers, not today's
 
 
-def _open_library():
-    from .engine import setup_beets
-
-    setup_beets()
-    from beets import config as beets_config
-    from beets.library import Library
-
-    return Library(beets_config["library"].as_filename(),
-                   beets_config["directory"].as_filename())
-
-
 def _find_singleton(lib, artist: str, title: str):
     """The item this track request just created (artist/title match,
     singleton = no album row, newest added first): (beets item id,
@@ -505,7 +495,7 @@ def _find_singleton(lib, artist: str, title: str):
         if not items:
             return None
         newest = max(items, key=lambda i: i.added or 0)
-        mbid = (newest.mb_artistid or "").strip().split(";")[0].strip()
+        mbid = engine.first_mbid(newest.mb_artistid)
         return newest.id, mbid or None
     except Exception:
         traceback.print_exc()
@@ -518,7 +508,7 @@ def _remove_singleton(item_id) -> str:
     if not item_id:
         return ""
     try:
-        lib = _open_library()
+        lib = engine.open_library()
         item = lib.get_item(item_id)
         if item is None:
             return ""
@@ -550,7 +540,7 @@ def _maybe_album_offer(job: dict, query: str, pick: dict, send) -> None:
         artist, title = artist.strip(), title.strip()
         if not artist or not title:
             return
-        lib = _open_library()
+        lib = engine.open_library()
         found = _find_singleton(lib, artist, title)
         singleton_id, artist_mbid = found if found else (None, None)
         cands = track_album_candidates(artist, title, library=lib,
@@ -735,7 +725,7 @@ async def _cookie_watch(app) -> None:
     from . import cookies as cookies_mod
     from . import fetch as fetch_mod
 
-    path = fetch_mod._cookie_path(fetch_mod._fetch_config())
+    path = fetch_mod.cookie_path(fetch_mod.fetch_config())
     prev = None
     while True:
         try:

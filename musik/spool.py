@@ -116,13 +116,13 @@ def flip_retry(paths: list[str]) -> int:
     konservativ). Aufrufer koordiniert den ingest.lock."""
     from . import state as state_mod
 
-    targets = {os.path.normcase(os.path.normpath(p)) for p in paths}
+    targets = {state_mod.norm_key(p) for p in paths}
     retryable = ("network", "unmatched", "error") if targets \
         else ("network", "unmatched")
     st = state_mod.load()
     n = 0
     for u in state_mod.units(st).values():
-        up = os.path.normcase(os.path.normpath(u.get("path") or ""))
+        up = state_mod.norm_key(u.get("path") or "")
         if targets and up not in targets:
             continue
         if u.get("status") in retryable:

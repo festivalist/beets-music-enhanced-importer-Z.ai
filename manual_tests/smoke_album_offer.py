@@ -50,7 +50,7 @@ class FakeLib:
         return FakeItem(id, "Example Band", "Song") if id == 7 else None
 
 
-B._open_library = lambda: FakeLib()
+B.engine.open_library = lambda: FakeLib()  # Story 6.3: die Factory lebt in engine
 
 
 def send(text, markup=None):
