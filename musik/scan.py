@@ -126,7 +126,7 @@ def parse_track_filename(path: str) -> tuple[str, str] | None:
 
     Track dumps use both 'Artist - Title' and 'Title - Artist'; the
     orientation is decided per unit (majority vote against the tags,
-    see asis.plan_va_normalize), not here. None when the name carries
+    see session.plan_va_normalize), not here. None when the name carries
     no ' - ' separator or one side is empty."""
     stem = os.path.splitext(os.path.basename(path))[0].replace("_", " ")
     stem = _TRACKNUM_PREFIX_RE.sub("", stem).strip()
@@ -146,6 +146,169 @@ def artist_values(files: list[str]) -> list[str]:
         a = tag_of(f, "albumartist") or tag_of(f, "artist")
         out.append(a.lower().strip())
     return out
+
+
+# --- Own-tags identity gates (Story 6.4: hierher aus asis — session und
+# asis brauchen beide die Datei-Ebene, nicht die Entscheidungs-Ebene) ------
+
+# Story 10.3: an artist tag holding one of these is NOT an identity —
+# units whose per-track artists all resolve to this never import on own
+# tags (they went through the auto path as artist=Unknown in the 10.2
+# live run) and fall through to review instead.
+_UNKNOWN_ARTISTS = {"", "unknown", "unknown artist"}
+
+
+def artist_present(value: str) -> bool:
+    return (value or "").strip().lower() not in _UNKNOWN_ARTISTS
+
+
+def from_fetch(unit: dict) -> bool:
+    """Downloader staging unit (bot fetch jobs, MusicGrabber output).
+
+    Per-track tags come from the streaming catalog (fetch jobs) or
+    MusicGrabber's own AcoustID/MusicBrainz tagging and are authoritative
+    per file; the album tag intentionally differs between tracks (a best-of
+    playlist spans many releases; MG's Singles/ tree holds one release per
+    track). Beets groups these by album tag on import, landing every track
+    in its own release's folder. The staging folder name is job metadata,
+    never release identity.
+    """
+    p = os.path.basename(unit.get("path") or "")
+    if p.startswith("fetch-"):
+        return True
+    parts = os.path.normpath(unit.get("path") or "").split(os.sep)
+    return "musicgrabber" in parts
+
+
+def tags_complete(unit: dict) -> tuple[bool, str]:
+    """Every file needs artist/album/title; album must be consistent.
+
+    Singleton units (chart dumps etc.) and fetch-staging units (playlists,
+    multi-release downloads) carry a different release album tag per track
+    by design — there the album tag is neither compared across files nor
+    strictly required per file (matches the singleton behavior).
+    """
+    if not unit.get("files"):
+        return False, "no files"
+    per_track = bool(
+        unit.get("singleton") or unit.get("split_into_singletons")
+        or from_fetch(unit)
+    )
+    album = None
+    for f in unit["files"]:
+        if not os.path.isfile(openable(f)):
+            return False, f"missing file {os.path.basename(f)}"
+        artist = tag_of(f, "albumartist") or tag_of(f, "artist")
+        title = tag_of(f, "title")
+        fa = tag_of(f, "album")
+        if not artist_present(artist) or not title or (not fa and not per_track):
+            return False, (
+                f"incomplete tags in {os.path.basename(f)} "
+                f"(artist={artist!r}, album={fa!r}, title={title!r})"
+            )
+        if album is None:
+            album = fa.lower() if fa else ""
+        elif not per_track and fa and fa.lower() != album:
+            return False, "inconsistent album tags across files"
+    return True, ""
+
+
+def enrich_from_meta_files(unit: dict) -> int:
+    """Fill missing artist/title tags from the release's .nfo/.txt.
+
+    Scene rips ship .nfo files whose tracklist ('01. Artist - Title (4:23)')
+    is authoritative when the sources don't know the release and the
+    files' own tags are thin. Only EMPTY fields are filled; tracks are
+    matched by track number (tag, else leading filename number).
+    Returns the number of files touched.
+    """
+    metas = [m for m in (unit.get("meta_files") or [])
+             if os.path.isfile(openable(m))]
+    if not metas:
+        return 0
+    entries: dict[int, dict] = {}
+    for mf in metas:
+        try:
+            with open(mf, "rb") as fh:
+                raw = fh.read()
+        except OSError:
+            continue
+        text = None
+        for enc in ("utf-8", "cp437", "latin-1"):
+            try:
+                text = raw.decode(enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        if not text:
+            continue
+        for line in text.splitlines():
+            m = re.match(r"^\s{0,6}(\d{1,2})[\.\)\-]\s+(\S.*?)\s*$", line)
+            if not m:
+                continue
+            num = int(m.group(1))
+            rest = re.sub(r"\s*[\(\[][0-9:]{3,5}[\)\]]?\s*$", "", m.group(2))
+            if num not in entries and rest:
+                if " - " in rest:
+                    artist, title = rest.split(" - ", 1)
+                    entries[num] = {"artist": artist.strip(), "title": title.strip()}
+                else:
+                    entries[num] = {"artist": "", "title": rest.strip()}
+    if not entries:
+        return 0
+
+    def track_no(f: str) -> int | None:
+        m = re.match(r"^(\d{1,2})", tag_of(f, "track"))
+        if m:
+            return int(m.group(1))
+        m = re.match(r"^(\d{1,2})[\s\.\-_]", os.path.basename(f))
+        return int(m.group(1)) if m else None
+
+    touched = 0
+    for f in unit.get("files") or []:
+        need_artist = not tag_of(f, "artist") and not tag_of(f, "albumartist")
+        need_title = not tag_of(f, "title")
+        if not (need_artist or need_title):
+            continue
+        num = track_no(f)
+        entry = entries.get(num or -1)
+        if not entry:
+            continue
+        m = mutagen.File(openable(f), easy=True)
+        if m is None:
+            continue
+        changed = False
+        if need_artist and entry["artist"]:
+            m["artist"] = entry["artist"]
+            if not tag_of(f, "albumartist"):
+                m["albumartist"] = entry["artist"]
+            changed = True
+        if need_title and entry["title"]:
+            m["title"] = entry["title"]
+            changed = True
+        if changed:
+            m.save()
+            touched += 1
+    return touched
+
+
+def token_seq(text: str) -> list[str]:
+    """Ordered token sequence (lowercase, non-alphanumeric trennt) —
+    Grundlage der kontiguierlichen Subsequenz-Checks. Eine Quelle für
+    asis.repair_from_folder (Story 10.9) und session (Story 10.7-
+    Korroboration)."""
+    return [t for t in re.split(r"[^a-z0-9]+", (text or "").lower()) if t]
+
+
+def token_seq_in(hay_text: str, needle: str) -> bool:
+    """True, wenn needle als kontinuierliche Tokenfolge in hay_text
+    liegt (Story 10.7: Ordner korroboriert Artist/Album-Kandidaten)."""
+    hay = token_seq(hay_text)
+    n = token_seq(needle)
+    if not n or len(n) > len(hay):
+        return False
+    return any(hay[i:i + len(n)] == n
+               for i in range(len(hay) - len(n) + 1))
 
 
 def should_split(files: list[str], kind: str) -> bool:

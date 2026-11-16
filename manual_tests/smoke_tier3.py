@@ -18,7 +18,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 tmp = tempfile.mkdtemp()
 
-from musik import asis as asis_mod   # noqa: E402
 from musik import scan as scan_mod   # noqa: E402
 from musik.session import Decider, NetworkErrorRecorder  # noqa: E402
 
@@ -30,7 +29,8 @@ def fake_tag(f: str, field: str) -> str:
     return TAGS.get(os.path.normcase(f), {}).get(field, "")
 
 
-asis_mod._tag = fake_tag
+# tags_complete lives in scan since Story 6.4 and resolves tag_of via the
+# scan module globals — patching there reaches the gate.
 scan_mod.tag_of = fake_tag
 
 

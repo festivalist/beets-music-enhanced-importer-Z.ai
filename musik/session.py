@@ -17,12 +17,24 @@ import os
 import re
 import threading
 
+import mutagen
+
 from beets.autotag import Recommendation, tag_item
 from beets.importer.actions import Action, DuplicateAction
 from beets.importer.session import ImportSession
 
 from . import quality
 from .beetscompat import tag_album_compat
+from .scan import (
+    artist_present,
+    from_fetch,
+    norm_name,
+    openable,
+    parse_track_filename,
+    tag_of,
+    tags_complete,
+    token_seq,
+)
 
 _PLUGIN_ERROR_RE = re.compile(r"Error in '([^']+)'")
 # beatport4 catches its own API errors inside candidates()/item_candidates()
@@ -213,9 +225,7 @@ class Decider:
     def _token_seq(text: str) -> list[str]:
         """Ordered token variant of _tokens (contiguous-subsequence
         checks need the order a set throws away). Gemeinsame Quelle mit
-        asis.repair_from_folder (Story 10.9): asis.token_seq."""
-        from .asis import token_seq
-
+        asis.repair_from_folder (Story 10.9): scan.token_seq."""
         return token_seq(text)
 
     _UUID_RE = re.compile(
@@ -273,10 +283,8 @@ class Decider:
     def _va_like(self) -> bool:
         """True for album units whose file tags carry no meaningful
         release credit (VA compilations, DJ-mixed albums, series/junk
-        credits). Single source of truth: asis.va_like_unit (Story
-        11.5 — plan_artist_fill needs the same verdict)."""
-        from .asis import va_like_unit
-
+        credits). Single source of truth: va_like_unit (Story 11.5 —
+        plan_artist_fill needs the same verdict)."""
         return va_like_unit(self.unit or {})
 
     # Album-title looseness for va_like units: the tags often carry the
@@ -398,8 +406,6 @@ class Decider:
         tags are complete and consistent, and (for album units) the
         folder-name parse agrees with the tags. Never fires after a
         network failure — "MB answered: nothing" must be real."""
-        from .asis import from_fetch, tags_complete
-
         mb_errors = NetworkErrorRecorder.errors_from(
             self.netrec.snapshot(), "musicbrainz"
         )
@@ -418,7 +424,7 @@ class Decider:
                 # Downloader staging (fetch-…): the folder name carries job
                 # metadata, not release identity, and a playlist's tracks
                 # span many releases by design — the streaming-catalog tags
-                # are authoritative per file (asis.from_fetch). The
+                # are authoritative per file (scan.from_fetch). The
                 # folder-agreement corroboration does not apply here.
                 reason = (
                     "own metadata: downloader tags authoritative (fetch staging); "
@@ -448,8 +454,6 @@ class Decider:
             )
         else:
             reason = "own metadata: no suitable MusicBrainz/Discogs match; tags complete"
-        from .asis import plan_artist_fill
-
         return {
             "status": "asis",
             "reason": reason,
@@ -491,8 +495,6 @@ class Decider:
         if self.lib is None:
             return None
         if getattr(self, "_album_cache", None) is None:
-            from .scan import norm_name
-
             self._album_cache = {
                 (norm_name(getattr(a, "albumartist", "")),
                  norm_name(getattr(a, "album", "")))
@@ -584,7 +586,6 @@ class Decider:
         guard cannot decide: no library handle, or fewer than
         va_redundant_min_tracks resolvable files."""
         from .paths import musik_config
-        from .scan import norm_name, openable, tag_of
 
         pairs = self._library_pairs()
         if pairs is None:
@@ -619,8 +620,6 @@ class Decider:
         computed once per decision (the plan feeds both the ignored and
         the survivor outcome)."""
         if self._va_cache is None:
-            from .asis import plan_va_normalize
-
             plan = plan_va_normalize(
                 list(self.unit.get("files") or []),
                 seen=list(self.unit.get("artists_seen") or []),
@@ -976,8 +975,6 @@ class MusikSession(ImportSession):
             # normalized first (albumartist=Various Artists, gaps filled
             # from filenames); beets writes the tags onto the copies.
             if record.get("normalize_va"):
-                from .asis import apply_va_plan
-
                 n = apply_va_plan(task, record["normalize_va"])
                 if n:
                     record["reason"] += (
@@ -987,8 +984,6 @@ class MusikSession(ImportSession):
             # Story 11.5: AA-valid/artist-junk files get artist := AA so
             # the junk never reaches the DB (non-VA units only).
             if record.get("fill_artist"):
-                from .asis import apply_artist_fill
-
                 n = apply_artist_fill(task, record["fill_artist"])
                 if n:
                     record["reason"] += (
@@ -1019,8 +1014,6 @@ class MusikSession(ImportSession):
             # Story 11.5: singletons take the same AA-valid/artist-junk
             # repair as album units — the live case was a singleton.
             if record.get("fill_artist"):
-                from .asis import apply_artist_fill
-
                 n = apply_artist_fill(task, record["fill_artist"])
                 if n:
                     record["reason"] += (
@@ -1152,6 +1145,244 @@ class MusikSession(ImportSession):
             f for f in new_files if os.path.isfile(f)
         )
         return DuplicateAction.SKIP
+
+
+# --- VA-Kompilations-Logik (Stories 10.5/10.6/11.5; Story 6.4 hierher aus
+# asis — die Entscheidungs- und Apply-Ebene gehört zum Decider-Modul, damit
+# session nicht nach unten in den asis-Befehl greift) ------------------------
+
+def va_like_unit(unit: dict) -> bool:
+    """True for album units whose file tags carry no meaningful release
+    credit: no/blank albumartist with several distinct track artists, or
+    an albumartist that already says "various" (VA compilations, DJ-mixed
+    albums), or a series/junk credit matching none of the >=3 real track
+    artists ("Essential Albums" stamped onto a 20-artist compilation).
+    On these the artist-vs-credit comparison is meaningless — the track
+    artists belong to individual tracks, not to the release."""
+    u = unit or {}
+    hints = u.get("hints") or []
+    if "multi-artist-dir" in hints or "va-album" in hints:
+        return True
+    first = next(
+        (f for f in u.get("files", []) if os.path.isfile(openable(f))), None
+    )
+    aa = tag_of(first, "albumartist") if first else ""
+    if aa and aa.strip().lower() in (
+        "various artists", "various", "va", "v.a.",
+    ):
+        return True
+    seen = u.get("artists_seen") or []
+    if len(seen) < 3:
+        return False
+    if not aa:
+        return True
+    return aa.strip().lower() not in seen
+
+
+def plan_artist_fill(unit: dict) -> dict | None:
+    """Story 11.5: streaming-catalog sources (live case 2026-11-13:
+    jiosaavn) can write a valid ALBUMARTIST while the per-track ARTIST
+    tag is junk ("Unknown"). tags_complete's identity check takes
+    `albumartist OR artist`, so the unit passes — and the junk artist
+    used to land in the DB. For NON-VA units the albumartist IS the
+    identity: return {"fill": {path: aa}} for every file whose artist
+    tag is junk while the albumartist is valid. VA-like units return
+    None — their per-track artists are legitimately messy and Story
+    10.6 owns that path."""
+    if va_like_unit(unit):
+        return None
+    fills: dict[str, str] = {}
+    for f in unit.get("files") or []:
+        if artist_present(tag_of(f, "artist")):
+            continue
+        aa = tag_of(f, "albumartist")
+        if artist_present(aa):
+            fills[f] = aa.strip()
+    return {"fill": fills} if fills else None
+
+
+def apply_artist_fill(task, plan: dict) -> int:
+    """Mutate the task's in-memory items per plan_artist_fill; beets
+    writes the tags onto the imported copies (write: yes). Mirrors
+    apply_va_plan. Returns the number of fields touched."""
+    touched = 0
+    fills = plan.get("fill") or {}
+    for item in task.imported_items():
+        aa = fills.get(os.fsdecode(item.path))
+        if aa and not artist_present(item.artist or ""):
+            item.artist = aa
+            touched += 1
+    return touched
+
+
+def plan_va_normalize(files: list, seen: list[str] | None = None) -> dict | None:
+    """Decide whether a va_like album unit can import as a clean
+    Various-Artists album on its own metadata (Story 10.6), and how.
+
+    The files' own tags are authoritative — the live windows drop even
+    carries CORRECT tags where the filename has the typo. A filename
+    ('NN. Part A - Part B.ext') only FILLS missing artist/title tags;
+    its orientation (artist first vs. title first) is majority-voted
+    per unit against the fully tagged files. A junk release credit
+    (albumartist matching none of `seen`, the >=3 real track artists)
+    is REPLACED by Various Artists; an empty one is filled.
+
+    Returns None (stay in review) when a file has neither complete tags
+    nor a filename that can fill its gaps. Otherwise:
+    {"fill": {path: (artist, title)}, "aa": bool, "aa_overwrite": bool}
+    — "aa" says some file lacks albumartist, "aa_overwrite" says some
+    file carries a junk credit that must be replaced."""
+    seen = {s.strip().lower() for s in (seen or [])}
+    entries = []
+    votes_artist = votes_title = 0
+    for f in files:
+        if not os.path.isfile(openable(f)):
+            return None
+        artist = tag_of(f, "artist")
+        if not artist_present(artist):
+            artist = ""
+        title = tag_of(f, "title")
+        parsed = parse_track_filename(os.fsdecode(f))
+        if artist and title and parsed:
+            pa, pt = parsed
+            if (norm_name(pa) == norm_name(artist)
+                    and norm_name(pt) == norm_name(title)):
+                votes_artist += 1
+            elif (norm_name(pa) == norm_name(title)
+                    and norm_name(pt) == norm_name(artist)):
+                votes_title += 1
+        entries.append((f, artist, title, parsed))
+
+    orientation = None
+    if votes_artist or votes_title:
+        orientation = (
+            "artist_first" if votes_artist >= votes_title else "title_first"
+        )
+
+    fill: dict[str, tuple[str, str]] = {}
+    aa = aa_overwrite = 0
+    for f, artist, title, parsed in entries:
+        credit = tag_of(f, "albumartist")
+        if not artist_present(credit) \
+                or credit.strip().lower() in ("various artists", "various",
+                                              "va", "v.a."):
+            aa += 1
+        elif seen and len(seen) >= 3 and credit.strip().lower() not in seen:
+            aa_overwrite += 1
+        if artist and title:
+            continue
+        if parsed is None or orientation is None:
+            return None
+        pa, pt = parsed
+        fa, ft = (
+            (pa, pt) if orientation == "artist_first" else (pt, pa)
+        )
+        fill[os.fsdecode(f)] = (
+            fa if not artist else "", ft if not title else ""
+        )
+    return {"fill": fill, "aa": aa > 0, "aa_overwrite": aa_overwrite > 0}
+
+
+def apply_va_plan(task, plan: dict) -> int:
+    """Mutate the task's in-memory items per plan_va_normalize; beets
+    writes the tags onto the imported copies (write: yes). Returns the
+    number of fields touched."""
+    touched = 0
+    fills = plan.get("fill") or {}
+    for item in task.imported_items():
+        path = os.fsdecode(item.path)
+        artist, title = fills.get(path, ("", ""))
+        if artist and not (item.artist or "").strip():
+            item.artist = artist
+            touched += 1
+        if title and not (item.title or "").strip():
+            item.title = title
+            touched += 1
+        if plan.get("aa") and not (item.albumartist or "").strip():
+            item.albumartist = "Various Artists"
+            touched += 1
+        elif plan.get("aa_overwrite") and (item.albumartist or "").strip() \
+                and item.albumartist.strip().lower() != "various artists":
+            item.albumartist = "Various Artists"
+            touched += 1
+    return touched
+
+
+def apply_va_normalize_files(unit: dict, plan: dict) -> bool:
+    """Write the Story-10.6 normalization onto the FILES (asis path,
+    where beets re-reads tags from disk): fill artist/title gaps per the
+    plan, set albumartist=Various Artists where empty. Returns False
+    when a write failed (the unit then falls back to plain asis)."""
+    for f in unit.get("files") or []:
+        artist, title = plan.get("fill", {}).get(os.fsdecode(f), ("", ""))
+        if not artist and not title and not plan.get("aa"):
+            continue
+        try:
+            m = mutagen.File(openable(f), easy=True)
+        except Exception:
+            m = None
+        if m is None:
+            continue
+        changed = False
+        if artist and not (m.get("artist") or [""])[0].strip():
+            m["artist"] = artist
+            changed = True
+        if title and not (m.get("title") or [""])[0].strip():
+            m["title"] = title
+            changed = True
+        credit = (m.get("albumartist") or [""])[0].strip()
+        if plan.get("aa") and not credit:
+            m["albumartist"] = "Various Artists"
+            changed = True
+        elif plan.get("aa_overwrite") and credit \
+                and credit.lower() != "various artists":
+            m["albumartist"] = "Various Artists"
+            changed = True
+        if changed:
+            try:
+                m.save()
+            except Exception:
+                return False
+    return True
+
+
+def va_gate_unit(unit: dict, lib, dry_run: bool = False) -> tuple[str, str]:
+    """Asis-fallback gate for va_like album units (Stories 10.5/10.6).
+
+    Returns ('ignored', reason) — the compilation is largely already in
+    the library: archive it, don't import; ('normalize', reason) —
+    mostly unique: normalize to a clean Various-Artists album (files
+    written unless dry_run) and import; ('pass', '') — the gate does
+    not apply (not va_like, no library, too few tagged files, or
+    identity not resolvable)."""
+    from .paths import musik_config
+
+    # auto_accept_distance aus der Config (6.5-Drift-Fix): der Wert wird
+    # im Gate-Pfad selbst nicht für Auto-Entscheidungen genutzt, aber
+    # ein hartkodierter Abweichler erzeugt Phantom-Drift zur Doku.
+    decider = Decider(
+        NetworkErrorRecorder(),
+        auto_accept_distance=float(
+            musik_config().get('auto_accept_distance', 0.25)),
+        unit=unit, lib=lib,
+    )
+    if not decider._va_like():
+        return "pass", ""
+    plan, verdict = decider._va_assess()
+    if verdict is not None and verdict[0]:
+        reason = decider._va_ignored_record(
+            verdict, unit.get("guessed")
+        )["reason"]
+        return "ignored", reason
+    if plan is None or verdict is None:
+        return "pass", ""
+    note = (
+        f"VA compilation, own metadata authoritative "
+        f"({verdict[1]}/{verdict[2]} tracks already in library)"
+    )
+    if not dry_run and not apply_va_normalize_files(unit, plan):
+        return "pass", ""
+    return "normalize", note
 
 
 def aggregate_unit_status(unit: dict, results: list[dict]) -> tuple[str, str]:

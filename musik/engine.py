@@ -515,7 +515,7 @@ def cmd_import(dry_run: bool = False, statuses: list[str] | None = None,
                                      f"dry-run: {outcome['status']}")
             else:
                 if unit.get("meta_files"):
-                    from .asis import enrich_from_meta_files
+                    from .scan import enrich_from_meta_files
 
                     n = enrich_from_meta_files(unit)
                     if n:

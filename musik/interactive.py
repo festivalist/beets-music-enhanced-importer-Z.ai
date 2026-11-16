@@ -10,7 +10,7 @@ an import run. Mirrors beets' usual options per unit:
 import os
 
 from . import state as state_mod
-from .scan import openable
+from .scan import openable, tags_complete
 
 
 def _show(unit: dict) -> None:
@@ -155,7 +155,7 @@ def cmd_review(only: str | None = None) -> int:
             if choice == "w":
                 from . import asis
 
-                ok, why = asis.tags_complete(unit)
+                ok, why = tags_complete(unit)
                 if not ok:
                     print(f"  cannot import as-is: {why}")
                     continue

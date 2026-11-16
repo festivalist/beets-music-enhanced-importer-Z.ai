@@ -16,8 +16,8 @@ from musik.asis import (  # noqa: E402
     _split_disc_suffix,
     _title_from_filename,
     repair_from_folder,
-    tags_complete,
 )
+from musik.scan import tags_complete  # noqa: E402  (Story 6.4: Gate lebt in scan)
 
 FRAME = b"\xff\xfb\x90\x00" + b"\x00" * 413  # MPEG-1 L3, 128 kbit/s, 44.1 kHz
 

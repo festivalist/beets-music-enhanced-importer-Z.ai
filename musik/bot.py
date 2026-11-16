@@ -41,7 +41,7 @@ from . import plex as plex_mod
 from . import playlists as playlists_mod
 from . import state as state_mod
 from .paths import PROJECT_DIR, bootstrap, musik_config
-from .scan import artist_values
+from .scan import artist_values, tags_complete
 
 MAX_MESSAGE_LEN = 400
 
@@ -455,7 +455,7 @@ def _asis_candidates() -> list[dict]:
         u = dict(u)
         u["files"] = present
         u["n_files"] = len(present)
-        ok, _why = asis_mod.tags_complete(u)
+        ok, _why = tags_complete(u)
         if not ok:
             continue
         tags = [t for t in artist_values(present) if t]

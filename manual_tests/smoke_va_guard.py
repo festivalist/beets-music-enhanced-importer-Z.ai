@@ -24,8 +24,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 tmp = tempfile.mkdtemp()
 
-from musik import asis as asis_mod   # noqa: E402
 from musik import scan as scan_mod   # noqa: E402
+from musik import session as session_mod   # noqa: E402  # VA logic lives here since 6.4
 from musik.session import Decider, NetworkErrorRecorder  # noqa: E402
 
 # Fake per-file tags: {absolute path: {field: value}}
@@ -36,7 +36,7 @@ def fake_tag(f: str, field: str) -> str:
     return TAGS.get(os.path.normcase(f), {}).get(field, "")
 
 
-asis_mod._tag = fake_tag
+session_mod.tag_of = fake_tag
 scan_mod.tag_of = fake_tag
 
 
@@ -164,7 +164,7 @@ TAGS[os.path.normcase(p4)] = {"artist": "", "title": "Fill Title",
                               "album": "X", "albumartist": ""}
 u["files"].append(p4)
 u["n_files"] = 4
-plan = asis_mod.plan_va_normalize(u["files"])
+plan = session_mod.plan_va_normalize(u["files"])
 assert plan is not None, plan
 assert plan["aa"] is True, plan
 assert plan["fill"].get(os.fsdecode(p4)) == ("Fill Artist", ""), plan
@@ -176,7 +176,7 @@ open(p5, "wb").close()
 TAGS[os.path.normcase(p5)] = {"artist": "", "title": "", "album": "X",
                               "albumartist": ""}
 u["files"].append(p5)
-assert asis_mod.plan_va_normalize(u["files"]) is None
+assert session_mod.plan_va_normalize(u["files"]) is None
 print("3) plan_va_normalize: unresolvable file -> stays review OK")
 
 # 4) guard end-to-end through decide_album: 8/10 tracks in the library
@@ -219,7 +219,7 @@ print("7) below va_redundant_min_tracks: guard abstains OK")
 item = types.SimpleNamespace(
     path=os.fsencode(p4), artist="", title="Fill Title", albumartist="")
 task = types.SimpleNamespace(imported_items=lambda: [item])
-n = asis_mod.apply_va_plan(
+n = session_mod.apply_va_plan(
     task, {"fill": {os.fsdecode(p4): ("Fill Artist", "")}, "aa": True})
 assert n == 2, n
 assert item.artist == "Fill Artist" and item.albumartist == "Various Artists"
@@ -228,10 +228,10 @@ print("8) apply_va_plan: filename fill + AA normalization OK")
 # 9) va_gate_unit (asis-fallback gate): redundant -> ignored, unique ->
 #    normalize (empty dummy files: mutagen skips writes, gate still fires)
 u = make_va_unit("gate-unit-redundant", essential_tracks(10))
-gate, note = asis_mod.va_gate_unit(u, FakeLib(lib_pairs))
+gate, note = session_mod.va_gate_unit(u, FakeLib(lib_pairs))
 assert gate == "ignored" and "redundant" in note, (gate, note)
 u = make_va_unit("gate-unit-unique", essential_tracks(10))
-gate, note = asis_mod.va_gate_unit(u, FakeLib([]))
+gate, note = session_mod.va_gate_unit(u, FakeLib([]))
 assert gate == "normalize" and "0/10" in note, (gate, note)
 # not va_like (no hints, no distinct artists) -> pass
 u2 = make_va_unit("gate-unit-single", [
@@ -239,7 +239,7 @@ u2 = make_va_unit("gate-unit-single", [
                 "albumartist": "One Band"}),
 ], guessed={"artist": "One Band", "album": "A"})
 u2["hints"] = []
-gate, _note = asis_mod.va_gate_unit(u2, FakeLib([]))
+gate, _note = session_mod.va_gate_unit(u2, FakeLib([]))
 assert gate == "pass", gate
 print("9) va_gate_unit: ignored/normalize/pass OK (asis fallback)")
 
@@ -294,7 +294,7 @@ item = types.SimpleNamespace(
     path=os.fsencode(u["files"][0]), artist="Artist 01",
     title="Track 01", albumartist="Essential Albums")
 task = types.SimpleNamespace(imported_items=lambda: [item])
-asis_mod.apply_va_plan(task, record["normalize_va"])
+session_mod.apply_va_plan(task, record["normalize_va"])
 assert item.albumartist == "Various Artists", item.albumartist
 print("11) junk albumartist: va_like + replaced before tier 3 OK")
 
