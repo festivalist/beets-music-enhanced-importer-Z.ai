@@ -5,9 +5,17 @@
 Serienordner-Reparatur + Spool-Retry), 1.3-Abnahme 5/5 Zeilen ✓,
 Bibliothek ~25,6k Items, Review-Queue 1 Unit (Heretics — Forced-Apply-
 Fallback-Fall aus 9.11). **16.11. nm.: Code-Health-Sweep 6.3/6.4/6.6 +
-6.5-Mikropunkte komplett** (fb104a1/586037e/cf2da90 — Zyklus session↔asis
-aufgelöst, 14 Library-Factories→1, STATUSES-Guard, Smokes-Suite in CI;
-27/27 lokal). **Echt offen:** 7.7 Alt-Kollektion (wartet auf „los"),
+6.5-Mikropunkte komplett** (fb104a1/586037e/cf2da90 + CI-Nachreichungen
+7d03542/fc77271/1bc4c2d/d1b24ea/82c1c24 — Zyklus session↔asis aufgelöst,
+14 Library-Factories→1, STATUSES-Guard, Smokes-Suite in CI: **smokes-Job
+grün auf ubuntu-24.04/x64**, Win 27/27, Pi 26/27 (nur 10.4-Quirk), Pi auf
+82c1c24 deployed + Bot-Restart 14:2x). **CI-Smokes funden dabei 2 echte
+Produktionsbugs:** (1) `_config_data()` crashte ohne config.yaml (frischer
+Checkout/CI) → jetzt configless-tolerant (CLI-Gate bleibt, d1b24ea);
+(2) Album-Progress-Throttle init `last_note=[0.0]` vs. time.monotonic()
+= Uptime — auf frisch gebooteten Maschinen (<60 s) wurde die erste
+Progress-Zeile lautlos verworfen → Start bei -60 (82c1c24); dazu
+playlists._youtube_order mit toten fetch-Privatnamen (fc77271). **Echt offen:** 7.7 Alt-Kollektion (wartet auf „los"),
 8.8 Dell-Tag (vertagt, grilling-ready), 10.4 (wontfix-Kandidat,
 Nutzer-Entscheid), 6.7/6.8 (bewusst später), optional 2.6/3.3,
 Nutzer-Seite: PI-SETUP-Phase-8-Testfälle.
