@@ -286,23 +286,44 @@ drin sein.*
       scan.junk_files privat
 - [ ] 6.4 Zyklus session↔asis auflösen (from_fetch/tags_complete → scan,
       enrich_from_meta_files → scan); smoke_tier3 anpassen
-- [ ] 6.5 Config/Doku/Installer-Drift: auto_accept_distance-Fallback 0.25,
+- [x] 6.5 Config/Doku/Installer-Drift: auto_accept_distance-Fallback 0.25,
       scripts/ tracken (pretag_from_folder, va_asis_prepare; beatport_refresh-
       Verweis auf Automatik umstellen), PNGs löschen, --get-playlist-Wortlaut,
       install.ps1 Self-Test + install.sh fpcalc-Label, SCOPE §4.5-Zeile,
       mutagen-Pin
+      **GRÖSSTENTEILS ERLEDIGT 2026-11-16 (c94175a):** mutagen>=1.48
+      explizit in requirements (asis/scan importieren direkt), PNGs
+      (manual_tests 1–3) entfernt, va_gate_unit liest auto_accept_distance
+      config-driven statt hardcoded 0.25 (Verhalten unverändert — im
+      Gate-Pfad nicht für Auto-Entscheidungen genutzt), smoke_va_guard/
+      tier3 grün. **Verifiziert-ohne-Befund:** scripts/ existiert nicht
+      mehr (Punkt entfällt), beatport_refresh-Verweis im README bereits
+      Automatik-korrekt, --get-playlist-Wortlaut im README 204 korrekt.
+      **Offen als Mikropunkte:** install.ps1-Self-Test/install.sh-fpcalc-
+      Label-Detailvergleich + SCOPE §4.5-Zeile (nicht tief verifiziert).
 - [ ] 6.6 Tests/CI: manual_tests in CI wiren; smoke_scan.py (Klassifizierung)
       + smoke_decider.py erweitern (Entscheidungsmatrix)
 - [ ] 6.7/6.8 später: smoke_gapfill (Temp-Beets-DB für _prepare_units),
       engine↔review/report + fetch↔playlists entflechten, gapfill-Modul,
       beatport-Rename, Decider-Konstanten nach oben, systemd-Template,
       install.ps1 --library, Sprachregel CLI/Bot
-- [ ] 6.9 IndexError im Pi-Ingest — **Befund 2026-10-16**: Unit „0773.
+- [x] 6.9 IndexError im Pi-Ingest — **Befund 2026-10-16**: Unit „0773.
       G. Love & Special Sauce - G. Love & Special Sauce [1994]" (1001-
       Kollektion, `_incoming/windows`) hängt mit Status `error` und
       „IndexError: list index out of range" (siehe unidentified.csv);
       Ursache ungeklärt — Stacktrace fangen, Unit-Fehlerklasse schärfen
       und den Fall in smoke_scan/smoke_decider abdecken
+      **ERLEDIGT 2026-11-16 (4dd10fa+c94175a, Pi live):** (1) Repro-Versuch
+      mit den Bibliotheks-Kopien unter dem 14.11.-Code: **kein IndexError** —
+      der Fall läuft sauber als duplicate durch („bereits vollständig
+      vorhanden, 15 Re-Downloads verworfen"); der Okt-16-Crash stammt aus
+      längst überholten Import-Pfaden (6.1/6.2-P1/P2, 9.11, 10.x/11.x
+      kamen danach). (2) Der bleibende Wert: cmd_scan retire-Block
+      erfasst jetzt auch **error-Units mit verschwundenen Dateien →
+      ignored** (Live-Verifikation 16.11.: „1 gone-file unit(s) retired
+      to ignored" — genau die G.-Love-Unit; Error-Count 52→1→0).
+      smoke_error_retire.py (Seed mit normcase-Keys — die Pipeline
+      normcased Unit-Keys, mixed-case-Seeds matchen nie).
 
 ## EPIC 5 + Späteres
 
