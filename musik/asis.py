@@ -321,7 +321,7 @@ def cmd_asis(only: str | None = None, dry_run: bool = False,
              include_pending: bool = False) -> int:
     from . import state as state_mod
     from . import trash as trash_mod
-    from .engine import fill_empty_original_years, restrict_sources
+    from .engine import fill_empty_original_years, restrict_sources, setup_beets
     from .session import MusikSession, va_gate_unit
 
     # as-is imports perform no lookups — never load metadata source
