@@ -256,7 +256,7 @@
         return `<div class="mon-item">` +
             `<b>${esc(b.id.replace(/^upg-\d+-/, ""))}</b> — ${b.n} Tracks ` +
             `<span class="mon-mut">${UPG_STATUS_LABELS[b.status] || b.status}${res}</span>${runBtn}` +
-            `<details id="upgdet-${esc(b.id)}" style="margin-top:2px"${upgOpen.has(b.id) ? " open" : ""}><summary class="mon-mut" style="cursor:pointer">Tracks anzeigen</summary>${rows}${more}${dup}</details></div>`;
+            `<details id="upgdet-${esc(b.id)}" data-upgid="${esc(b.id)}" style="margin-top:2px"${upgOpen.has(b.id) ? " open" : ""}><summary class="mon-mut" style="cursor:pointer">Tracks anzeigen</summary>${rows}${more}${dup}</details></div>`;
     }
 
     function upgradesHtml(sum) {
@@ -430,10 +430,12 @@
                 upgDetailTs = null;  // Detail nach der Entscheidung neu laden
             }));
         // Offen-Zustand der Upgrade-Track-Listen über Poll-Re-Renders retten
+        // (Key = Batch-Id via data-upgid, nicht die DOM-Id mit Prefix)
         box.querySelectorAll("details[id^='upgdet'], details#upgkept").forEach(d =>
             d.addEventListener("toggle", () => {
-                if (d.open) upgOpen.add(d.id);
-                else upgOpen.delete(d.id);
+                const key = d.dataset.upgid || d.id;
+                if (d.open) upgOpen.add(key);
+                else upgOpen.delete(key);
             }));
         const ingest = document.getElementById("monIngest");
         if (ingest) ingest.addEventListener("click", () => {
