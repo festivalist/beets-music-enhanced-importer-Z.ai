@@ -377,12 +377,19 @@ als Stories 4.1/4.3 weitergeführt.*
       (PI-SETUP 9.4). Der erste echte Neuzugang kommt, wenn einer der
       13 released — MG lädt ins Albums/<Artist>-Staging, Ingest
       importiert wie gewohnt; Beobachtungspunkt bleibt im ToDo-Kontext.
-- [ ] 3.3 Track-Upgrades lossy→besser (lossless first) — Report-first +
+- [x] 3.3 Track-Upgrades lossy→besser (lossless first) — Report-first +
       batchweiser Re-Download per Nutzer-Entscheid im Import-Monitor
-      (Scope-Change 2026-11-18: Apply nicht mehr generell manuelle
-      Ausnahme, sondern UI-entschieden je Batch; SCOPE §8 entsprechend
-      datiert geändert). Datenbefund 18.11.: 1290 lossy <200k
-      (Massenbasis 192k-MP3-Alt-Kompilationen + 128k AAC/Opus
+      **ERLEDIGT + DEPLOYED 18.11. Abend (81f1fec, a71583b, 36926f0):
+      Suite 29/29 auf Win und Pi, Bot-Restart, Live-Verifikation: /api/
+      upgrades + /monitor rendern 12 Batches (11×109 + 1×91) mit
+      Nachladen-/Behalten-Buttons; erster Scan 1290 Kandidaten <200k;
+      2 Browser-Befunde gefixt (details-Open-State über 5-s-Poll retten,
+      upgOpen-Key-Mismatch DOM-Id vs. Batch-Id); ingest.timer beim Deploy
+      NICHT angefasst (aktiv verifiziert). Erster Batch-Klick steht beim
+      Nutzer.** (Scope-Change 2026-11-18: Apply nicht mehr generell
+      manuelle Ausnahme, sondern UI-entschieden je Batch; SCOPE §8
+      entsprechend datiert geändert. Datenbefund 18.11.: 1290 lossy
+      <200k (Massenbasis 192k-MP3-Alt-Kompilationen + 128k AAC/Opus
       YouTube-Restbestand), 467 in 200–249k (nicht Teil der Batches;
       threshold konfigurierbar). Teilstories:
   - [x] 3.3a `musik upgrades`-Scanner + Report (state/upgrades.json,
