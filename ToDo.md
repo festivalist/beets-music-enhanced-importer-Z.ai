@@ -377,8 +377,32 @@ als Stories 4.1/4.3 weitergeführt.*
       (PI-SETUP 9.4). Der erste echte Neuzugang kommt, wenn einer der
       13 released — MG lädt ins Albums/<Artist>-Staging, Ingest
       importiert wie gewohnt; Beobachtungspunkt bleibt im ToDo-Kontext.
-- [ ] 3.3 Track-Upgrades lossy→lossless report-first (optional; Apply bleibt
-      manuelle Ausnahme, SCOPE §8)
+- [ ] 3.3 Track-Upgrades lossy→besser (lossless first) — Report-first +
+      batchweiser Re-Download per Nutzer-Entscheid im Import-Monitor
+      (Scope-Change 2026-11-18: Apply nicht mehr generell manuelle
+      Ausnahme, sondern UI-entschieden je Batch; SCOPE §8 entsprechend
+      datiert geändert). Datenbefund 18.11.: 1290 lossy <200k
+      (Massenbasis 192k-MP3-Alt-Kompilationen + 128k AAC/Opus
+      YouTube-Restbestand), 467 in 200–249k (nicht Teil der Batches;
+      threshold konfigurierbar). Teilstories:
+  - [x] 3.3a `musik upgrades`-Scanner + Report (state/upgrades.json,
+        reports/upgrade-report.md; threshold_kbps=200, batch_size=109,
+        Junk ohne Artist/Title ausgenommen; Behalten-Entscheidungen
+        überleben Rescans; CLI `musik upgrades`)
+  - [x] 3.3b Monitor-UI-Sektion „⬆️ Upgrades": Batchliste je ≤109 mit
+        Nachladen-Button, Track-Liste mit Behalten-Toggle, Scan-Button;
+        bot_http /api/upgrades (Detail, on-demand) + Summary im Snapshot
+  - [x] 3.3c Batch-Executor (kind=upgrade_batch): je Track MG-Suche
+        (ranked_results, lossless-first, Cover-Guard) → Download → EIN
+        Ingest unter ingest.lock (2.3/2.8-Dupe-Check entscheidet,
+        Verlierer → _trash) → Reconcile je Kandidat
+        (replaced/kept/kept-user/no-source/dup_risk/gone) → Plex-Refresh
+        via Ingest; ingest-pending-Wiederaufnahme ohne Re-Download;
+        Behalten nach Planung gilt für den laufenden Batch; Batch-IDs
+        sekundensicher fortlaufend (Smoke-Befund)
+  - [x] 3.3d Smoke smoke_upgrades.py (Scanner/Planung/Entscheidungen/
+        Batch-Flows mit FakeMG; Suite 29/29), Doku (SCOPE-Dated-Change/
+        README/PI-SETUP) — Deploy Pi + Live-Check offen
 
 ## EPIC 6 — Code-Health (Audit 2026-10-08: Totcode/Datentypen/Struktur/Konventionen)
 

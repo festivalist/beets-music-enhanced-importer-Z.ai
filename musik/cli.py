@@ -191,6 +191,11 @@ def main(argv: list[str] | None = None) -> int:
         "bot",
         help="run the Telegram bot service (link in -> music in the library)",
     )
+    sub.add_parser(
+        "upgrades",
+        help="lossy tracks below the quality threshold: scan, report and "
+             "batch plan (decisions/re-download run in the Import-Monitor)",
+    )
 
     args = parser.parse_args(argv)
 
@@ -368,5 +373,10 @@ def main(argv: list[str] | None = None) -> int:
         from . import bot
 
         return bot.cmd_bot()
+
+    if args.cmd == "upgrades":
+        from . import upgrades
+
+        return upgrades.cmd_cli()
 
     parser.error(f"unknown command {args.cmd}")

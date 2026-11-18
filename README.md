@@ -149,8 +149,10 @@ when ignored; taps on stale offers (bot restart) get an alert.
    `http://<host>:8283` (LAN-only, no auth — same posture as the
    MusicGrabber UI): `GET /api/status` returns a JSON snapshot (job
    queue, ingest stand incl. per-unit statuses, review queue,
-   `_incoming` backlog), `POST /api/action` accepts `{action: asis |
-   retry | ingest | review}` jobs into the same serial queue the
+   `_incoming` backlog, upgrade summary), `GET /api/upgrades` the full
+   upgrade state on demand, `POST /api/action` accepts `{action: asis |
+   retry | ingest | review | upgrade_scan | upgrade_batch |
+   upgrade_decide}` jobs into the same serial queue the
    Telegram bot uses (`review` carries `decisions` in the review.csv
    vocabulary: accept/accept2/override/unmatched/ignore). Write-actions
    are never lost: when the ingest lock is occupied (the timer chain
@@ -164,6 +166,9 @@ when ignored; taps on stale offers (bot restart) get an alert.
    candidate buttons (K1/K2), as-is, override and ignore — each behind
    a confirmation, executed by the bot under the ingest lock, progress
    visible in the Bot-Jobs block. See `musicgrabber/overlay/README.md`.
+   The monitor page itself is served by the bot at `:8283/monitor`
+   (Story 11.7, same-origin) and carries the "⬆️ Upgrades" section
+   (Story 3.3: batch re-downloads + per-track keep decisions).
 
 This bot is **independent** of the ZCode desktop Telegram relay — it runs
 as its own service with its own token.
@@ -402,6 +407,10 @@ musik.bat retag                             :: re-check as-is albums against the
 musik.bat dedupe --fingerprint              :: same recording under different metadata
                                             ::    (AcoustID), report only; --apply trashes
                                             ::    the lower-quality copy
+musik.bat upgrades                          :: lossy tracks below the quality threshold
+                                            ::    -> upgrade-report.md + batch plan; the
+                                            ::    re-download runs in the Import-Monitor
+                                            ::    (Story 3.3, see below)
 ```
 
 Notes:
@@ -417,6 +426,22 @@ Notes:
 - FLAC integrity is checked by actually decoding every file against its
   internal MD5 — the first full `doctor` run takes a while, `--quick`
   (mtime/size cache) is what the monthly routine uses.
+- **Track-Upgrades (Story 3.3)**: `musik upgrades` scans the library for
+  lossy tracks below `musik: upgrades: threshold_kbps` (default 200) and
+  writes `reports/upgrade-report.md` plus a batch plan
+  (`state/upgrades.json`, batches of ≤ `batch_size`, default 109). The
+  actual re-download is a **user decision per batch** in the Import
+  Monitor's "⬆️ Upgrades" section: "Nachladen" sends each track through
+  the MusicGrabber search (lossless first, cover guard); ONE ingest run
+  then lets the usual duplicate comparison decide — the better copy
+  stays, the loser moves to `_trash` automatically, so a worse
+  re-download can never degrade the library. Tracks without a usable
+  source or without a better copy are documented results (`no-source` /
+  `kept`), never errors; multiple library matches for one track are
+  flagged as `dup_risk` for manual review. A "Behalten" click removes a
+  track from the batches (decisions survive rescans); if the ingest lock
+  is busy the batch parks as `ingest-pending` and re-triggering resumes
+  without re-downloading. Dated scope basis: SCOPE.md 2026-11-18.
 
 ## How decisions are made
 

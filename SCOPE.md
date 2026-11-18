@@ -267,7 +267,30 @@ test for §4.2. The tool must work for any mix of material, not just these.
 ## 8. Future (explicitly not now)
 
 Plexamp project · Deezer plugin · scheduled re-scans · `retag --apply` (re-file as-is albums that gained a strong MusicBrainz match — needs a careful move-out/re-import/row-swap flow) · `musik similar` via a user-provided last.fm key as alternative data source · any web UI (→ Scope-Change 2026-10-19: der schlanke Import-Monitor ist
-jetzt in Scope, siehe §2) · Soulseek via slskd as further MusicGrabber source · active (applying, not report-only) lossless upgrades of existing stock.
+jetzt in Scope, siehe §2) · Soulseek via slskd as further MusicGrabber source · active (applying, not report-only) lossless upgrades of existing stock
+(→ Scope-Change 2026-11-18: Upgrade-Batches mit expliziter Nutzer-
+Entscheidung im Import-Monitor sind jetzt in Scope, Story 3.3 — der
+§8-Ausschluss gilt nur noch für VOLLautomatische Bestands-Upgrades
+ohne Nutzerentscheid).
+
+*Scope change 2026-11-18 (Track-Upgrades lossy → besser, Story 3.3):
+der §8-Ausschluss „active lossless upgrades of existing stock" wird
+eingeschränkt: Upgrade-Batches sind in Scope, wenn JEDE Beschaffung
+durch eine explizite Nutzer-Entscheidung getriggert wird (Batch-Button
+im Import-Monitor, Stapel à ≤ `batch_size` Tracks, Default 109; je
+Track „behalten" möglich). Der Scan selbst bleibt report-first
+(`musik upgrades`, `reports/upgrade-report.md`, state/upgrades.json) und
+schreibt nie die Bibliothek. Die Ersetzung läuft vollständig über die
+bewährte Maschinerie ohne neue Schreib-Pfade: MusicGrabber-Suche
+(lossless-first, Cover-Guard) → Download ins Staging → EIN Ingest-Lauf
+unter dem ingest.lock → 2.3/2.8-Dupe-Qualitätsvergleich (bessere Kopie
+gewinnt, Verlierer automatisch nach `_trash`, schlechtere Neukopien
+können die Bibliothek also nicht verschlechtern) → Plex-Refresh. Keine
+Quelle / nicht besser / fehlgeschlagen = dokumentiertes Ergebnis
+(no-source-Status im Batch, kein Stillstand). VOLLautomatische
+Bestands-Upgrades ohne je Batch-Entscheidung bleiben §8. Konfig:
+`musik: upgrades: {threshold_kbps: 200, batch_size: 109,
+ingest_patience: 7200}`.*
 
 *Scope change 2026-10-21 (VA-Kompilations-Guard + Survivor-Import,
 Stories 10.5/10.6): Album-Units mit VA-Identität (kein Albumartist,

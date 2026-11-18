@@ -352,6 +352,15 @@ def _execute_job(job: dict, send) -> None:
     if job.get("kind") == "review":
         _execute_review(job, send)
         return
+    if job.get("kind") == "upgrade_scan":
+        _execute_upgrade_scan(job, send)
+        return
+    if job.get("kind") == "upgrade_batch":
+        _execute_upgrade_batch(job, send)
+        return
+    if job.get("kind") == "upgrade_decide":
+        _execute_upgrade_decide(job, send)
+        return
     query = job["text"].strip()
     print(f"bot: job {job['id']} running: {query[:120]}")
     if _is_free_text(query) and _try_musicgrabber(job, query, send):
@@ -531,6 +540,84 @@ def _execute_review(job: dict, send) -> None:
         send(summary)
     else:
         _spool_or_note("review", job, {"decisions": rows}, send)
+
+
+# -- Story 3.3: Track-Upgrades (Scanner, Batch, Entscheidungen) ------------
+
+def _execute_upgrade_scan(job: dict, send) -> None:
+    """Upgrade-Kandidaten scannen + Report + Batch-Plan (liest die beets
+    DB nur; upgrades.json/Report sind die Schreib-Ziele)."""
+    from . import upgrades as upgrades_mod
+
+    send("🔍 Upgrade-Scan läuft …")
+    try:
+        lines, failed = upgrades_mod.cmd_scan()
+    except Exception as e:
+        traceback.print_exc()
+        msg = f"❌ Upgrade-Scan fehlgeschlagen: {type(e).__name__}: {str(e)[:200]}"
+        jobs_mod.update_job(job["id"], status="error",
+                            finished=time.time(), summary=msg)
+        send(msg)
+        return
+    summary = "\n".join(lines)[:1500]
+    jobs_mod.update_job(job["id"], status="error" if failed else "done",
+                        finished=time.time(), summary=summary)
+    send(summary)
+
+
+def _execute_upgrade_batch(job: dict, send) -> None:
+    """Upgrade-Batch ausführen: MG-Downloads je Track, EIN Ingest unter
+    dem ingest.lock (2.3/2.8-Dupe-Vergleich entscheidet), Reconcile.
+    Progress geht in den Job-Record (Monitor-Poll) — Telegram-Zeilen nur
+    gedrosselt und nur für Chat-Jobs."""
+    from . import upgrades as upgrades_mod
+
+    bid = (job.get("batch_id") or "").strip()
+    chat_id = job.get("chat_id") or 0
+    last_send = [0.0]
+
+    def progress(line: str, idx: int, total: int) -> None:
+        jobs_mod.update_job(job["id"], summary=line[:1500])
+        now = time.time()
+        if chat_id and (idx % 10 == 0 or now - last_send[0] >= 60):
+            last_send[0] = now
+            send(f"⬆️ Upgrade-Batch ({idx}/{total}):\n{line}")
+
+    try:
+        lines, failed = upgrades_mod.cmd_batch(bid, progress=progress,
+                                               lock_runner=_run_exclusive)
+    except Exception as e:
+        traceback.print_exc()
+        msg = f"❌ Upgrade-Batch fehlgeschlagen: {type(e).__name__}: {str(e)[:300]}"
+        jobs_mod.update_job(job["id"], status="error",
+                            finished=time.time(), summary=msg)
+        send(msg)
+        return
+    summary = "\n".join(lines)[:1500]
+    jobs_mod.update_job(job["id"], status="error" if failed else "done",
+                        finished=time.time(), summary=summary)
+    send(summary)
+
+
+def _execute_upgrade_decide(job: dict, send) -> None:
+    """Behalten/Freigeben je Upgrade-Kandidat (schreibt nur
+    upgrades.json; die Job-Queue serialisiert gegen den Batch-Executor)."""
+    from . import upgrades as upgrades_mod
+
+    try:
+        lines, failed = upgrades_mod.cmd_decide(job.get("item_ids") or [],
+                                                job.get("decision"))
+    except Exception as e:
+        traceback.print_exc()
+        msg = f"❌ Upgrade-Entscheid fehlgeschlagen: {type(e).__name__}: {str(e)[:200]}"
+        jobs_mod.update_job(job["id"], status="error",
+                            finished=time.time(), summary=msg)
+        send(msg)
+        return
+    summary = "\n".join(lines)[:1500]
+    jobs_mod.update_job(job["id"], status="error" if failed else "done",
+                        finished=time.time(), summary=summary)
+    send(summary)
 
 
 def _asis_candidates() -> list[dict]:

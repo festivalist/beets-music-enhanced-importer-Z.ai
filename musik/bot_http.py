@@ -2,11 +2,13 @@
 (EPIC 9; ADR-0002: beobachten und Aufträge annehmen, nie selbst
 importieren).
 
-GET  /api/status  → JSON-Snapshot (Job-Queue, Ingest-Stand inkl. Units,
-                    Review-Liste, _incoming-Stau)
-POST /api/action  → Auftrag in die bestehende Bot-Job-Queue — derselbe
-                    Worker, dasselbe ingest.lock wie Telegram-Jobs.
-                    Aktionen: asis, retry, ingest
+GET  /api/status   → JSON-Snapshot (Job-Queue, Ingest-Stand inkl. Units,
+                     Review-Liste, _incoming-Stau, Upgrade-Summary)
+GET  /api/upgrades → kompletter Upgrade-Zustand (Story 3.3, on-demand)
+POST /api/action   → Auftrag in die bestehende Bot-Job-Queue — derselbe
+                     Worker, dasselbe ingest.lock wie Telegram-Jobs.
+                     Aktionen: asis, retry, ingest, upgrade_scan,
+                     upgrade_batch, upgrade_decide
 
 Keine Auth: Betriebsart ist LAN-only ohne Port-Forwarding — dieselbe
 Postur wie die MusicGrabber-UI. Konfiguration unter
@@ -149,7 +151,21 @@ def snapshot() -> dict:
         # Story 10.10: offene Nutzer-Entscheidungen im Spool — das Tab
         # zeigt den Zähler, bis der Ingest sie geflusht hat
         "spool": spool_mod.open_actions(),
+        # Story 3.3: Upgrade-Kandidaten als Leichte-Sicht (Counts + Batches;
+        # die Track-Liste holt das Tab on-demand über /api/upgrades)
+        "upgrades": _upgrades_summary_safe(),
     }
+
+
+def _upgrades_summary_safe() -> dict:
+    """Snapshot-Feld für Story 3.3 — Fehler hier dürfen den Monitor nicht
+    leermachen (z. B. korruptes state/upgrades.json)."""
+    try:
+        from . import upgrades as upgrades_mod
+
+        return upgrades_mod.summary()
+    except Exception:
+        return {}
 
 
 def handle_action(payload: dict) -> tuple[int, dict]:
@@ -167,7 +183,66 @@ def handle_action(payload: dict) -> tuple[int, dict]:
         return _enqueue_job("Ingest-Trigger (Import-Monitor)", kind="ingest")
     if action == "review":
         return _action_review(payload)
+    if action == "upgrade_scan":
+        return _enqueue_job("Upgrade-Scan (Import-Monitor)",
+                            kind="upgrade_scan")
+    if action == "upgrade_batch":
+        return _action_upgrade_batch(payload)
+    if action == "upgrade_decide":
+        return _action_upgrade_decide(payload)
     return 400, {"error": f"unbekannte Aktion: {action!r}"}
+
+
+def _action_upgrade_batch(payload: dict) -> tuple[int, dict]:
+    """Story 3.3: einen geplanten Upgrade-Batch zum Nachladen anstoßen.
+    Erlaubt nur Batches, die noch nicht laufen/fertig sind."""
+    from . import upgrades as upgrades_mod
+
+    bid = (payload.get("batch_id") or "").strip()
+    if not bid:
+        return 400, {"error": "batch_id fehlt"}
+    batch = next((b for b in upgrades_mod.load().get("batches", [])
+                  if b.get("id") == bid), None)
+    if batch is None:
+        return 400, {"error": f"unbekannter Batch: {bid!r} (nach einem "
+                              "Rescan den neuen Plan benutzen)"}
+    if batch.get("status") not in ("queued", "error", "ingest-pending"):
+        return 400, {"error": f"Batch {bid} ist {batch.get('status')} — "
+                              "nicht anstoßbar"}
+    return _enqueue_job(f"Upgrade-Batch {bid} nachladen "
+                        f"({batch.get('n')} Tracks)",
+                        kind="upgrade_batch", batch_id=bid)
+
+
+def _action_upgrade_decide(payload: dict) -> tuple[int, dict]:
+    """Story 3.3: Behalten/Freigeben je Upgrade-Kandidat — serialisiert
+    über die Job-Queue, damit nie parallel zum Batch-Executor geschrieben
+    wird."""
+    from . import upgrades as upgrades_mod
+
+    ids = payload.get("item_ids") or []
+    decision = payload.get("decision") or None
+    if decision not in ("keep", None):
+        return 400, {"error": "decision muss 'keep' oder null sein"}
+    if not ids:
+        return 400, {"error": "item_ids fehlt"}
+    known = {c.get("id") for c in
+             upgrades_mod.load().get("candidates", [])}
+    canon, bad = [], []
+    for iid in ids:
+        try:
+            key = int(iid)
+        except (TypeError, ValueError):
+            bad.append(iid)
+            continue
+        (canon if key in known else bad).append(key)
+    if bad:
+        return 400, {"error": "Item-Ids gehören nicht zum aktuellen "
+                              "Kandidaten-Plan (Rescan?)", "items": bad[:5]}
+    label = "behalten" if decision == "keep" else "freigeben"
+    return _enqueue_job(f"Upgrade: {len(canon)} Track(s) {label}",
+                        kind="upgrade_decide", item_ids=canon,
+                        decision=decision)
 
 
 def _action_review(payload: dict) -> tuple[int, dict]:
@@ -299,6 +374,12 @@ class _Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path == "/api/status":
             self._json(200, snapshot())
+        elif path == "/api/upgrades":
+            # Story 3.3: kompletter Upgrade-Zustand — on-demand (Tab
+            # öffnet die Sektion / Scan ändert scanned_ts), nicht im 5-s-Poll
+            from . import upgrades as upgrades_mod
+
+            self._json(200, upgrades_mod.detail())
         elif path == "/monitor":
             self._monitor_page()
         elif path == "/":

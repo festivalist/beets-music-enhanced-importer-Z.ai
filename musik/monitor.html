@@ -64,6 +64,13 @@
     let lastReviewShown = [];
     let msgTimer = null;
     let msgText = null;   // überlebt Poll-Re-Renders
+    // Story 3.3: Upgrade-Detail on-demand — der 5-s-Poll trägt nur die
+    // Summary; die Kandidaten-Liste (1290+ Rows) kommt aus /api/upgrades
+    // und nur, wenn sich scanned_ts geändert hat (oder Entscheidungen
+    // upgDetailTs invalidieren).
+    let upgDetail = null;
+    let upgDetailTs = null;
+    let upgFetching = false;
 
     const mgLink = document.getElementById("mgLink");
     if (mgLink) mgLink.href = location.protocol + "//" + location.hostname + ":38274/";
@@ -200,6 +207,88 @@
             `<table class="mon-table" style="margin-top:8px"><thead><tr><th>Unit</th><th>Status</th><th>Grund</th><th>Dateien</th><th>geändert</th></tr></thead><tbody>${rows}</tbody></table>${hint}</div>`;
     }
 
+    // -- Story 3.3: Upgrades (lossy → besser) --------------------------------
+
+    const UPG_STATUS_LABELS = {
+        queued: "bereit", running: "🔄 läuft", done: "✅ fertig",
+        error: "❌ Fehler", "ingest-pending": "⏳ wartet auf Ingest"
+    };
+
+    function upgResultsLine(res) {
+        if (!res || res.replaced == null) return "";
+        const parts = [`${res.replaced} ersetzt`, `${res.kept ?? 0} behalten`,
+            `${res.no_source ?? 0} ohne Quelle`];
+        if (res.gone) parts.push(`${res.gone} weg`);
+        let s = " · " + parts.join(" · ");
+        if (res.dup_risk && res.dup_risk.length)
+            s += ` · ⚠️ ${res.dup_risk.length} prüfen`;
+        return `<span class="mon-mut">${esc(s)}</span>`;
+    }
+
+    function upgTrackRow(c) {
+        const kept = c.decision === "keep";
+        const statusIcon = c.status === "downloaded" ? "⬇️"
+            : c.status === "kept-user" || kept ? "🔇"
+                : c.status === "no-source" ? "∅" : "";
+        const src = c.source ? ` · ${esc(c.source)} ${esc(c.quality || "")}` : "";
+        return `<div class="mon-item">` +
+            `<span class="mon-mut">${statusIcon} ${esc(c.kbps)}k ${esc(c.format)}</span> ` +
+            `<b>${esc(c.artist)}</b> — ${esc(c.title)} ` +
+            `<span class="mon-mut">· ${esc(c.album)}${c.track ? " (" + c.track + ")" : ""}${src}</span> ` +
+            `<button class="mon-act" data-upgdec="${c.id}" data-cur="${kept ? "keep" : ""}" ` +
+            `title="${kept ? "Wieder zum Nachladen freigeben" : "Diesen Track behalten (nicht nachladen)"}">` +
+            `${kept ? "🔊 Freigeben" : "🔇 Behalten"}</button></div>`;
+    }
+
+    function upgBatchHtml(b) {
+        const canRun = ["queued", "error", "ingest-pending"].includes(b.status);
+        const items = b.items || [];
+        const rows = items.slice(0, 130).map(upgTrackRow).join("");
+        const more = items.length > 130
+            ? `<div class="mon-item mon-mut">… ${items.length - 130} weitere (Report: reports/upgrade-report.md)</div>` : "";
+        const runBtn = canRun
+            ? ` <button class="mon-act" data-upgbatch="${esc(b.id)}" title="Batch via MusicGrabber neu nachladen; der Import-Vergleich behält automatisch die bessere Kopie">⬇️ Nachladen</button>` : "";
+        const res = b.results && b.results.replaced != null
+            ? upgResultsLine(b.results) : "";
+        const dup = (b.results && b.results.dup_risk || []).map(d =>
+            `<div class="mon-item">⚠️ ${esc(d)}</div>`).join("");
+        return `<div class="mon-item">` +
+            `<b>${esc(b.id.replace(/^upg-\d+-/, ""))}</b> — ${b.n} Tracks ` +
+            `<span class="mon-mut">${UPG_STATUS_LABELS[b.status] || b.status}${res}</span>${runBtn}` +
+            `<details style="margin-top:2px"><summary class="mon-mut" style="cursor:pointer">Tracks anzeigen</summary>${rows}${more}${dup}</details></div>`;
+    }
+
+    function upgradesHtml(sum) {
+        if (!sum || !sum.scanned_ts) {
+            return `<div class="mon-box"><h3>⬆️ Upgrades (lossy → besser)</h3>` +
+                `<div class="mon-item mon-mut">Noch kein Scan — findet lossy-Tracks unter der Qualitätsschwelle und plant Nachladen-Batches.</div>` +
+                `<div class="mon-acts"><button class="mon-act" id="monUpgScan">🔍 Scan jetzt</button></div></div>`;
+        }
+        const d = upgDetail;
+        const batches = (d && d.batches) || [];
+        const queued = batches.filter(b => b.status === "queued");
+        const kept = (d && d.candidates || []).filter(c => c.decision === "keep");
+        const keptRows = kept.slice(0, 40).map(upgTrackRow).join("");
+        const keptMore = kept.length > 40
+            ? `<div class="mon-item mon-mut">… ${kept.length - 40} weitere</div>` : "";
+        const body = d
+            ? (queued.length
+                ? queued.map(upgBatchHtml).join("") +
+                  (batches.some(b => b.status !== "queued")
+                    ? `<details style="margin-top:6px"><summary class="mon-mut" style="cursor:pointer">Frühere Batches (${batches.length - queued.length})</summary>` +
+                      batches.filter(b => b.status !== "queued").map(upgBatchHtml).join("") + `</details>`
+                    : "")
+                : batches.map(upgBatchHtml).join("") +
+                  `<div class="mon-item mon-mut">keine offenen Batches — nach einem Rescan erscheinen neue</div>`)
+            : `<div class="mon-item mon-mut">lädt Kandidaten …</div>`;
+        const keptBox = kept.length
+            ? `<details style="margin-top:6px"><summary class="mon-mut" style="cursor:pointer">Behalten: ${kept.length} Track(s) — nicht nachladen</summary>${keptRows}${keptMore}</details>` : "";
+        return `<div class="mon-box"><h3>⬆️ Upgrades (lossy → besser): ${sum.total} Kandidaten < ${esc(sum.threshold_kbps)} kbps · Scan ${esc(relAge(sum.scanned_ts))} · Batches à ≤ ${esc(sum.batch_size)}</h3>` +
+            body + keptBox +
+            `<div class="mon-acts"><button class="mon-act" id="monUpgScan">🔍 Scan jetzt</button></div>` +
+            `<div class="mon-item mon-mut" style="margin-top:6px">Nachladen = MusicGrabber sucht jede Quelle (lossless first); der Import-Vergleich behält automatisch die bessere Kopie, der Verlierer geht nach _trash. Keine Quelle / nicht besser = dokumentiertes Ergebnis, kein Schaden.</div></div>`;
+    }
+
     function setError(msg) {
         const el = document.getElementById("monitorErr");
         if (!el) return;
@@ -308,6 +397,7 @@
             myJobsHtml(snap.jobs_all) +
             headHtml(snap) +
             reviewHtml(snap.review) +
+            upgradesHtml(snap.upgrades) +
             jobsHtml(snap.jobs) +
             unitsHtml(snap.ingest || {}) +
             `</div>`;
@@ -319,6 +409,25 @@
         box.querySelectorAll(".mon-act[data-rev]").forEach(b =>
             b.addEventListener("click", () =>
                 doReview(lastReviewShown[Number(b.dataset.rev)], b.dataset.dec)));
+        const upgScan = document.getElementById("monUpgScan");
+        if (upgScan) upgScan.addEventListener("click", () => {
+            if (confirm("Upgrade-Kandidaten neu scannen? (liest die Bibliothek, schreibt nur Report/Plan)")) {
+                upgDetailTs = null;
+                postAction({ action: "upgrade_scan" });
+            }
+        });
+        box.querySelectorAll(".mon-act[data-upgbatch]").forEach(b =>
+            b.addEventListener("click", () => {
+                if (confirm(`Batch ${b.dataset.upgbatch} jetzt nachladen? MusicGrabber lädt die Tracks neu; der Import behält automatisch die bessere Kopie (Verlierer nach _trash). Läuft länger — Fortschritt bei den Bot-Jobs.`)) {
+                    postAction({ action: "upgrade_batch", batch_id: b.dataset.upgbatch });
+                }
+            }));
+        box.querySelectorAll(".mon-act[data-upgdec]").forEach(b =>
+            b.addEventListener("click", () => {
+                const keep = b.dataset.cur !== "keep";
+                postAction({ action: "upgrade_decide", item_ids: [Number(b.dataset.upgdec)], decision: keep ? "keep" : null });
+                upgDetailTs = null;  // Detail nach der Entscheidung neu laden
+            }));
         const ingest = document.getElementById("monIngest");
         if (ingest) ingest.addEventListener("click", () => {
             if (confirm("Ingest-Lauf jetzt anstoßen? (scannt Staging und importiert)")) postAction({ action: "ingest" });
@@ -329,6 +438,22 @@
         });
     }
 
+    async function fetchUpgDetail() {
+        if (upgFetching) return;
+        upgFetching = true;
+        try {
+            const r = await fetch("/api/upgrades");
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            upgDetail = await r.json();
+            upgDetailTs = upgDetail.scanned_ts;
+            if (lastSnap) render(lastSnap);
+        } catch (e) {
+            setError("Upgrade-Detail nicht ladbar (" + e.message + ")");
+        } finally {
+            upgFetching = false;
+        }
+    }
+
     async function tick() {
         try {
             const r = await fetch("/api/status");
@@ -336,6 +461,10 @@
             lastSnap = await r.json();
             render(lastSnap);
             setError(null);
+            // Story 3.3: Kandidaten-Liste nur bei geändertem Scan-Stand
+            // nachladen (Entscheidungs-Buttons invalidieren upgDetailTs)
+            const ts = (lastSnap.upgrades || {}).scanned_ts;
+            if (ts && ts !== upgDetailTs) fetchUpgDetail();
         } catch (e) {
             setError("Endpoint nicht erreichbar (" + e.message + ") — läuft der musik-Bot?");
         }

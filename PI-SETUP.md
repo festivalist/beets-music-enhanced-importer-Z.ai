@@ -514,6 +514,7 @@ Nach kurzer Zeit muss das Album in **Plexamp** auftauchen.
 | Komplett-Reinstall nach Repo-Update | `bash install.sh --library /mnt/music` (idempotent, hält config.yaml) |
 | Cookies neu (nach Logout/Passwortwechsel) | Phase 3 wiederholen (nur Schritt 4-5 + scp) |
 | Review-Einheiten auf eigene Tags importieren | Handy: Bot-`/asis` (Knöpfe antippen) · Terminal: `musik.py asis --pending` |
+| Upgrade-Batches lossy→besser nachladen | Monitor `http://192.168.50.43:8283/monitor` → „⬆️ Upgrades": 🔍 Scan, je Batch ⬇️ Nachladen (≤109 Tracks), je Track 🔇 Behalten; Report: `reports/upgrade-report.md` (Story 3.3) |
 | Defekte Tags (Vinyl-Rips, Tribute, Junk-Artists) | automatisch: Reparatur aus Ordner-Identität vor jedem As-is (Story 9.9, Default an; aus: `musik: asis_folder_repair: no`) — kein Handeingreifen nötig |
 | Windows-Bestand nachträglich übernehmen | Phase 5b (SMB + scan + `asis --pending --unit …`) |
 | Plex-Scan manuell anstoßen | `.venv/bin/python musik.py plex` (meldet die konkrete Ursache, falls es hakt) |
@@ -656,7 +657,23 @@ kehrt die Aktion **begrenzt in den Spool zurück** (5 Zyklen ≈ 75 min,
 dann Verfall mit Hinweis im Job) — die Kopfzeile zeigt solange
 „⏳ offene Nutzer-Entscheidungen: N". Importierte/erledigte Units
 verbrauchen die Entscheidung; ein Review-Apply, das deterministisch
-wieder in Review landet, wird nicht erneut versucht. Das
+wieder in Review landet, wird nicht erneut versucht.
+**„⬆️ Upgrades"-Sektion (Story 3.3, 2026-11-18):** lossy-Tracks unter
+der Qualitätsschwelle (`musik: upgrades: threshold_kbps`, Default 200
+kbps) werden zu Batches à ≤ `batch_size` (Default 109) geplant
+(`musik upgrades` oder der „🔍 Scan jetzt"-Button schreibt
+`state/upgrades.json` + `reports/upgrade-report.md`). „⬇️ Nachladen"
+lädt je Track über die MusicGrabber-Suche neu (lossless-first,
+Cover-Guard) und überlässt die Entscheidung dem Import: der
+2.3/2.8-Dupe-Vergleich behält automatisch die bessere Kopie, der
+Verlierer geht nach `_trash` — eine schlechtere Neukopie kann die
+Bibliothek also nicht verschlechtern. Je Track „🔇 Behalten" nimmt ihn
+aus allen Batches (Entscheidungen überleben Rescans); ohne Quelle /
+nicht besser sind dokumentierte Ergebnisse, Mehrfach-Treffer werden als
+`dup_risk` gemeldet. Läuft der ingest.lock dauerhaft, parkt der Batch
+als `ingest-pending` — erneutes Anstoßen holt nur Ingest + Auswertung
+nach (kein Re-Download). Grundlage: datierter Scope-Change 2026-11-18
+in SCOPE.md. Das
 Upstream-Backend bleibt unangetastet; unsere
 UI-Stellen sind mit `musik-monitor`-Markern geflaggt. Bump-Prozedur mit
 Overlay-Verträglichkeitscheck: `musicgrabber/overlay/README.md`. Der
