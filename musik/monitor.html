@@ -71,6 +71,7 @@
     let upgDetail = null;
     let upgDetailTs = null;
     let upgFetching = false;
+    const upgOpen = new Set();   // aufgeklappte Track-Listen überleben den 5-s-Poll
 
     const mgLink = document.getElementById("mgLink");
     if (mgLink) mgLink.href = location.protocol + "//" + location.hostname + ":38274/";
@@ -255,7 +256,7 @@
         return `<div class="mon-item">` +
             `<b>${esc(b.id.replace(/^upg-\d+-/, ""))}</b> — ${b.n} Tracks ` +
             `<span class="mon-mut">${UPG_STATUS_LABELS[b.status] || b.status}${res}</span>${runBtn}` +
-            `<details style="margin-top:2px"><summary class="mon-mut" style="cursor:pointer">Tracks anzeigen</summary>${rows}${more}${dup}</details></div>`;
+            `<details id="upgdet-${esc(b.id)}" style="margin-top:2px"${upgOpen.has(b.id) ? " open" : ""}><summary class="mon-mut" style="cursor:pointer">Tracks anzeigen</summary>${rows}${more}${dup}</details></div>`;
     }
 
     function upgradesHtml(sum) {
@@ -282,7 +283,7 @@
                   `<div class="mon-item mon-mut">keine offenen Batches — nach einem Rescan erscheinen neue</div>`)
             : `<div class="mon-item mon-mut">lädt Kandidaten …</div>`;
         const keptBox = kept.length
-            ? `<details style="margin-top:6px"><summary class="mon-mut" style="cursor:pointer">Behalten: ${kept.length} Track(s) — nicht nachladen</summary>${keptRows}${keptMore}</details>` : "";
+            ? `<details id="upgkept" style="margin-top:6px"${upgOpen.has("upgkept") ? " open" : ""}><summary class="mon-mut" style="cursor:pointer">Behalten: ${kept.length} Track(s) — nicht nachladen</summary>${keptRows}${keptMore}</details>` : "";
         return `<div class="mon-box"><h3>⬆️ Upgrades (lossy → besser): ${sum.total} Kandidaten < ${esc(sum.threshold_kbps)} kbps · Scan ${esc(relAge(sum.scanned_ts))} · Batches à ≤ ${esc(sum.batch_size)}</h3>` +
             body + keptBox +
             `<div class="mon-acts"><button class="mon-act" id="monUpgScan">🔍 Scan jetzt</button></div>` +
@@ -427,6 +428,12 @@
                 const keep = b.dataset.cur !== "keep";
                 postAction({ action: "upgrade_decide", item_ids: [Number(b.dataset.upgdec)], decision: keep ? "keep" : null });
                 upgDetailTs = null;  // Detail nach der Entscheidung neu laden
+            }));
+        // Offen-Zustand der Upgrade-Track-Listen über Poll-Re-Renders retten
+        box.querySelectorAll("details[id^='upgdet'], details#upgkept").forEach(d =>
+            d.addEventListener("toggle", () => {
+                if (d.open) upgOpen.add(d.id);
+                else upgOpen.delete(d.id);
             }));
         const ingest = document.getElementById("monIngest");
         if (ingest) ingest.addEventListener("click", () => {
