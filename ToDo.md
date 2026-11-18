@@ -306,11 +306,20 @@ als Stories 4.1/4.3 weitergeführt.*
       (e) 5 Opus 128–133k (<200k): retry-track je Track angestoßen
       (MG sucht neu, landet jetzt in Playlists/<Name>/) → der nächste
       Ingest-Import entscheidet per 2.8-Dupe-Check (bessere Kopie
-      ersetzt, gleiche/gleiche Quelle wird als Dupe verworfen).
-      Smoke: smoke_playlist_recovery Fall 11 (Watchlist-Pläne:
-      dir-less only, API-Ordnung, MG-down-Abstieg), smoke_playlists
-      3b (beide Matcher-Regeln + Negativfall); Suite 28/28.
-      PI-SETUP 9.4-Watchlist-Absatz ergänzt.
+      ersetzt, gleiche Quelle wird als Dupe verworfen). **Verifiziert
+      live:** FOVOS 128k → Opus 260k ersetzt (Mechanik funktioniert
+      Ende-zu-Ende), HYPERKID/KXXMA/Ordinary Kid/STVW behalten ihre
+      ~130k-Kopien (MG lieferte erneut nur YouTube-opus — Ersatz-
+      Downloads korrekt als Dupe verworfen; beste verfügbare Qualität).
+      **Endstand Techno Beats Mix: 48/50 in Plexamp** (2 Einträge
+      unmatched wegen MB-Retags mit Voll-Retitle — „Montagem Coral"
+      statt des YT-Titels; Titel-Fuzzy-Grenze, kein Datenverlust —
+      beide Tracks sind in der Bibliothek). KK unberührt 75/75.
+      mg-<Name>-States existieren für beide Watchlists (Steady-State-
+      Gate ab jetzt aktiv). Smoke: smoke_playlist_recovery Fall 11
+      (Watchlist-Pläne: supersede, steady-state, heal, MG-down),
+      smoke_playlists 3b (beide Matcher-Regeln + Negativfall); Suite
+      28/28 auf Win und Pi. PI-SETUP 9.4-Watchlist-Absatz ergänzt.
 
 ## EPIC 3 — Beschaffung ohne Nutzerinteraktion
 
