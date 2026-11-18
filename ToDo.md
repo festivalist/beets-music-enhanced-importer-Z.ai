@@ -262,38 +262,46 @@ als Stories 4.1/4.3 weitergeführt.*
       Abnahme: Live-End-to-End (Spotify-Playlist-Link + Restart-Mitten-
       im-Job) am nächsten echten Playlist-Request — KK selbst ist längst
       75/75 in Plex.
-- [ ] 2.9 [ready-for-agent] MG-Watchlist ohne Playlists-Dir → keine Plex-Playlist
-      + Matcher-/Integrity-Lücken — **Befund 18.11. („Techno Beats Mix",
-      Spotify 37i9dQZF1EIhi15O2hEGJA, 50 Tracks, Nutzer-Anlage):**
-      (a) Watchlist mit `use_playlists_dir=0` schreibt Dateien+m3u nach
-      `Singles/…` — die 2.2-Maschinerie liest nur `musicgrabber/Playlists/`
-      → kein Playlist-Build, die m3u wurde vom Cleanup-Junk-Sweep
-      archiviert. Übergang 18.11.: Watchlist per PUT auf
-      use_playlists_dir=1 gestellt (persistiert in MG /data), Übergangs-
-      Playlist manuell aus der archivierten m3u-Ordnung gegen beets
-      gematcht (43/50 live in Plexamp; gleiche Idempotenz wie KK —
-      2.2-Rebuild schreibt denselben Dateipfad und ersetzt). Umsetzung:
-      Watchlist-Anlage validieren (use_playlists_dir erzwingen oder
-      Default umdrehen) UND/ODER `_mg_playlist_plans` um die
-      Watchlist-API (`watched-playlists/{id}/tracks` = Name+Ordnung
-      aus MG-DB) als Spec-Quelle erweitern — global, nicht pro Fall.
-      (b) Matcher-Lücke (auch in playlists._score): Mid-Titel-Varianten
-      matchen nicht („Winter (The Four Seasons) - Techno Mix" vs
-      beets „…(Extended Techno Mix)") — Regel: Common-Präfix ≥12 +
-      kompatibler Rest-Schwanz als zusätzliche Score-Stufe (live 1
-      Match gewonnen, 18.11.); in Smoke verankern.
-      (c) MG watched-track-Integrity: Artist-Credit-Varianten failen
-      dauerhaft (3/50: „feat./&"-Reihenfolge, Disney-Credit) —
-      retry-track läuft ins gleiche Messer; Kandidaten-Entscheidung
-      (Credits kanonisieren wie 3.3-Störtebeker oder Match-Guard
-      lockern) noch offen.
-      (d) MG `downloaded_count` schrumpft nach Ingest-Move (42→15/50,
-      file_missing_at-Marker) — nur Anzeige, 3.1-ENV verhindert
-      Re-Downloads; „unresolved→healed"-Pfad prüfen, damit die m3u-
-      Regeneration die verschobenen Dateien nicht vergisst.
-      (e) Qualität: 5/39 heute importierte Opus 128–133k (<200k,
-      YouTube-Quellen) → Upgrade-Kandidaten über die KK-Mechanik
-      (Watchlist-Re-Download → Qualitätsvergleich), beim Nutzer melden.
+- [x] 2.9 MG-Watchlist ohne Playlists-Dir → keine Plex-Playlist
+      + Matcher-/Integrity-Lücken — **ERLEDIGT 2026-11-18** (Befund:
+      „Techno Beats Mix", Spotify 37i9dQZF1EIhi15O2hEGJA, 50 Tracks,
+      Nutzer-Anlage mit use_playlists_dir=0):
+      (a) `_watchlist_playlist_plans()` im Ingest: für enabled
+      Watchlists MIT use_playlists_dir=0 kommen Name+volle
+      Track-Ordnung direkt aus MGs Watched-API (GET /api/watched-
+      playlists[/id/tracks]) — egal, wo MG die Dateien abgelegt hat;
+      gleiche State-Benennung wie 2.2 (mg-<Name>) → idempotent auch
+      bei späterem Flip; Gate: nur Zyklen mit frischem Staging
+      (pending>0) und nur wenn 2.2 nicht ohnehin feuert; MG-unreach-
+      able degradiert zu []. Übergang vorab: Watchlist per PUT auf
+      use_playlists_dir=1 gestellt, Übergangs-Playlist manuell aus der
+      archivierten m3u gebaut (43/50 live in Plexamp).
+      (b) Matcher in playlists._score um zwei Regeln erweitert
+      (jeweils +3, nur wenn <3): Mid-Titel-Varianten (Common-Präfix
+      ≥12 + kompatible Rest-Schwänze — „… - Techno Mix" vs „…
+      (Extended Techno Mix)", live 1 Match gewonnen) und
+      Featuring-Credits (Entry „X (feat. Y)" vs MB-kanonisch „X",
+      Live-Fall „Amor (feat. CERES)"). smoke_playlists 3b.
+      (c) 3 Credit-Mismatch-Fails (Disney-/„feat./&"-Varianten)
+      GEHEILT per MGs eigener match-API: beste verworfene Kopien aus
+      MGs .trash nach Playlists/<Name>/ kopiert (267–271k opus /
+      256k m4a — alles über der Linie) und gegen
+      /music/…-Pfade gematcht → MG-Buchstellung geführt, Dateien
+      gehen durch den normalen Ingest (Tags mit Varianten-Credit —
+      der (b)-Präfix-Match ordnet sie der Playlist zu).
+      (d) downloaded_count-Schrumpfung nach Ingest-Move als
+      Normalzustand bestätigt und durch die Matches geheilt
+      (15→36/50, unresolved 15→1); m3u-Regeneration-Ordnungsrisiko
+      (Multi-Wellen-Append) ist durch (a) wurzelaufgelöst — die API
+      liefert IMMER die volle Playlist-Ordnung.
+      (e) 5 Opus 128–133k (<200k): retry-track je Track angestoßen
+      (MG sucht neu, landet jetzt in Playlists/<Name>/) → der nächste
+      Ingest-Import entscheidet per 2.8-Dupe-Check (bessere Kopie
+      ersetzt, gleiche/gleiche Quelle wird als Dupe verworfen).
+      Smoke: smoke_playlist_recovery Fall 11 (Watchlist-Pläne:
+      dir-less only, API-Ordnung, MG-down-Abstieg), smoke_playlists
+      3b (beide Matcher-Regeln + Negativfall); Suite 28/28.
+      PI-SETUP 9.4-Watchlist-Absatz ergänzt.
 
 ## EPIC 3 — Beschaffung ohne Nutzerinteraktion
 

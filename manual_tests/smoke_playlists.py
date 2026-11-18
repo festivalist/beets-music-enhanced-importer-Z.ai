@@ -94,6 +94,31 @@ assert e3["dest"].endswith("B - Feuer.m4a"), e3   # artist disambiguates
 assert e4.get("dest") is None                     # not in the library
 print("matching OK")
 
+# 3b) Story 2.9 matcher rules: mid-title variants + featuring credits
+e5 = {"file": "l - w.m4a", "artist": "LANNÉ", "title":
+      "Winter (The Four Seasons) - Techno Mix"}
+i5 = {"id": 5, "path": "C:\\Music\\L\\Winter.m4a", "title":
+      "Winter (The Four Seasons) (Extended Techno Mix)", "artist": "LANNÉ",
+      "albumartist": "LANNÉ"}
+P._match_entries([e5], [i5])
+assert (e5.get("dest") or "").endswith("Winter.m4a"), \
+    "mid-title variant must match (prefix>=12 + compatible tails)"
+e6 = {"file": "c - amor.m4a", "artist": "Charlotte de Witte",
+      "title": "Amor (feat. CERES)"}
+i6 = {"id": 6, "path": "C:\\Music\\C\\Amor.m4a", "title": "Amor",
+      "artist": "Charlotte de Witte feat. CERES",
+      "albumartist": "Charlotte de Witte"}
+P._match_entries([e6], [i6])
+assert (e6.get("dest") or "").endswith("Amor.m4a"), \
+    "feat-credit entry must match the canonical core title"
+e7 = {"file": "x - y.m4a", "artist": "Someone", "title": "Totalmente Demais"}
+i7 = {"id": 7, "path": "C:\\Music\\S\\Amor da minha vida.m4a", "title":
+      "Amor da minha vida (feat. Alguem)", "artist": "Someone Else",
+      "albumartist": "Someone Else"}
+P._match_entries([e7], [i7])
+assert e7.get("dest") is None, "unrelated titles must not match"
+print("2.9 matcher rules OK (mid-title + feat)")
+
 # 4) state io + m3u write via a fake job
 class FakeJob:  # noqa: D401 - minimal FetchJob stand-in
     job_id = "fetch-20260921-120000-spotify-BestOf"

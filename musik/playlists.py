@@ -374,6 +374,24 @@ def _score(entry: dict, item: dict) -> int:
         score += 1
     elif difflib.SequenceMatcher(None, e_tit, i_tit).ratio() >= 0.8:
         score += 1
+    if score < 3:
+        # Story 2.9: mid-title variants — the playlist source wrote extra
+        # words INSIDE the title ('Winter (The Four Seasons) - Techno Mix'
+        # vs the retagged '… (Extended Techno Mix)'). A long shared prefix
+        # whose leftover tails are compatible (one ends with the other) is
+        # the same recording (live match won 18.11.).
+        pre = os.path.commonprefix([e_tit, i_tit])
+        if len(pre) >= 12:
+            e_tail, i_tail = e_tit[len(pre):], i_tit[len(pre):]
+            if e_tail and i_tail and \
+                    (e_tail.endswith(i_tail) or i_tail.endswith(e_tail)):
+                score = 3
+    if score < 3 and len(i_tit) >= 4 and \
+            e_tit.startswith(i_tit) and e_tit[len(i_tit):].startswith("feat"):
+        # Story 2.9: featuring credits — entry 'X (feat. Y)' vs the MB-
+        # canonical item 'X' (live case 'Amor (feat. CERES)'). The core
+        # title is identical, the rest is a credit, not another song.
+        score = 3
     if not e_art or not i_art:
         return score
     if e_art == i_art:

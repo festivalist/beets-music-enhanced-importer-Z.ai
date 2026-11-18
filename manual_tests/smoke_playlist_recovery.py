@@ -436,4 +436,54 @@ touched2 = P.repath()
 assert touched2 == [], touched2
 print("   repath leaves healthy states alone OK")
 
+# ------------------------------ 11) watchlist plans (Story 2.9a)
+import musik.musicgrabber as MG  # noqa: E402
+
+MG.available = lambda: True
+_MG_API = {
+    "GET /api/watched-playlists": {"playlists": [
+        {"id": "aaa", "name": "Techno Beats Mix", "enabled": 1,
+         "use_playlists_dir": 0},
+        {"id": "bbb", "name": "KK", "enabled": 1,
+         "use_playlists_dir": 1},          # 2.2's territory -> skipped
+        {"id": "ccc", "name": "Aus", "enabled": 0,
+         "use_playlists_dir": 0},          # disabled -> skipped
+    ]},
+    "GET /api/watched-playlists/aaa/tracks": {"tracks": [
+        {"artist": "Maddix", "title": "Rave Therapy"},
+        {"artist": "Creeds", "title": "Push Up"},
+        {"artist": "", "title": ""},       # skipped: no title
+    ]},
+}
+
+
+def fake_api(method, path, json_body=None, timeout=None):
+    return _MG_API[f"{method} {path}"]
+
+
+MG._api = fake_api
+P.snapshot_ids = lambda: set()
+wplans = ing._watchlist_playlist_plans(incoming)
+assert len(wplans) == 1, wplans
+plan = wplans[0]
+assert plan["job"].job_id == "mg-Techno Beats Mix", plan["job"].job_id
+assert plan["specs"][0]["name"] == "Techno Beats Mix"
+assert [e["title"] for e in plan["specs"][0]["entries"]] == \
+    ["Rave Therapy", "Push Up"]          # API order preserved
+print("11) watchlist plans from MG API (dir-less lists only) OK")
+
+# unreachable MG -> no plans, no crash
+MG.available = lambda: False
+assert ing._watchlist_playlist_plans(incoming) == []
+MG.available = lambda: True
+
+
+def bad_api(method, path, json_body=None, timeout=None):
+    raise MG.MGUnavailable("down")
+
+
+MG._api = bad_api
+assert ing._watchlist_playlist_plans(incoming) == []
+print("    unavailable/failing MG degrades to [] OK")
+
 print("ALL SMOKE TESTS PASSED")

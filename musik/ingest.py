@@ -283,6 +283,71 @@ def _fetch_playlist_plans(root: str) -> list[dict]:
     return plans
 
 
+def _watchlist_playlist_plans(root: str) -> list[dict]:
+    """Story 2.9: playlist specs straight from MG's watchlist DB for
+    watchlists with use_playlists_dir=0 — those write their files + m3u
+    into Singles/<Artist>/ (live case 'Techno Beats Mix' 18.11.), where
+    the 2.2 machinery (Playlists/ marker) never looks and the m3u dies
+    in the junk sweep. The API provides name + full tracked order
+    regardless of where the files landed, so the Plex playlist builds —
+    and heals (entries without dest re-match) — every cycle that sees
+    new files under the root. Same state-file naming as the 2.2 plans
+    ('mg-<Name>'), so a later switch to the Playlists dir stays
+    idempotent. [] when MG is unreachable or no such watchlist exists."""
+    from types import SimpleNamespace
+
+    from . import musicgrabber as mg
+    from . import playlists as playlists_mod
+    from .playlists import _safe_filename
+
+    if not mg.available():
+        return []
+    try:
+        data = mg._api("GET", "/api/watched-playlists")
+    except (mg.MGUnavailable, Exception) as e:
+        print(f"ingest: watchlist specs nicht lesbar ({str(e)[:100]})")
+        return []
+    singles_root = os.path.join(
+        os.path.normpath(root), "musicgrabber", "Singles")
+    plans = []
+    for pl in (data.get("playlists") or []):
+        if not pl.get("enabled") or pl.get("use_playlists_dir"):
+            continue  # 2.2 covers these via the Playlists/ dir
+        try:
+            tr = mg._api(
+                "GET", f"/api/watched-playlists/{pl['id']}/tracks")
+        except Exception as e:
+            print(f"ingest: watchlist {pl.get('name')} tracks nicht "
+                  f"lesbar ({str(e)[:80]})")
+            continue
+        tracks = tr.get("tracks", tr) if isinstance(tr, dict) else (tr or [])
+        entries = []
+        for t in tracks:
+            artist = (t.get("artist") or "").strip()
+            title = (t.get("title") or "").strip()
+            if not title:
+                continue
+            entries.append({
+                "file": f"{artist} - {title}",
+                "artist": artist, "title": title,
+            })
+        if not entries:
+            continue
+        name = (pl.get("name") or "").strip() or "MG Watchlist"
+        plans.append({
+            "job": SimpleNamespace(
+                job_id=f"mg-{_safe_filename(name)}",
+                job_dir=singles_root,
+                query="",
+            ),
+            "specs": [{"name": name, "entries": entries}],
+            "ids": playlists_mod.snapshot_ids(),
+        })
+        print(f"ingest: watchlist playlist „{name}“ "
+              f"({len(entries)} Einträge) vorgemerkt")
+    return plans
+
+
 def _ingest_one(root: str) -> int:
     from . import asis as asis_mod
     from . import cleanup as cleanup_mod
@@ -351,6 +416,18 @@ def _ingest_one(root: str) -> int:
     mg_plans = _mg_playlist_plans(root)
     # Story 2.7: fetch staging dirs (interrupted bot jobs) — same contract
     fetch_plans = _fetch_playlist_plans(root)
+    # Story 2.9: Playlists-dir-less MG watchlists — only when this cycle
+    # actually has fresh staging (otherwise the API poll + snapshot would
+    # run every 15 min for nothing)
+    watchlist_plans: list[dict] = []
+    if not mg_plans:
+        pending_new = sum(
+            1 for k, u in state_mod.units(state_mod.load()).items()
+            if u.get("status") == "pending"
+            and state_mod.path_under(state_mod.norm_key(k), rk)
+        )
+        if pending_new:
+            watchlist_plans = _watchlist_playlist_plans(root)
 
     print("ingest: running import (musicbrainz chain)")
     _activity("import", root)
@@ -362,9 +439,9 @@ def _ingest_one(root: str) -> int:
     _activity("asis", root)
     asis_mod.cmd_asis(only=root, include_pending=True)
 
-    # Story 2.2 + 2.7: match the imported playlist tracks, write the m3u
+    # Story 2.2 + 2.7 + 2.9: match the imported playlist tracks, write the m3u
     pl_states = []
-    if mg_plans or fetch_plans:
+    if mg_plans or fetch_plans or watchlist_plans:
         from . import playlists as playlists_mod
 
         for plan in mg_plans:
@@ -373,6 +450,11 @@ def _ingest_one(root: str) -> int:
             print(f"ingest: {playlists_mod.summarize(pl_states[-1])}"
                   if pl_states else "ingest: playlist build leer")
         for plan in fetch_plans:
+            pl_states.extend(playlists_mod.build(
+                plan["job"], plan["specs"], plan["ids"]))
+            print(f"ingest: {playlists_mod.summarize(pl_states[-1])}"
+                  if pl_states else "ingest: playlist build leer")
+        for plan in watchlist_plans:
             pl_states.extend(playlists_mod.build(
                 plan["job"], plan["specs"], plan["ids"]))
             print(f"ingest: {playlists_mod.summarize(pl_states[-1])}"
