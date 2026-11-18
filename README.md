@@ -490,10 +490,16 @@ identity and misses same-song tracks held under different albums and
 singletons with differing album tags. musik adds two layers: singletons
 and gap-fill tracks are compared against the library by normalized
 artist+title within a 15 s duration grace — the quality loser goes to
-`_trash\duplicate\`, the winner stays (Story 2.3); full releases are
-covered by the redundancy guard (tier 4 above). Cross-album duplicates of
-*genuinely different recordings* remain a manual `dedupe --fingerprint`
-case — no tag-level signal can catch those.
+`_trash\duplicate\`, the winner stays (Story 2.3); the same check runs
+for asis-imported singletons (upgrades through the asis path replace a
+held weaker copy instead of pairing with it, Story 2.8); full releases
+are covered by the redundancy guard (tier 4 above). Cross-album
+duplicates of *genuinely different recordings* remain a manual
+`dedupe --fingerprint` case — no tag-level signal can catch those.
+Because replacements retire the old library file, the ingest cycle also
+re-resolves playlist m3u entries whose target file vanished and
+re-uploads the affected playlists (same file path → Plex replaces,
+Story 2.8).
 
 ### 0-day material and the asis command
 

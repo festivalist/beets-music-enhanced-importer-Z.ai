@@ -729,3 +729,33 @@ def rebuild(unit_paths: list[str]) -> list[dict]:
     except Exception as e:
         print(f"playlists: rebuild failed: {type(e).__name__}: {e}")
     return out
+
+
+def repath() -> list[dict]:
+    """Re-resolve playlist entries whose dest FILE vanished (Story 2.8):
+    quality upgrades replace library files (singleton dedup 2.3/2.8,
+    dedupe --apply, manual trash) and the old m3u paths age — entries
+    keep artist/title, drop the dead dest and re-match against the
+    library. Touched states get their m3u rewritten (same file path, so
+    a Plex re-upload replaces). Returns the touched states; the caller
+    uploads them after its Plex refresh. A track with no surviving
+    library copy stays unmatched (m3u entry dropped until it returns)."""
+    touched: list[dict] = []
+    try:
+        for pl in all_states():
+            dead = [t for t in pl.get("tracks", [])
+                    if t.get("dest") and not os.path.isfile(t["dest"])]
+            if not dead:
+                continue
+            for t in dead:
+                t.pop("item_id", None)
+                t["dest"] = None
+            _match_entries(dead, _items_since(None))
+            write_m3u(pl)
+            _save_state(pl)
+            touched.append(pl)
+            print(f"playlists: repath „{pl.get('name')}“: "
+                  f"{len(dead)} veraltete Pfad-Einträge neu aufgelöst")
+    except Exception as e:
+        print(f"playlists: repath failed: {type(e).__name__}: {e}")
+    return touched

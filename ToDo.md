@@ -421,14 +421,30 @@ drin sein.*
       Dirs zusammengeführt, 0 tote Item-Rows. **Bibliothek 34218 Items,
       0 Multi-Row-Album-Keys, KK-Playlist heil.** Verbleibend bekannt:
       Mothers-Genre „Other" (doctor --fix-Kandidat).
-- [ ] 2.8 [ready-for-agent] asis-Singleton-Lücken: (a) choose_item's
-      apply-asis-Zweig ruft _singleton_dupe NICHT auf → Qualitäts-Upgrades
-      über den asis-Pfad erzeugen still Paar-Dupes (KK-Fall 16.11.: 17
-      Paare, Auflösung manuell per Qualitätsvergleich). Fix: Dupe-Check
-      auch im apply-asis-Zweig (nach fill_artist), Smoke: asis-Singleton-
-      Upgrade ersetzt den Verlierer. (b) Fetch-Playlists nach Datei-Ersatz:
-      m3u-Pfade altern, wenn Upgrade-Kopien alte Pfade ersetzen — Playlist
-      nach solchen Läufen neu bauen/uploaden (16.11. manuell gemacht).
+- [x] 2.8 asis-Singleton-Lücken — **ERLEDIGT 2026-11-18:** (a) choose_item's
+      apply-asis-Zweig ruft jetzt NACH fill_artist denselben
+      _singleton_dupe-Check auf wie der apply-Zweig (match=None →
+      Fallback auf die eigenen Item-Tags): schlechtere asis-Kopie einer
+      gehaltenen Track-Instanz wird als duplicate übersprungen, bessere
+      ersetzt den Verlierer (_trash/duplicate + DB-Remove) — die
+      KK-Lücke (17 stiller Paar-Dupes, 16.11. manuell aufgelöst) ist
+      geschlossen; Album-Units (choose_match) bewusst unverändert
+      (Singleton-spezifische Regel). (b) playlists.repath(): veraltete
+      m3u-Ziele (Datei weg nach Upgrade/Dedupe/Manuell) behalten
+      Artist/Title, verlieren dest/item_id und matchen neu gegen die
+      Bibliothek (nur existierende Dateien, KK-GOTCHA);write_m3u
+      schreibt denselben Dateipfad → Plex-Re-Upload ERSETZT; Hook im
+      Ingest nach dem Plex-Refresh (deckt ALLE Ersetzungsquellen
+      innerhalb eines 15-min-Zyklus ab: 2.3/2.8-Singleton-Dedup,
+      dedupe --apply, manuelles Trashen), gesunde States werden nicht
+      angerührt. Smoke: smoke_decider 2.8-A/B/C (loser skip / Upgrade
+      ersetzt / ohne Bestand importiert), smoke_playlist_recovery Fall
+      10 (repath re-matchet, leerer Bestand → Eintrag fällt, zweiter
+      Lauf = no-op); Suite 28/28 grün. README „Duplicate boundaries".
+      Testmatrix-Abnahme live: benötigt einen echten Upgrade-Lauf
+      (asis-Singleton ersetzt Bestand) — als Beobachtungspunkt für den
+      nächsten MG-Upgrade-Fall vermerkt; offline-Smokes decken die
+      Entscheidungslogik vollständig ab.
 - [x] 6.4 Zyklus session↔asis auflösen — **ERLEDIGT 2026-11-16
       (fb104a1)**: scan bekommt die Datei-/Text-Ebene (from_fetch,
       tags_complete, artist_present+_UNKNOWN_ARTISTS, enrich_from_meta_

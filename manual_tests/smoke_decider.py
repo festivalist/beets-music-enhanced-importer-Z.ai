@@ -254,4 +254,66 @@ assert action == "skip" and record["status"] == "review", (action, record)
 assert "not among candidates" in record["reason"], record
 print("M6) forced id miss -> clean review skip OK")
 
+# --- Story 2.8(a): apply-asis singletons hit the cross-engine dedup -------
+# same contract as case 5, but through choose_item's apply-asis branch
+# (the KK-upgrade path): a worse asis copy skips as duplicate, a better
+# one replaces the held item (loser -> _trash), no held copy imports.
+import musik.session as sess_mod  # noqa: E402
+from beets.importer.actions import Action as _Action  # noqa: E402
+
+
+class _FakeQuality:
+    def __init__(self, better):
+        self._better = better
+
+    def better(self, new, old):
+        return self._better
+
+
+def asis_session(lib_items, better):
+    s = MusikSession.__new__(MusikSession)
+    s.lib = _FakeLib(lib_items)
+    s.duplicate_losers = []
+    s.results = []
+    s.decider = types.SimpleNamespace(
+        decide_item=lambda t: ("apply-asis", {"status": "asis"}))
+    sess_mod.quality = _FakeQuality(better)
+    return s
+
+
+asis_task = types.SimpleNamespace(
+    paths=[b"/x/new.mp3"],
+    item=types.SimpleNamespace(
+        path=b"/x/new.mp3", artist="A", title="T", length=200.0))
+
+# A) worse asis copy of a held track -> skipped as duplicate
+sA = asis_session([_OldItem()], better=False)
+actionA = sA.choose_item(asis_task)
+assert actionA == _Action.SKIP, actionA
+assert sA.results[-1]["status"] == "duplicate", sA.results[-1]
+assert "2.3/2.8" in sA.results[-1]["reason"], sA.results[-1]
+print("2.8-A) apply-asis loser skipped as duplicate OK")
+
+# B) better asis copy -> replaces the held item (loser archived), imports
+sB = asis_session([_OldItem()], better=True)
+removed = []
+
+
+class _OldItem2(_OldItem):
+    def remove(self, with_album=False):
+        removed.append(self.path)
+
+
+sB.lib = _FakeLib([_OldItem2()])
+actionB = sB.choose_item(asis_task)
+assert actionB == _Action.ASIS, actionB
+assert sB.results[-1].get("status") != "duplicate", sB.results[-1]
+print("2.8-B) apply-asis upgrade replaces held item OK")
+
+# C) no held copy -> plain asis import, untouched
+sC = asis_session([], better=True)
+actionC = sC.choose_item(asis_task)
+assert actionC == _Action.ASIS, actionC
+print("2.8-C) apply-asis without held copy imports OK")
+
 print("smoke_decider: all assertions passed")

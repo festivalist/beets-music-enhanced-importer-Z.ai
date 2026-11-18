@@ -413,4 +413,12 @@ def _ingest_one(root: str) -> int:
 
         for line in playlists_mod.upload(pl_states):
             print("ingest:", line)
+    # Story 2.8: quality replacements age playlist m3u paths (the old
+    # library file is trashed when a better copy wins). Re-resolve aged
+    # entries and re-upload the touched playlists — upload replaces by
+    # file path, so this is idempotent.
+    from . import playlists as playlists_mod
+
+    for line in playlists_mod.upload(playlists_mod.repath()):
+        print("ingest:", line)
     return 0

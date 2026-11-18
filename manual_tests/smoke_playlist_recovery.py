@@ -382,4 +382,58 @@ try:
 except ValueError:
     print("9) resume_dir+multi-input guard OK")
 
+# --------------------------------------- 10) repath (Story 2.8b)
+lib_dir2 = os.path.join(tmp, "lib2")
+os.makedirs(lib_dir2, exist_ok=True)
+live_path = os.path.join(lib_dir2, "01 Eins (Upgrade).m4a")
+with open(live_path, "w") as fh:
+    fh.write("x")
+still_there = os.path.join(lib_dir2, "03 Bleibt.m4a")
+with open(still_there, "w") as fh:
+    fh.write("x")
+
+rp_dir = os.path.join(tmp, "m3u")
+rp_m3u = os.path.join(rp_dir, "Upgrade Liste.m3u")
+rp_state = {
+    "job_id": "fetch-upgrade-job",
+    "name": "Upgrade Liste",
+    "state_file": "fetch-upgrade-job",
+    "tracks": [
+        {"file": "a.m4a", "artist": "A", "title": "Eins",
+         "dest": os.path.join(lib_dir2, "01 Eins ALT.m4a")},   # dead: replaced
+        {"file": "b.m4a", "artist": "B", "title": "Zwei",
+         "dest": os.path.join(lib_dir2, "02 Zwei ALT.m4a")},   # dead: no copy
+        {"file": "c.m4a", "artist": "C", "title": "Bleibt",
+         "dest": still_there},                                  # healthy
+    ],
+    "m3u": rp_m3u,
+}
+P._save_state(rp_state)
+
+rep_items = [
+    {"id": 11, "path": live_path, "title": "Eins", "artist": "A",
+     "albumartist": "A"},
+    {"id": 13, "path": still_there, "title": "Bleibt", "artist": "C",
+     "albumartist": "C"},
+]
+P._items_since = lambda ids: rep_items
+touched = P.repath()
+rp = [pl for pl in touched if pl.get("name") == "Upgrade Liste"]
+assert len(rp) == 1, touched
+tr = rp[0]["tracks"]
+assert tr[0]["dest"] == live_path, tr[0]          # re-matched to the upgrade
+assert tr[1].get("dest") is None, tr[1]           # no surviving copy
+assert tr[2]["dest"] == still_there, tr[2]        # healthy untouched
+assert os.path.isfile(rp_m3u)
+content = open(rp_m3u, encoding="utf-8").read()
+assert "01 Eins (Upgrade).m4a" in content
+assert "02 Zwei ALT" not in content and "Bleibt" in content
+assert P._load_state("fetch-upgrade-job")["tracks"][0]["dest"] == live_path
+print("10) repath: dead dests re-resolved, healthy untouched, m3u stable OK")
+
+# once every dest is healthy again, a second pass touches nothing
+touched2 = P.repath()
+assert touched2 == [], touched2
+print("   repath leaves healthy states alone OK")
+
 print("ALL SMOKE TESTS PASSED")

@@ -1019,6 +1019,20 @@ class MusikSession(ImportSession):
                     record["reason"] += (
                         f"; artist filled from albumartist on {n} item(s)"
                     )
+            # Story 2.8: quality upgrades through the asis path must hit
+            # the same cross-engine dedup as MB-matched singletons —
+            # without this, an upgraded copy silently paired with the held
+            # one (KK case 16.11.: 17 pairs, resolved manually). The dupe
+            # check falls back to the item's own tags (no MB match here);
+            # a better copy replaces the held one (loser -> _trash), a
+            # worse one archives the new file and skips the import.
+            if self._singleton_dupe(task, None):
+                record["status"] = "duplicate"
+                record["reason"] = (
+                    "singleton duplicate of a held track "
+                    "(quality loser archived, Story 2.3/2.8)"
+                )
+                return Action.SKIP
             return Action.ASIS
         if action == "apply":
             match = self._match_for(task, record)
