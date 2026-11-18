@@ -235,9 +235,108 @@ def _try_musicgrabber(job: dict, query: str, send) -> bool:
         return False
 
 
+def _deliver_fetch(fetch_jobs, send) -> list[str]:
+    """Import + Plex-Refresh + Playlist-Upload for finished fetch jobs
+    (shared by the normal and the resume path, Story 2.7). Returns the
+    per-job summaries (already sent as progress messages)."""
+    summaries = []
+    for fj in fetch_jobs:
+        if fj.files:
+            send(f"📦 {len(fj.files)} Track(s) geladen — Import & Tagging laufen…")
+            fetch._import_job(fj)
+            ok, note = plex_mod.refresh_library()
+            if ok:
+                send(f"🎧 {note} — neues Album ist gleich in Plexamp sichtbar")
+            elif note:  # configured but failed
+                send(f"⚠️ {note}")
+            # playlist upload waits for the scan it just triggered
+            for msg in playlists_mod.upload(fj.playlists):
+                send(msg)
+        summaries.append(fetch.summarize_job(fj))
+        send(summaries[-1])
+    return summaries
+
+
+def _execute_fetch_resume(job: dict, send) -> None:
+    """Continuation of a job the restart killed (Story 2.7 bounce of the
+    11.6 recovery) — WITHOUT asking the user to send the link again.
+
+    - staging folder with audio: download continues IN THE SAME FOLDER
+      (the tools skip files they already wrote), then the normal import
+      chain incl. playlist build/upload.
+    - staging folder gone/empty: the units were imported in the meantime
+      (ingest timer) — only the playlist upload was lost with the old
+      process; upload the existing playlist state.
+    - neither: honest error — this one is really lost.
+    """
+    jobs_mod.update_job(job["id"], status="running", started=time.time())
+    query = job["text"].strip()
+    staging = job.get("staging_dir") or ""
+    print(f"bot: job {job['id']} resume: {query[:120]}")
+    send(f"🔄 Bot-Neustart aufgearbeitet — Job wird fortgesetzt, bereits "
+         f"geladene Dateien werden nicht erneut heruntergeladen:\n"
+         f"{query[:200]}")
+    try:
+        fj_dir = fetch.job_from_dir(staging) if staging and \
+            os.path.isdir(staging) else None
+        if fj_dir is not None and fj_dir.files:
+            # context query (marker) wins over the job text: it is the
+            # exact original request of THIS folder
+            resume_query = fj_dir.query or query
+            fetch_jobs = fetch.run_fetch([resume_query], resume_dir=staging)
+            summaries = _deliver_fetch(fetch_jobs, send)
+            jobs_mod.update_job(job["id"], status="done",
+                                finished=time.time(),
+                                summary="\n—\n".join(summaries)[:1500])
+            print(f"bot: job {job['id']} resume done")
+            # free text fell back to the spotDL/SomeDL chain (MG could not
+            # deliver) — the album offer belongs to the REQUEST, so it
+            # fires here too (same rule as the normal path)
+            if _is_free_text(query):
+                _maybe_album_offer(job, query, {}, send)
+            return
+        # staging gone or emptied: the audio was imported meanwhile
+        pl_id = os.path.basename(os.path.normpath(staging)) if staging else ""
+        states = playlists_mod.state_for_job(pl_id) if pl_id else []
+        if any(t.get("dest") for pl in states
+               for t in pl.get("tracks", [])):
+            ok, note = plex_mod.refresh_library()
+            if ok and note:
+                send(f"🎧 {note}")
+            elif note:
+                send(f"⚠️ {note}")
+            lines = playlists_mod.upload(states)
+            summary = "\n".join(lines) if lines else \
+                "Import war schon abgeschlossen; Playlist-Upload übersprungen " \
+                "(Plex nicht konfiguriert)."
+            send(f"🎵 Import war schon abgeschlossen — Playlist nachgeholt:\n"
+                 f"{summary}")
+            jobs_mod.update_job(job["id"], status="done",
+                                finished=time.time(), summary=summary[:1500])
+            print(f"bot: job {job['id']} resume done (playlist only)")
+            return
+        msg = ("❌ Vom unterbrochenen Job ist weder ein Staging-Ordner mit "
+               "Dateien übrig noch ein ausstehender Playlist-Zustand — "
+               "Link erneut schicken.")
+        send(msg)
+        jobs_mod.update_job(job["id"], status="error", finished=time.time(),
+                            summary=msg)
+        print(f"bot: job {job['id']} resume: nothing left")
+    except Exception as e:
+        traceback.print_exc()
+        msg = f"❌ Resume fehlgeschlagen: {type(e).__name__}: {str(e)[:300]}"
+        send(msg)
+        jobs_mod.update_job(job["id"], status="error", finished=time.time(),
+                            summary=msg)
+        print(f"bot: job {job['id']} resume error")
+
+
 def _execute_job(job: dict, send) -> None:
     """Run one job end to end; `send` delivers progress messages."""
     jobs_mod.update_job(job["id"], status="running", started=time.time())
+    if job.get("resume"):
+        _execute_fetch_resume(job, send)
+        return
     if job.get("kind") == "asis":
         _execute_asis(job, send)
         return
@@ -259,28 +358,20 @@ def _execute_job(job: dict, send) -> None:
         return
     send(f"⬇️ Download läuft:\n{query[:200]}")
     try:
-        fetch_jobs = fetch.run_fetch([query])
+        fetch_jobs = fetch.run_fetch(
+            [query],
+            # record the staging dir BEFORE the long download runs — it is
+            # what makes a restart bounce resumable (Story 2.7)
+            on_job_dir=lambda fj: jobs_mod.update_job(
+                job["id"], staging_dir=fj.job_dir),
+        )
         if not fetch_jobs:
             msg = "Keine unterstützte Quelle erkannt — Spotify- oder YouTube-Link schicken."
             send(msg)
             jobs_mod.update_job(job["id"], status="error", finished=time.time(),
                                 summary=msg)
             return
-        summaries = []
-        for fj in fetch_jobs:
-            if fj.files:
-                send(f"📦 {len(fj.files)} Track(s) geladen — Import & Tagging laufen…")
-                fetch._import_job(fj)
-                ok, note = plex_mod.refresh_library()
-                if ok:
-                    send(f"🎧 {note} — neues Album ist gleich in Plexamp sichtbar")
-                elif note:  # configured but failed
-                    send(f"⚠️ {note}")
-                # playlist upload waits for the scan it just triggered
-                for msg in playlists_mod.upload(fj.playlists):
-                    send(msg)
-            summaries.append(fetch.summarize_job(fj))
-            send(summaries[-1])
+        summaries = _deliver_fetch(fetch_jobs, send)
         jobs_mod.update_job(job["id"], status="done", finished=time.time(),
                             summary="\n—\n".join(summaries)[:1500])
         print(f"bot: job {job['id']} done")

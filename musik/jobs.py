@@ -93,7 +93,8 @@ def queue_stats() -> dict:
 
 
 def recover_interrupted() -> tuple[list[dict], list[dict]]:
-    """Boot-time repair for the in-memory worker queue (Story 11.6).
+    """Boot-time repair for the in-memory worker queue (Story 11.6,
+    extended by Story 2.7).
 
     The queue lives only in memory, so after a restart every 'running'
     record is a zombie (its thread died with the process — live case:
@@ -102,19 +103,54 @@ def recover_interrupted() -> tuple[list[dict], list[dict]]:
     error with an honest summary and return (killed, requeued) so the
     caller can notify the affected chats and re-enqueue the queued jobs
     in file order.
+
+    Story 2.7 — bounce instead of 'send the link again': a killed FETCH
+    job whose staging folder survives (recorded via on_job_dir before the
+    download ran) is re-enqueued with resume=True — the worker continues
+    it WITHOUT re-downloading. Same for a staging folder that is already
+    gone but whose playlist state never made it to Plex (the ingest timer
+    imported the audio, the playlist build/upload was lost with the
+    process). Only truly lost jobs (no staging, no pending playlist)
+    keep the 'send the link again' message.
     """
     killed: list[dict] = []
     requeued: list[dict] = []
+
+    def bounces(job: dict) -> bool:
+        if job.get("kind"):
+            return False  # asis/album/retry/ingest/review: managed kinds
+        staging = job.get("staging_dir")
+        if staging and os.path.isdir(staging):
+            return True
+        if staging:
+            # audio already imported elsewhere (ingest timer): the resume
+            # then only completes the playlist upload — worth a bounce when
+            # that upload never happened
+            from .playlists import state_for_job
+
+            pl_id = os.path.basename(os.path.normpath(staging))
+            for pl in state_for_job(pl_id):
+                if not pl.get("plex", {}).get("uploaded"):
+                    return True
+        return False
+
     with _lock:
         jobs = load_jobs()
         changed = False
         for job in jobs:
             if job["status"] == "running":
-                job["status"] = "error"
-                job["finished"] = time.time()
-                job["summary"] = ("Bot-Neustart hat den Job unterbrochen "
-                                  "— Link erneut schicken.")
-                killed.append(job)
+                if bounces(job):
+                    job["status"] = "queued"
+                    job["resume"] = True
+                    job["summary"] = ("Bot-Neustart hat den Job unterbrochen "
+                                      "— Fortsetzung ohne erneuten Download.")
+                    requeued.append(job)
+                else:
+                    job["status"] = "error"
+                    job["finished"] = time.time()
+                    job["summary"] = ("Bot-Neustart hat den Job unterbrochen "
+                                      "— Link erneut schicken.")
+                    killed.append(job)
                 changed = True
             elif job["status"] == "queued":
                 requeued.append(job)

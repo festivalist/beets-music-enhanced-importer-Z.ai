@@ -810,6 +810,33 @@ live N/M-Track-Zähler von MG. Config: `musik: musicgrabber:
 {album_offer: true, album_job_timeout: 3600}` (Defaults; album_offer
 schaltet die Buttons ganz ab).
 
+**9.10 Bot-Interrupt-Recovery + echte Playlist-Namen (Story 2.7, 2026-11-18):**
+Ein Bot-Neustart (11.6) killt laufende Fetch-Jobs — bisher blieb der
+Playlist-Build/-Upload dabei dauerhaft verloren (Re-Importe brachten nur
+Audio; Live-Fall „Klare Kante" 13.11.). Jetzt:
+- **Job-Record kennt sein Staging** (`staging_dir`, geschrieben bevor der
+  Download läuft) + jede Fetch-Staging-Mappe trägt `_fetch_job.json`
+  (Query/Kind) — Cleanup archiviert den Marker mit der geleerten Mappe.
+- **Ingest-Timer macht Playlists fertig:** importiert er `fetch-…`-Staging
+  (z. B. nach einem Interrupt), sammelt er dieselben Playlist-Specs wie die
+  Bot-Kette (m3u8-Sidecar, sonst oEmbed-Name + mtime-Ordnung) und lädt nach
+  dem Refresh hoch — kein Wiederaufhol-Pfad mehr nötig.
+- **Job-Bounce statt „Link erneut schicken":** beim Boot bounct der Bot
+  gekillte Fetch-Jobs mit erhaltener Staging-Mappe (`resume=True`) — der
+  Worker setzt im GLEICHEN Ordner fort (Downloader skippen vorhandene
+  Dateien, kein Re-Download) oder — wenn der Ingest das Audio schon
+  importiert hat — holt nur den Playlist-Upload nach. „Link erneut
+  schicken" bleibt nur für Jobs ohne verwertbare Überreste.
+- **Namen:** Spotify-Playlists ohne Sidecar bekommen den echten Titel per
+  Spotify-oEmbed (authfrei) statt „spotify-37i9d…"; Bestands-States mit
+  Slug-Namen werden beim Upload einmalig umbenannt. Umbenennung ist
+  idempotent: die m3u-DATEI behält ihren Pfad, PMS ersetzt die Playlist
+  beim Re-Upload (statt eine zweite anzulegen).
+- **Stale-Guard:** Playlist-Matches greifen nie auf beets-Rows mit toten
+  Dateipfaden (KK-GOTCHA 16.11.).
+Kein Config-Bedarf; Smoke: `manual_tests/smoke_playlist_recovery.py`
+(netzfrei; Live-oEmbed-Probe in der Story verifiziert).
+
 **Noch offen (Stories 1.2–2.x, siehe ToDo.md):** Quellen-/Qualitäts-Fein-
 konfiguration, Testmatrix-Abnahme (Single/Album/Spotify-Playlist/YouTube-
 Playlist/0-day), MG-Playlists-M3U in die Plex-Playlist-Kette.

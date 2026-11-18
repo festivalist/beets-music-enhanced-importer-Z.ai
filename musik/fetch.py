@@ -12,6 +12,7 @@ album tags (one album unit, MB match), a playlist link yields mixed tags
 (scan's should_split routes those to singletons).
 """
 
+import json
 import os
 import re
 import shutil
@@ -219,6 +220,67 @@ class FetchJob:
 def _slug(text: str) -> str:
     s = re.sub(r"[^A-Za-z0-9_-]+", "", text)
     return s[:24]
+
+
+CONTEXT_FILE = "_fetch_job.json"
+
+
+def write_context(job_dir: str, kind: str, query: str) -> None:
+    """Persist the job context INSIDE the staging folder (Story 2.7).
+
+    The dir name truncates the URL slug and carries no query, so a later
+    importer (ingest timer after an interrupted bot job, or the resume
+    path) could not reconstruct what this staging belongs to. The marker
+    travels with the folder: cleanup archives it together with the emptied
+    dir, so it never lingers. Best-effort — a fetch job must not fail on
+    bookkeeping."""
+    try:
+        with open(os.path.join(job_dir, CONTEXT_FILE), "w",
+                  encoding="utf-8") as fh:
+            json.dump({"kind": kind, "query": query,
+                       "created": time.time()}, fh, ensure_ascii=False)
+    except OSError as e:
+        print(f"fetch: context marker failed for {job_dir}: {e}")
+
+
+def read_context(job_dir: str) -> dict:
+    """Stored context for a staging folder ({} when absent/corrupt)."""
+    try:
+        with open(os.path.join(job_dir, CONTEXT_FILE),
+                  encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+_DIR_KIND_RE = re.compile(
+    r"^fetch-\d{8}-\d{6}-(spotify|youtube|search)(?:-\d+)?-")
+
+
+def job_from_dir(job_dir: str) -> FetchJob:
+    """Rebuild a FetchJob from a staging folder on disk (Story 2.7: ingest
+    plans + resume path). kind/query come from the context marker, with
+    the dir name as fallback for pre-marker folders (kind only — the query
+    of an old folder is unrecoverable)."""
+    base = os.path.basename(os.path.normpath(job_dir))
+    ctx = read_context(job_dir)
+    kind = ctx.get("kind")
+    if kind not in ("spotify", "youtube", "search"):
+        m = _DIR_KIND_RE.match(base)
+        kind = m.group(1) if m else "search"
+    from .paths import reports_dir
+    from .scan import collect_audio_tree
+
+    return FetchJob(
+        job_id=base,
+        kind=kind,
+        tool="spotdl" if kind == "spotify" else "somedl",
+        query=str(ctx.get("query") or ""),
+        job_dir=os.path.normpath(job_dir),
+        log_path=os.path.join(reports_dir(), "fetch", f"{base}.log"),
+        files=collect_audio_tree(job_dir),
+    )
 
 
 def _new_job_dir(kind: str, query: str) -> str:
@@ -438,7 +500,19 @@ def _bot_challenge_detected(job: FetchJob) -> bool:
 
 
 def run_fetch(inputs: list[str], timeout_s: float | None = DOWNLOAD_TIMEOUT,
-              quiet: bool = False) -> list[FetchJob]:
+              quiet: bool = False,
+              resume_dir: str | None = None,
+              on_job_dir=None) -> list[FetchJob]:
+    """Download links/searches into fresh staging folders.
+
+    resume_dir (Story 2.7): continue an interrupted job in its ORIGINAL
+    staging folder — the tools skip files they already wrote (same-dir
+    contract of the retry rounds), so the resume completes the missing
+    tracks without re-downloading what survived the interruption.
+    on_job_dir: callback fired right after a job folder exists, so the
+    bot can persist the staging dir on its job record BEFORE the long
+    download runs (that record is what makes a later restart bounce
+    resumable instead of 'send the link again')."""
     bootstrap()
     missing = [k for k, v in tool_versions().items() if not v]
     if missing:
@@ -455,6 +529,8 @@ def run_fetch(inputs: list[str], timeout_s: float | None = DOWNLOAD_TIMEOUT,
     if unsupported:
         for u in unsupported:
             print(f"unsupported source (not Spotify/YouTube): {u}")
+    if resume_dir is not None and len(pairs) != 1:
+        raise ValueError("resume_dir needs exactly one supported input")
 
     log_dir = os.path.join(reports_dir(), "fetch")
     os.makedirs(log_dir, exist_ok=True)
@@ -462,13 +538,22 @@ def run_fetch(inputs: list[str], timeout_s: float | None = DOWNLOAD_TIMEOUT,
     jobs: list[FetchJob] = []
     for kind, query in pairs:
         tool = "spotdl" if kind == "spotify" else "somedl"
-        job_dir = _new_job_dir(kind, query)
+        if resume_dir is not None:
+            job_dir = os.path.normpath(resume_dir)
+        else:
+            job_dir = _new_job_dir(kind, query)
+        write_context(job_dir, kind, query)
         job = FetchJob(
             job_id=os.path.basename(job_dir),
             kind=kind, tool=tool, query=query,
             job_dir=job_dir,
             log_path=os.path.join(log_dir, f"{os.path.basename(job_dir)}.log"),
         )
+        if on_job_dir is not None:
+            try:
+                on_job_dir(job)
+            except Exception as e:  # bookkeeping must not kill the job
+                print(f"fetch: on_job_dir callback failed: {e}")
         errors_file = os.path.join(log_dir, f"{os.path.basename(job_dir)}.errors")
         print(f"fetch: [{tool}] {query}")
         print(f"  -> {job.job_dir}")

@@ -202,7 +202,24 @@ YouTube playlist links get their true name and order from yt-dlp
 (bundled with spotDL; cookies from `musik: fetch: cookies_file` are used
 when present) — `watch?v=…&list=…` links download the whole playlist
 (`--get-playlist`). Only when yt-dlp cannot read the playlist (private/
-deleted) does the order fall back to download time (mtime).
+deleted) does the order fall back to download time (mtime). Spotify
+playlists without an m3u8 sidecar (e.g. an interrupted job) resolve
+their true name via Spotify's public oEmbed endpoint instead of showing
+the job-id slug (`spotify-37i9d…`); playlists still carrying such a
+slug name are renamed once at upload time (Story 2.7).
+
+**Interrupted bot jobs recover themselves (Story 2.7).** A restart
+killing a running fetch job used to lose the playlist build/upload —
+re-imports (ingest timer) brought only the audio. Now: the job record
+remembers its staging folder, the ingest timer completes playlist
+build + upload for any `fetch-…` staging it imports, and at boot the
+bot bounces the killed job (`resume`) so it continues in the SAME
+folder without re-downloading (the downloaders skip files they already
+wrote); if the staging is already gone, the bounce only re-uploads the
+pending playlist state. "Send the link again" remains only for jobs
+with nothing left to salvage. Renames are idempotent: the m3u file path
+stays stable across renames, so a Plex re-upload replaces the playlist
+instead of spawning a second one.
 
 ### Runbook
 

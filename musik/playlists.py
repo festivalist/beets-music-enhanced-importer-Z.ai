@@ -220,6 +220,31 @@ def _youtube_order(job) -> tuple[str, list[dict]] | None:
     return _order_from_info(info, job.files)
 
 
+def _spotify_oembed_name(url: str) -> str | None:
+    """Public playlist name via Spotify's oEmbed endpoint (no auth).
+    Story 2.7: without spotDL's m3u sidecar the only name on hand is the
+    job id slug ('spotify-37i9d…') — this resolves the real title before
+    the upload. Name only, no track list."""
+    try:
+        import requests
+
+        r = requests.get(
+            "https://open.spotify.com/oembed",
+            params={"url": url}, timeout=20,
+        )
+        if r.status_code != 200:
+            return None
+        title = ((r.json() or {}).get("title") or "").strip()
+        return title or None
+    except Exception as e:
+        print(f"playlists: Spotify-oEmbed namenlos ({str(e)[:120]}) "
+              f"— Job-Label-Fallback")
+        return None
+
+
+SPOTIFY_ID_NAME_RE = re.compile(r"^spotify-[A-Za-z0-9_-]{8,}$")
+
+
 def _job_label(job_id: str) -> str:
     """Human-ish name from 'fetch-20260921-123001-spotify-bestsongs'."""
     parts = job_id.split("-", 3)
@@ -266,7 +291,7 @@ def prepare(job) -> list[dict] | None:
     able to fail an import.
     """
     try:
-        if not is_playlist_query(job.query) or not job.files:
+        if not job.files:
             return None
         specs: list[dict] = []
         for name in sorted(os.listdir(job.job_dir)):
@@ -277,6 +302,12 @@ def prepare(job) -> list[dict] | None:
                         "name": os.path.splitext(name)[0],
                         "entries": entries,
                     })
+        if not specs and not is_playlist_query(job.query):
+            # no sidecar and no playlist link: an album/track job must not
+            # spawn a Plex playlist (a sidecar alone IS the evidence —
+            # spotDL writes it only for playlist links; this also lets
+            # pre-marker staging folders resume, Story 2.7)
+            return None
         if specs:
             # spotDL writes the sidecar after the FIRST download run;
             # tracks that only succeeded in a retry round are missing from
@@ -288,7 +319,9 @@ def prepare(job) -> list[dict] | None:
                 specs[-1]["entries"].extend(_tag_entries(extras))
         else:
             # No sidecar (SomeDL): YouTube jobs get the TRUE playlist name
-            # and order from yt-dlp metadata; without that, mtime is the
+            # and order from yt-dlp metadata; Spotify jobs resolve at least
+            # the true NAME via oEmbed (Story 2.7 — the job id slug would
+            # upload as 'spotify-37i9d…'); without that, mtime is the
             # best guess (paced downloads finish in playlist order).
             name = None
             entries = None
@@ -296,6 +329,8 @@ def prepare(job) -> list[dict] | None:
                 got = _youtube_order(job)
                 if got:
                     name, entries = got
+            elif job.kind == "spotify":
+                name = _spotify_oembed_name(job.query)
             if entries is None:
                 def _mtime(f: str) -> float:
                     try:
@@ -397,15 +432,21 @@ def snapshot_ids() -> set[int] | None:
 def _items_since(ids_before: set[int] | None) -> list[dict]:
     """Library items added after the snapshot: [{id, path, title, artist,
     albumartist}]. With ids_before=None the whole library is returned (used
-    by rebuild to fill gaps after a later /asis)."""
+    by rebuild to fill gaps after a later /asis). Items whose file is gone
+    (stale rows with dead staging paths) never match: an m3u entry pointing
+    at a missing file is worthless in Plex (KK-GOTCHA 16.11. — Titel-
+    Fallback-Matches landeten auf toten Rows)."""
     lib = _lib()
     out = []
     for it in lib.items():
         if ids_before is not None and it.id in ids_before:
             continue
+        path = os.fsdecode(it.path)
+        if not os.path.isfile(path):
+            continue
         out.append({
             "id": it.id,
-            "path": os.fsdecode(it.path),
+            "path": path,
             "title": it.title or "",
             "artist": it.artist or "",
             "albumartist": it.albumartist or "",
@@ -468,9 +509,16 @@ def _save_state(pl: dict) -> None:
     os.replace(tmp, p)
 
 
-def write_m3u(pl: dict) -> str:
-    """(Re)write the .m3u for a playlist state; returns its path."""
-    path = os.path.join(m3u_dir(), _safe_filename(pl["name"]) + ".m3u")
+def write_m3u(pl: dict, path: str | None = None) -> str:
+    """(Re)write the .m3u for a playlist state; returns its path.
+
+    An explicit path (or a path carried over from a previous state in
+    build()) wins over the name-derived one: Plex replaces a playlist by
+    m3u FILE path, so a rename must keep writing the same file — a new
+    filename would spawn a second playlist instead (Story 2.7,
+    'Umbenennung idempotent')."""
+    path = path or pl.get("m3u") \
+        or os.path.join(m3u_dir(), _safe_filename(pl["name"]) + ".m3u")
     lines = ["#EXTM3U"]
     for t in pl["tracks"]:
         if not t.get("dest"):
@@ -500,11 +548,17 @@ def build(job, specs: list[dict] | None, ids_before: set[int] | None) -> list[di
             # one state file each (plain job_id would overwrite)
             sf = job.job_id if len(specs) == 1 else (
                 f"{job.job_id}--{_safe_filename(spec['name'])}")
-            # keep earlier matches (item_id) stable across rebuilds
+            # keep earlier matches (item_id) stable across rebuilds; keep
+            # the m3u file path stable even across RENAMES — Plex replaces
+            # a playlist by file path, a new filename would spawn a second
+            # playlist (Story 2.7, 'Umbenennung idempotent')
             prev = None
+            prev_m3u = None
             old = _load_state(sf)
-            if old and old.get("name") == spec["name"]:
-                prev = {t["file"]: t for t in old.get("tracks", [])}
+            if old:
+                if old.get("name") == spec["name"]:
+                    prev = {t["file"]: t for t in old.get("tracks", [])}
+                prev_m3u = old.get("m3u")
             tracks = []
             for e in spec["entries"]:
                 t = dict(e)
@@ -528,7 +582,7 @@ def build(job, specs: list[dict] | None, ids_before: set[int] | None) -> list[di
                 "created": time.time(),
                 "tracks": tracks,
             }
-            write_m3u(pl)
+            write_m3u(pl, prev_m3u)
             _save_state(pl)
             states.append(pl)
     except Exception as e:
@@ -549,6 +603,29 @@ def summarize(pl: dict) -> str:
     return line
 
 
+def _resolve_upload_name(pl: dict) -> str | None:
+    """True name for a state still carrying a 'spotify-<id>' label (old
+    states built before the oEmbed fallback, or a leaked job-id slug).
+    Story 2.7: resolve ONCE from the query, rename the state + m3u in
+    place (same file path → Plex re-upload REPLACES, see write_m3u), so
+    repeated uploads stay idempotent. None = nothing to fix."""
+    name = pl.get("name") or ""
+    if not SPOTIFY_ID_NAME_RE.match(name):
+        return None
+    if not (pl.get("query") or "").strip().lower().startswith(
+            ("http://open.spotify.com", "https://open.spotify.com",
+             "http://spotify.link", "https://spotify.link")):
+        return None
+    real = _spotify_oembed_name(pl["query"])
+    if not real or real == name:
+        return None
+    pl["name"] = real
+    if pl.get("m3u"):
+        write_m3u(pl, pl["m3u"])
+        _save_state(pl)
+    return real
+
+
 def upload(states: list[dict]) -> list[str]:
     """Upload playlist states to Plex (after a library refresh). Returns
     message lines; empty when Plex is not configured or nothing to do."""
@@ -558,7 +635,12 @@ def upload(states: list[dict]) -> list[str]:
     for pl in states:
         if not pl.get("m3u"):
             continue
-        ok, note = plex_mod.upload_playlist(pl["m3u"], title=pl.get("name"))
+        title = pl.get("name")
+        real = _resolve_upload_name(pl)
+        if real:
+            msgs.append(f"🎵 Playlist umbenannt: „{title}“ → „{real}“")
+            title = real
+        ok, note = plex_mod.upload_playlist(pl["m3u"], title=title)
         if ok:
             msgs.append(f"🎵 {note}")
             pl["plex"] = {"uploaded": time.time(), "message": note}
@@ -566,6 +648,21 @@ def upload(states: list[dict]) -> list[str]:
         elif note:  # configured but failed
             msgs.append(f"⚠️ {note}")
     return msgs
+
+
+def state_for_job(job_id: str) -> list[dict]:
+    """Playlist states belonging to one fetch job id (exact match or the
+    multi-sidecar '<job_id>--<name>' variants). Used by the resume path
+    (Story 2.7) to re-upload a playlist whose staging folder is gone."""
+    job_id = (job_id or "").strip()
+    if not job_id:
+        return []
+    out = []
+    for pl in all_states():
+        if pl.get("job_id") == job_id or \
+                (pl.get("job_id") or "").startswith(f"{job_id}--"):
+            out.append(pl)
+    return out
 
 
 def find_by_name(name: str) -> list[dict]:

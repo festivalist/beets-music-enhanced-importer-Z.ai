@@ -226,6 +226,63 @@ def _mg_playlist_plans(root: str) -> list[dict]:
     return plans
 
 
+def _fetch_playlist_dirs(root: str) -> list[str]:
+    """Staging folders of interrupted (or still running) fetch jobs below
+    root: the root itself when it IS a fetch dir (ad-hoc
+    `musik ingest --root <library>/_incoming/fetch-…`), plus direct
+    `fetch-*` children (the bot/CLI create them there; Story 2.7)."""
+    from .scan import is_audio
+
+    candidates: list[str] = []
+    base = os.path.basename(os.path.normpath(root))
+    if base.startswith("fetch-"):
+        candidates.append(os.path.normpath(root))
+    try:
+        for name in sorted(os.listdir(root)):
+            if name.startswith("fetch-") and \
+                    os.path.isdir(os.path.join(root, name)):
+                candidates.append(os.path.join(root, name))
+    except OSError:
+        return []
+    out = []
+    for d in candidates:
+        try:
+            entries = os.listdir(d)
+        except OSError:
+            continue
+        if any(is_audio(n) for n in entries) or \
+                any(n.lower().endswith((".m3u", ".m3u8")) for n in entries):
+            out.append(d)
+    return out
+
+
+def _fetch_playlist_plans(root: str) -> list[dict]:
+    """Story 2.7: playlist specs for fetch staging dirs under root —
+    the recovery path for a bot job the restart killed mid-chain (11.6):
+    the timer imports the audio anyway, and with these plans it also
+    rebuilds + uploads the playlist instead of only bringing AUDIO.
+    Same prepare/build contract as the bot chain; job context (query,
+    kind) comes from the staging folder itself (fetch.job_from_dir)."""
+    from . import fetch as fetch_mod
+    from . import playlists as playlists_mod
+
+    plans = []
+    for d in _fetch_playlist_dirs(root):
+        job = fetch_mod.job_from_dir(d)
+        specs = playlists_mod.prepare(job)
+        if not specs:
+            continue
+        plans.append({
+            "job": job,
+            "specs": specs,
+            "ids": playlists_mod.snapshot_ids(),
+        })
+        print(f"ingest: fetch playlist „{specs[-1]['name']}“ "
+              f"({len(specs[-1]['entries'])} Einträge) vorgemerkt "
+              f"({job.job_id})")
+    return plans
+
+
 def _ingest_one(root: str) -> int:
     from . import asis as asis_mod
     from . import cleanup as cleanup_mod
@@ -292,6 +349,8 @@ def _ingest_one(root: str) -> int:
 
     # Story 2.2: MusicGrabber playlist dirs — singleton split + specs
     mg_plans = _mg_playlist_plans(root)
+    # Story 2.7: fetch staging dirs (interrupted bot jobs) — same contract
+    fetch_plans = _fetch_playlist_plans(root)
 
     print("ingest: running import (musicbrainz chain)")
     _activity("import", root)
@@ -303,14 +362,19 @@ def _ingest_one(root: str) -> int:
     _activity("asis", root)
     asis_mod.cmd_asis(only=root, include_pending=True)
 
-    # Story 2.2: match the imported playlist tracks, write the m3u
+    # Story 2.2 + 2.7: match the imported playlist tracks, write the m3u
     pl_states = []
-    if mg_plans:
+    if mg_plans or fetch_plans:
         from . import playlists as playlists_mod
 
         for plan in mg_plans:
             pl_states.extend(playlists_mod.build(
                 plan["job"], [plan["spec"]], plan["ids"]))
+            print(f"ingest: {playlists_mod.summarize(pl_states[-1])}"
+                  if pl_states else "ingest: playlist build leer")
+        for plan in fetch_plans:
+            pl_states.extend(playlists_mod.build(
+                plan["job"], plan["specs"], plan["ids"]))
             print(f"ingest: {playlists_mod.summarize(pl_states[-1])}"
                   if pl_states else "ingest: playlist build leer")
 

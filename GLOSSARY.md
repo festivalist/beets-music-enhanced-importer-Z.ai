@@ -74,6 +74,25 @@ Die Menge der Units, deren Import eine menschliche Entscheidung abwartet
 (Unit-Status `review`).
 _Avoid_: Review-Liste
 
+### Bot & Playlists
+
+**Bot-Job**:
+Ein Eintrag in der Telegram-Bot-Warteschlange (state/bot-jobs.json):
+Queued → Running → Done/Error. Fetch-Jobs merken sich ihren
+Staging-Ordner (`staging_dir`); nach einem Neustart werden sie
+gebounct (resume) statt mit „Link erneut schicken" liegen gelassen.
+
+**Job-Bounce**:
+Die Boot-Reparatur, die einen vom Neustart getöteten Fetch-Job mit
+erhaltener Staging-Mappe automatisch fortsetzt (ohne Re-Download) oder
+nur den fehlenden Playlist-Upload nachholt.
+
+**Playlist-State**:
+Der Zustands-JSON eines Spotify/YouTube-Playlist-Downloads
+(state/playlists/): Name, Query, Track-Zuordnungen (dest) und der
+m3u-Pfad. Der m3u-Pfad bleibt über Umbenennungen stabil — Plex ersetzt
+die Playlist beim Re-Upload per Dateipfad.
+
 ### Überwachung
 
 **Import-Monitor**:

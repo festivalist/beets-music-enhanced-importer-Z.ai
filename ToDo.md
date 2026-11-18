@@ -229,29 +229,39 @@ als Stories 4.1/4.3 weitergeführt.*
       keep_root schont Top-Level-Ordner, `ensure_staging_layout()` heilt
       vor jedem Download/nach jedem Ingest, Angebot jetzt engine-
       unabhängig (auch im Fallback-Pfad); smoke_cleanup_staging.py neu
-- [ ] 2.7 [ready-for-agent] Fetch-Playlist-Recovery + echte Spotify-Playlist-Namen
-  — **Befund 16.11. (Klare-Kante-Prüfung, Nutzer sah die Playlist nicht):**
-  (a) Der KK-Bot-Job (13.11.) wurde vom manuellen Bot-Restart getötet
-  (11.6-Markierung error) — die Re-Importe danach (flock-ingest/Timer)
-  bringen nur AUDIO, nie den Playlist-Build/-Upload: der hängt allein an
-  einem NORMAL abgeschlossenen Bot-Job (fetch._import_job-Kette). Kein
-  Wiederaufhol-Pfad → Playlist existierte nie in Plex (Notlösung 16.11.:
-  M3U aus MG-Watchlist `watched_playlist_tracks` (75/75) gegen beets
-  gematcht, `_playlists/Klare Kante.m3u` geschrieben, upload_playlist —
-  **75/75 live**; GOTCHA: Titel-Fallback-Matches auf STALE beets-Rows mit
-  toten Staging-Pfaden prüfen → nur Items mit existierender Datei).
-  (b) Spotify-Playlists heißen in Plex „spotify-37i9d…" statt Klare Kante
-  (Bestand: spotify-2mLk…, spotify-102Wv…): der echte Name wird nur für
-  YouTube aufgelöst (_youtube_order), für Spotify nie — Namensquelle
-  existiert aber: MG `watched_playlists.name` bzw. Spotify-API/yt-dlp.
-  Umsetzung: (1) Recovery — nach 11.6-Interrupt den Playlist-Build
-  nachholen, sobald die Units importiert sind (Job-Bounce statt „Link
-  erneut schicken", ohne Re-Download); (2) Namen — Spotify-Playlist-Titel
-  vor dem Upload auflösen (MG-Watchlist-Zuordnung per URL oder yt-dlp/Spotify-oEmbed),
-  Upload-Titel daraus statt „spotify-<id>"; Smoke-Matrix: Spotify/YT-Link,
-  Interrupt+Recovery, Umbenennung idempotent (Re-Upload ersetzt).
-      (Kandidatensuche dann aus den importierten Tags) und Freitext-
-      Album-Intent („artist - albumname" direkt als Album-Anfrage)
+- [x] 2.7 Fetch-Playlist-Recovery + echte Spotify-Playlist-Namen — **2026-11-18**:
+      (a) Recovery dreistufig, ohne Nutzerinteraktion und ohne Re-Download:
+      (1) Job-Record merkt sein Staging (`staging_dir`, via on_job_dir
+      BEVOR der Download läuft) und jede Fetch-Mappe trägt `_fetch_job.json`
+      (Query/Kind — cleanup archiviert den Marker mit der leeren Mappe);
+      (2) der Ingest-Timer ist playlist-bewusst für `fetch-…`-Dirs
+      (dieselbe prepare/build/upload-Kette wie die Bot-Route, Sidecar
+      bevorzugt, sonst oEmbed-Name + mtime-Ordnung) — der Interrupt-Fall
+      heilt sich im nächsten 15-min-Zyklus selbst; (3) 11.6-Bounce:
+      recover_interrupted bounct gekillte Fetch-Jobs (resume=True) mit
+      erhaltener Mappe → Worker setzt im GLEICHEN Ordner fort
+      (run_fetch(resume_dir) — Downloader skippen vorhandene Dateien) oder
+      — Staging schon weg, Playlist-State unuploaded — holt nur den Upload
+      nach (state_for_job); „Link erneut schicken" nur noch für echte
+      Verlustfälle (auch Smoke).
+      (b) Namen: Spotify ohne Sidecar → echter Titel per Spotify-oEmbed
+      (authfrei, live verifiziert 37i9dQZF1DXcBWIGoYBM5M → „Today's Top
+      Hits"; MG-Watchlist-Zuordnung bewusst NICHT gebaut — oEmbed ist
+      global und ohne Pi-Container-Abhängigkeit); Bestands-/Leak-States
+      mit `spotify-<id>`-Namen werden beim Upload einmalig umbenannt.
+      Umbenennung idempotent: m3u-DATEI-Pfad bleibt über Namensänderungen
+      stabil (write_m3u(prev_m3u)) → Plex-Re-Upload ERSETZT statt zweite
+      Playlist (upload_playlist matched per Pfad). KK-GOTCHA verankert:
+      Playlist-Matches nur auf Items mit existierender Datei
+      (_items_since Stale-Filter). prepare-Gate: Sidecar-Anwesenheit ist
+      Playlist-Beweis auch ohne Query (Pre-Marker-Resume).
+      Smoke: manual_tests/smoke_playlist_recovery.py (28/28 Suite grün;
+      Matrix Spotify/YT-Name, Interrupt+Recovery, Umbenennung idempotent —
+      netzfrei gemockt, oEmbed-Live-Probe in der Story). README
+      „Playlist links"/Recovery-Absatz, PI-SETUP 9.10. Offen für die
+      Abnahme: Live-End-to-End (Spotify-Playlist-Link + Restart-Mitten-
+      im-Job) am nächsten echten Playlist-Request — KK selbst ist längst
+      75/75 in Plex.
 
 ## EPIC 3 — Beschaffung ohne Nutzerinteraktion
 
