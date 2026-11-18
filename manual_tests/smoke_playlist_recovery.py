@@ -445,7 +445,7 @@ _MG_API = {
         {"id": "aaa", "name": "Techno Beats Mix", "enabled": 1,
          "use_playlists_dir": 0},
         {"id": "bbb", "name": "KK", "enabled": 1,
-         "use_playlists_dir": 1},          # 2.2's territory -> skipped
+         "use_playlists_dir": 1},          # dir=1: watchlist spec still wins
         {"id": "ccc", "name": "Aus", "enabled": 0,
          "use_playlists_dir": 0},          # disabled -> skipped
     ]},
@@ -453,6 +453,9 @@ _MG_API = {
         {"artist": "Maddix", "title": "Rave Therapy"},
         {"artist": "Creeds", "title": "Push Up"},
         {"artist": "", "title": ""},       # skipped: no title
+    ]},
+    "GET /api/watched-playlists/bbb/tracks": {"tracks": [
+        {"artist": "Kettcar", "title": "Landungsbrücken"},
     ]},
 }
 
@@ -464,13 +467,35 @@ def fake_api(method, path, json_body=None, timeout=None):
 MG._api = fake_api
 P.snapshot_ids = lambda: set()
 wplans = ing._watchlist_playlist_plans(incoming)
-assert len(wplans) == 1, wplans
+assert [p["job"].job_id for p in wplans] == \
+    ["mg-Techno Beats Mix", "mg-KK"], wplans
 plan = wplans[0]
-assert plan["job"].job_id == "mg-Techno Beats Mix", plan["job"].job_id
 assert plan["specs"][0]["name"] == "Techno Beats Mix"
 assert [e["title"] for e in plan["specs"][0]["entries"]] == \
     ["Rave Therapy", "Push Up"]          # API order preserved
-print("11) watchlist plans from MG API (dir-less lists only) OK")
+print("11) watchlist plans from MG API (all enabled, disabled skipped) OK")
+
+# steady state (state complete + fully matched) is not planned again
+P._save_state({"job_id": "mg-KK", "name": "KK",
+               "state_file": "mg-KK",
+               "tracks": [{"file": "Kettcar - Landungsbrücken",
+                           "artist": "Kettcar", "title": "Landungsbrücken",
+                           "dest": live_path}]})
+wplans = ing._watchlist_playlist_plans(incoming)
+assert [p["job"].job_id for p in wplans] == ["mg-Techno Beats Mix"], wplans
+print("    steady-state watchlist skipped OK")
+
+# heal gate: state incomplete (fewer tracks than API) -> planned again
+P._save_state({"job_id": "mg-Techno Beats Mix", "name": "Techno Beats Mix",
+               "state_file": "mg-Techno Beats Mix",
+               "tracks": [{"file": "Maddix - Rave Therapy",
+                           "artist": "Maddix", "title": "Rave Therapy",
+                           "dest": live_path}]})
+wplans = ing._watchlist_playlist_plans(incoming)
+assert [p["job"].job_id for p in wplans] == \
+    ["mg-Techno Beats Mix"], wplans      # KK stays steady-state-skipped
+assert len(wplans[0]["specs"][0]["entries"]) == 2   # full API order again
+print("    incomplete/heal state replanned OK")
 
 # unreachable MG -> no plans, no crash
 MG.available = lambda: False

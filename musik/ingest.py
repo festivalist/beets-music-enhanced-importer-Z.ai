@@ -284,16 +284,16 @@ def _fetch_playlist_plans(root: str) -> list[dict]:
 
 
 def _watchlist_playlist_plans(root: str) -> list[dict]:
-    """Story 2.9: playlist specs straight from MG's watchlist DB for
-    watchlists with use_playlists_dir=0 — those write their files + m3u
-    into Singles/<Artist>/ (live case 'Techno Beats Mix' 18.11.), where
-    the 2.2 machinery (Playlists/ marker) never looks and the m3u dies
-    in the junk sweep. The API provides name + full tracked order
-    regardless of where the files landed, so the Plex playlist builds —
-    and heals (entries without dest re-match) — every cycle that sees
-    new files under the root. Same state-file naming as the 2.2 plans
-    ('mg-<Name>'), so a later switch to the Playlists dir stays
-    idempotent. [] when MG is unreachable or no such watchlist exists."""
+    """Story 2.9: playlist specs straight from MG's watchlist DB — the
+    API provides name + the full tracked order for EVERY enabled
+    watchlist, regardless of where the files landed (use_playlists_dir=0
+    writes into Singles/<Artist>/ where the 2.2 machinery never looks;
+    live case 'Techno Beats Mix' 18.11.) and independent of MG's own m3u
+    regeneration timing. The watchlist spec therefore SUPERSEDES the 2.2
+    plan for the same name (caller skips it). Steady-state cheap: a
+    watchlist is only planned when its state is missing, incomplete
+    (fewer tracks than the API lists — new downloads arrived) or has
+    unmatched entries (heal). [] when MG is unreachable."""
     from types import SimpleNamespace
 
     from . import musicgrabber as mg
@@ -304,15 +304,15 @@ def _watchlist_playlist_plans(root: str) -> list[dict]:
         return []
     try:
         data = mg._api("GET", "/api/watched-playlists")
-    except (mg.MGUnavailable, Exception) as e:
+    except Exception as e:
         print(f"ingest: watchlist specs nicht lesbar ({str(e)[:100]})")
         return []
     singles_root = os.path.join(
         os.path.normpath(root), "musicgrabber", "Singles")
     plans = []
     for pl in (data.get("playlists") or []):
-        if not pl.get("enabled") or pl.get("use_playlists_dir"):
-            continue  # 2.2 covers these via the Playlists/ dir
+        if not pl.get("enabled"):
+            continue
         try:
             tr = mg._api(
                 "GET", f"/api/watched-playlists/{pl['id']}/tracks")
@@ -334,6 +334,13 @@ def _watchlist_playlist_plans(root: str) -> list[dict]:
         if not entries:
             continue
         name = (pl.get("name") or "").strip() or "MG Watchlist"
+        states = playlists_mod.state_for_job(f"mg-{_safe_filename(name)}")
+        prev = states[0] if len(states) == 1 else None
+        if prev is not None:
+            ts = prev.get("tracks") or []
+            unmatched = sum(1 for t in ts if not t.get("dest"))
+            if len(ts) >= len(entries) and not unmatched:
+                continue  # steady state: complete and fully matched
         plans.append({
             "job": SimpleNamespace(
                 job_id=f"mg-{_safe_filename(name)}",
@@ -416,18 +423,13 @@ def _ingest_one(root: str) -> int:
     mg_plans = _mg_playlist_plans(root)
     # Story 2.7: fetch staging dirs (interrupted bot jobs) — same contract
     fetch_plans = _fetch_playlist_plans(root)
-    # Story 2.9: Playlists-dir-less MG watchlists — only when this cycle
-    # actually has fresh staging (otherwise the API poll + snapshot would
-    # run every 15 min for nothing)
-    watchlist_plans: list[dict] = []
-    if not mg_plans:
-        pending_new = sum(
-            1 for k, u in state_mod.units(state_mod.load()).items()
-            if u.get("status") == "pending"
-            and state_mod.path_under(state_mod.norm_key(k), rk)
-        )
-        if pending_new:
-            watchlist_plans = _watchlist_playlist_plans(root)
+    # Story 2.9: watchlist specs from MG's API supersede the 2.2 plans of
+    # the same name (full tracked order, heals unmatched entries); the 2.2
+    # plans stay for the singleton split and any non-watchlist dirs
+    watchlist_plans = _watchlist_playlist_plans(root)
+    wl_names = {p["specs"][0]["name"] for p in watchlist_plans}
+    mg_plans = [p for p in mg_plans
+                if p["spec"]["name"] not in wl_names]
 
     print("ingest: running import (musicbrainz chain)")
     _activity("import", root)
@@ -455,8 +457,13 @@ def _ingest_one(root: str) -> int:
             print(f"ingest: {playlists_mod.summarize(pl_states[-1])}"
                   if pl_states else "ingest: playlist build leer")
         for plan in watchlist_plans:
-            pl_states.extend(playlists_mod.build(
-                plan["job"], plan["specs"], plan["ids"]))
+            states = playlists_mod.build(
+                plan["job"], plan["specs"], plan["ids"])
+            # brand-new watchlist, nothing imported yet: no empty playlist
+            # upload — the state stays and heals as tracks arrive
+            states = [s for s in states
+                      if any(t.get("dest") for t in s.get("tracks", []))]
+            pl_states.extend(states)
             print(f"ingest: {playlists_mod.summarize(pl_states[-1])}"
                   if pl_states else "ingest: playlist build leer")
 

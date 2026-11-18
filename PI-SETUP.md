@@ -685,11 +685,12 @@ Installer (70-musicgrabber) prüft Overlay-Datei und
   Ordner benutzen"** (use_playlists_dir — sonst landen die Tracks in
   `Singles/` und die 2.2-Playlist-Kette greift nicht) + **„Create M3U"**;
   Sync-Modus *Append* für wachsende, *Mirror* für kuratierte Listen.
-  Seit Story 2.9 (2026-11-18) baut der Ingest für use_playlists_dir=0-
-  Watchlists die Plex-Playlist trotzdem — Name+Reihenfolge kommen dann
-  aus MGs Watchlist-DB (Watched-API), der lokale M3U-Verlust im
-  Cleanup-Junk-Sweep schadet also nicht mehr; die Playlists-Ordner-
-  Empfehlung bleibt (echte M3U-Ordnung ist die bessere Quelle).
+  Seit Story 2.9 (2026-11-18) baut der Ingest die Plex-Playlist für
+  JEDE Watchlist direkt aus MGs Watched-API (volle Track-Ordnung,
+  unabhängig vom Dateiort) und ersetzt damit MGs eigene M3U als
+  Spec-Quelle — der lokale M3U-Verlust im Cleanup-Junk-Sweep und
+  use_playlists_dir-Fehlstellungen schaden also nicht mehr; die
+  Playlists-Ordner-Empfehlung bleibt (MGs Dateiordnung bleibt sauber).
   **Re-Download fehlender Dateien ist per compose-ENV global AUS**
   (`REDOWNLOAD_MISSING_FILES=false`) — unser Ingest verschiebt jede
   geladene Datei in die Bibliothek; mit MGs Default (an) würde jede

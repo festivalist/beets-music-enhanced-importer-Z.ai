@@ -266,16 +266,25 @@ als Stories 4.1/4.3 weitergeführt.*
       + Matcher-/Integrity-Lücken — **ERLEDIGT 2026-11-18** (Befund:
       „Techno Beats Mix", Spotify 37i9dQZF1EIhi15O2hEGJA, 50 Tracks,
       Nutzer-Anlage mit use_playlists_dir=0):
-      (a) `_watchlist_playlist_plans()` im Ingest: für enabled
-      Watchlists MIT use_playlists_dir=0 kommen Name+volle
-      Track-Ordnung direkt aus MGs Watched-API (GET /api/watched-
-      playlists[/id/tracks]) — egal, wo MG die Dateien abgelegt hat;
-      gleiche State-Benennung wie 2.2 (mg-<Name>) → idempotent auch
-      bei späterem Flip; Gate: nur Zyklen mit frischem Staging
-      (pending>0) und nur wenn 2.2 nicht ohnehin feuert; MG-unreach-
-      able degradiert zu []. Übergang vorab: Watchlist per PUT auf
-      use_playlists_dir=1 gestellt, Übergangs-Playlist manuell aus der
-      archivierten m3u gebaut (43/50 live in Plexamp).
+      (a) `_watchlist_playlist_plans()` im Ingest: für ALLE enabled
+      Watchlists kommen Name+volle Track-Ordnung direkt aus MGs
+      Watched-API (GET /api/watched-playlists[/id/tracks]) — egal, wo
+      MG die Dateien abgelegt hat und unabhängig von MGs m3u-
+      Regeneration; gleiche State-Benennung wie 2.2 (mg-<Name>) →
+      idempotent. Die Watchlist-Spec SUPERSEDET die 2.2-Pläne desselben
+      Namens (2.2 bleibt für den Singleton-Split + Nicht-Watchlist-
+      Dirs); Steady-State-Gate: nur planen, wenn State fehlt/unvoll-
+      ständig (neue Downloads)/unmatched (Heal) — sonst nur 2 kleine
+      API-Calls pro Zyklus; leerer Erst-Build (noch nichts importiert)
+      wird nicht hochgeladen, der State heilt nach. MG-unreachable
+      degradiert zu []. **Lehre aus dem 16:00-Lauf:** die Erstfassung
+      gate'te auf use_playlists_dir=0 + pending>0 und überließ
+      dir=1-Watchlists stillschweigend der 2.2-Maschinerie — die im
+      großen Zyklus keinen Plan lieferte (leer, ohne Log-Zeile);
+      Watchlist-API als alleinige Spec-Quelle ist die robustere Regel.
+      Übergang vorab: Watchlist per PUT auf use_playlists_dir=1
+      gestellt, Übergangs-Playlist manuell aus der archivierten m3u
+      gebaut (43/50 live in Plexamp).
       (b) Matcher in playlists._score um zwei Regeln erweitert
       (jeweils +3, nur wenn <3): Mid-Titel-Varianten (Common-Präfix
       ≥12 + kompatible Rest-Schwänze — „… - Techno Mix" vs „…
