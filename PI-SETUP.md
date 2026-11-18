@@ -721,6 +721,17 @@ Alben des jeweiligen Laufs an — Zyklen ohne Importe dauern Sekunden statt
 >1 h (Dauerbetrieb behoben, der Lock ist wieder frei für Bot/Monitor-
 Aktionen). Der Monitor-Tab zeigt die aktuelle Ingest-Phase live
 (Herzschlag `state/ingest-current.json`).
+**Vorkommnis 2026-11-18 (Deploy-Falle):** Der Timer wurde während eines
+Toolchain-Deploys manuell gestoppt (flock-Konflikt vermeiden) und nicht
+wieder gestartet — MG-Watchlist-Downloads stapelten sich unbemerkt, bis
+der nächste manuelle Ingest lief. **Regel:** Nach jedem manuellen
+`systemctl stop musik-ingest.timer` (und nach jedem Deploy/Handgriff am
+Pi) `systemctl is-active musik-ingest.timer` prüfen — bei `inactive`:
+`sudo systemctl start musik-ingest.timer`. Diagnose-Hinweis
+(systemd 257): Solange der Ingest-Service läuft, zeigt
+`list-timers`/`NextElapseUSecRealtime` transient `-`/leer — erst nach
+Service-Ende prüfen; gesund = `NextElapseUSecRealtime` auf die nächste
+15-min-Marke gesetzt und `LastTriggerUSec` wandert mit.
 
 **9.7 Betrieb:**
 
