@@ -262,6 +262,38 @@ als Stories 4.1/4.3 weitergeführt.*
       Abnahme: Live-End-to-End (Spotify-Playlist-Link + Restart-Mitten-
       im-Job) am nächsten echten Playlist-Request — KK selbst ist längst
       75/75 in Plex.
+- [ ] 2.9 [ready-for-agent] MG-Watchlist ohne Playlists-Dir → keine Plex-Playlist
+      + Matcher-/Integrity-Lücken — **Befund 18.11. („Techno Beats Mix",
+      Spotify 37i9dQZF1EIhi15O2hEGJA, 50 Tracks, Nutzer-Anlage):**
+      (a) Watchlist mit `use_playlists_dir=0` schreibt Dateien+m3u nach
+      `Singles/…` — die 2.2-Maschinerie liest nur `musicgrabber/Playlists/`
+      → kein Playlist-Build, die m3u wurde vom Cleanup-Junk-Sweep
+      archiviert. Übergang 18.11.: Watchlist per PUT auf
+      use_playlists_dir=1 gestellt (persistiert in MG /data), Übergangs-
+      Playlist manuell aus der archivierten m3u-Ordnung gegen beets
+      gematcht (43/50 live in Plexamp; gleiche Idempotenz wie KK —
+      2.2-Rebuild schreibt denselben Dateipfad und ersetzt). Umsetzung:
+      Watchlist-Anlage validieren (use_playlists_dir erzwingen oder
+      Default umdrehen) UND/ODER `_mg_playlist_plans` um die
+      Watchlist-API (`watched-playlists/{id}/tracks` = Name+Ordnung
+      aus MG-DB) als Spec-Quelle erweitern — global, nicht pro Fall.
+      (b) Matcher-Lücke (auch in playlists._score): Mid-Titel-Varianten
+      matchen nicht („Winter (The Four Seasons) - Techno Mix" vs
+      beets „…(Extended Techno Mix)") — Regel: Common-Präfix ≥12 +
+      kompatibler Rest-Schwanz als zusätzliche Score-Stufe (live 1
+      Match gewonnen, 18.11.); in Smoke verankern.
+      (c) MG watched-track-Integrity: Artist-Credit-Varianten failen
+      dauerhaft (3/50: „feat./&"-Reihenfolge, Disney-Credit) —
+      retry-track läuft ins gleiche Messer; Kandidaten-Entscheidung
+      (Credits kanonisieren wie 3.3-Störtebeker oder Match-Guard
+      lockern) noch offen.
+      (d) MG `downloaded_count` schrumpft nach Ingest-Move (42→15/50,
+      file_missing_at-Marker) — nur Anzeige, 3.1-ENV verhindert
+      Re-Downloads; „unresolved→healed"-Pfad prüfen, damit die m3u-
+      Regeneration die verschobenen Dateien nicht vergisst.
+      (e) Qualität: 5/39 heute importierte Opus 128–133k (<200k,
+      YouTube-Quellen) → Upgrade-Kandidaten über die KK-Mechanik
+      (Watchlist-Re-Download → Qualitätsvergleich), beim Nutzer melden.
 
 ## EPIC 3 — Beschaffung ohne Nutzerinteraktion
 
