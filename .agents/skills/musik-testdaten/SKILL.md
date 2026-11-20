@@ -1,6 +1,6 @@
 ---
 name: musik-testdaten
-description: Test-Policy des musik-Projekts (MusicBrainz-automated). Nutze dieses Skill immer, wenn Features getestet oder verifiziert werden, Import-/Fetch-/Plex-Ketten geprüft werden oder Testläufe geplant werden. Kern: feste Testmatrix (Alben, Singles/EPs, Top-100-Releases, Spotify- und YouTube-Playlists, 0-day) und bei fehlenden Testdaten aktiv beim Anwender nachfragen statt degeneriert zu testen.
+description: "Test-Policy des musik-Projekts (MusicBrainz-automated). Nutze dieses Skill immer, wenn Features getestet oder verifiziert werden, Import-/Fetch-/Plex-Ketten geprüft werden oder Testläufe geplant werden. Kern: feste Testmatrix (Alben, Singles/EPs, Top-100-Releases, Spotify- und YouTube-Playlists, 0-day) und bei fehlenden Testdaten aktiv beim Anwender nachfragen statt degeneriert zu testen."
 ---
 
 # musik — Testdaten-Policy

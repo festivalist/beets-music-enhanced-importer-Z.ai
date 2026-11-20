@@ -1,6 +1,6 @@
 ---
 name: musik-dev-prinzipien
-description: Kernprinzipien für alle Entwicklungsarbeit am musik-Projekt (MusicBrainz-automated). Nutze dieses Skill bei JEDEM Feature, Fix, Refactoring oder Konfig-Change in diesem Repo — auch wenn der Nutzer nur "mach das mal" sagt. Kern: konsistente Musik-Datenbank zuerst, Anwender automatisiert entlasten, Regeln global statt für Einzelfälle.
+description: "Kernprinzipien für alle Entwicklungsarbeit am musik-Projekt (MusicBrainz-automated). Nutze dieses Skill bei JEDEM Feature, Fix, Refactoring oder Konfig-Change in diesem Repo — auch wenn der Nutzer nur \"mach das mal\" sagt. Kern: konsistente Musik-Datenbank zuerst, Anwender automatisiert entlasten, Regeln global statt für Einzelfälle."
 ---
 
 # musik — Entwicklungsprinzipien

@@ -1,6 +1,6 @@
 ---
 name: musik-doku-hygiene
-description: Doku- und Aufräum-Regeln für das musik-Projekt (MusicBrainz-automated). Nutze dieses Skill beim Abschließen von Arbeiten und Commits, beim Ändern von README/PI-SETUP/SCOPE/ToDo, beim Anlegen neuer Dateien und beim Aufräumen des Repos. Kern: Fortschritt, offene Aufgaben und Installation (Unix UND Windows) stets am selben Ort dokumentieren; obsolete Test- und Hilfsdateien im selben Change löschen.
+description: "Doku- und Aufräum-Regeln für das musik-Projekt (MusicBrainz-automated). Nutze dieses Skill beim Abschließen von Arbeiten und Commits, beim Ändern von README/PI-SETUP/SCOPE/ToDo, beim Anlegen neuer Dateien und beim Aufräumen des Repos. Kern: Fortschritt, offene Aufgaben und Installation (Unix UND Windows) stets am selben Ort dokumentieren; obsolete Test- und Hilfsdateien im selben Change löschen."
 ---
 
 # musik — Doku & Repo-Hygiene
