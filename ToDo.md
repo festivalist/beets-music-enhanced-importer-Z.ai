@@ -410,23 +410,32 @@ als Stories 4.1/4.3 weitergeführt.*
   - [x] 3.3d Smoke smoke_upgrades.py (Scanner/Planung/Entscheidungen/
         Batch-Flows mit FakeMG; Suite 29/29), Doku (SCOPE-Dated-Change/
         README/PI-SETUP) — Deploy Pi + Live-Check offen
-  - [ ] 3.3e Batch-Executor-Härtung + b001-Nachlauf (Befund 18.11./20.11.,
-        Fix 20.11.): erster Echtlauf lief SCHIEF — Timer importierte
-        während der ~1,5-h-Download-Phase die MG-Singles als Ein-Track-
-        Alben über die MB-Albensuche → 22 Namensvetter-/Karaoke-Kopien
-        (Sunfly/Tribute/Panpipes) landeten neben den Originalen, 62
-        Downloads parksten als `Singles/Unknown`-Review-Einheit (MG
-        schrieb Unknown-Artist), Buchhaltung meldete fälschlich „88
-        behalten". accounting-realität: 0 echte Ersetzungen / 19 korrekt
-        als schlechter verworfen / 6 echt behalten. Fix: GESAMTER Batch
-        unter ingest.lock (Timer kann nicht zwischengreifen), Identitäts-
-        Gate je Download (Dauer ±5 s + fpcalc-Fingerprint vs. alte Datei
-        → Verwerfen als `upgrade-namesake`), Tag-Stamping aus dem
-        Bestands-Row, Einzelordner→Singleton-Isolation, asis-Import
-        (2.3/2.8-Gate entscheidet), statusgetreue Auswertung mit
-        `staged`/`namesake`/`partial` statt Schein-„kept". Suite 29/29.
-        Offen: b001 heilen (62 Staged-Files über den neuen Pfad), Junk-
-        Rollback der 22 Kopien (ID-Tabelle), bereinigtes Ergebnis.
+  - [x] 3.3e Batch-Executor-Härtung + b001-Nachlauf **ERLEDIGT + DEPLOYED
+        20.11. (b9b0e3d + Live-Heilung):** erster Echtlauf b001 lief schief
+        — Timer importierte während der ~1,5-h-Download-Phase die MG-
+        Singles als Ein-Track-Alben über die MB-Albensuche → 26 Namens-
+        vetter-/Karaoke-Kopien (Sunfly/Tribute/Panpipes) landeten neben
+        den Originalen, 62 Downloads parkten als `Singles/Unknown`-
+        Review-Einheit (MG schrieb Unknown-Artist), Auswertung meldete
+        fälschlich „88 behalten" (real 0 Ersetzungen, 19 korrekt
+        verworfen, 6 echt behalten). Fix: GESAMTER Batch unter
+        ingest.lock, Identitäts-Gate je Download (Dauer ±5 s + fpcalc-
+        Fingerprint vs. alte Datei → `upgrade-namesake`), Tag-Stamping
+        aus dem Bestands-Row, Einzelordner→Singleton-Isolation, asis-
+        Import (2.3/2.8-Gate), statusgetreue Auswertung (`staged`/
+        `namesake`/`partial`). Nachlauf: 26 Junk-Kopien per ID-Tabelle
+        mit Tag-Assertionen rückgerollt, Heal-Lauf über den neuen Pfad
+        (Gate: 27 bereit / 26 Namensvetter verworfen), ein übereifriger
+        Pair-Swap (121 Removes, Stale-Pool-Bug bei Mehrfach-Kandidaten)
+        vollständig aus `_trash` restauriert (115/115 + Rows via
+        Item.from_path) und korrekt wiederholt (28). **ENDSTAND b001:
+        26 Kandidaten mit nachweislich besserer Kopie (320k-Klasse), 66
+        unangetastet (Quelle nicht besser), 17 verworfen; Review 0,
+        Staging 0, tote Rows 0, Lib 34.416 Items, Plex-Refresh lief.**
+        Suite 29/29 Win+Pi. Rest-Risiko dokumentiert: Karaoke mit
+        identischer Dauer OHNE Fingerprint-Abweichung kann das Gate
+        theoretisch passieren (Quotenrisiko, Trash reversibel);
+        dup_risk-Liste = Alt-Dubletten (dedupe --fingerprint-Territorium).
 
 ## EPIC 6 — Code-Health (Audit 2026-10-08: Totcode/Datentypen/Struktur/Konventionen)
 
