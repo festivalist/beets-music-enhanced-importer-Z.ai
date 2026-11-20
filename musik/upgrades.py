@@ -19,6 +19,7 @@ import json
 import os
 import tempfile
 import time
+from collections import defaultdict
 
 from .paths import musik_config, reports_dir, state_dir
 
@@ -622,18 +623,21 @@ def _reconcile(lib, items: list[dict]) -> dict:
     der Lib), kept (Quelle nicht besser — Dupe-Gate hat die Neukopie
     archiviert), namesake (Identitäts-Gate hat verworfen), staged (liegt
     noch im Staging — KEIN 'kept'!), no_source, gone, kept-user.
-    lib=None überspringt die Hydration (nichts zu prüfen)."""
+    Bewertet wird immer die BESTE Lib-Kopie des Paares (matches[0] war
+    bei Mehrfach-Kopien willkürlich — Befund b002: meldete 0 ersetzt bei
+    20 echten Upgrades). lib=None überspringt die Hydration."""
     from .scan import norm_name
 
-    hydrated = []
+    # pair -> [(length, item)] — exakte Paare O(1); der teure Fuzzy-Scan
+    # (34k × norm_name pro Kandidat ≈ Minuten auf dem ARM) läuft nur für
+    # Paare, die kein exaktes Match haben.
+    by_pair: dict = defaultdict(list)
     if lib is not None:
         for it in lib.items():
-            hydrated.append((
-                (norm_name(getattr(it, "artist", "") or ""),
-                 norm_name(getattr(it, "title", "") or "")),
-                float(getattr(it, "length", 0) or 0),
-                it,
-            ))
+            pair = (norm_name(getattr(it, "artist", "") or ""),
+                    norm_name(getattr(it, "title", "") or ""))
+            by_pair[pair].append((float(getattr(it, "length", 0) or 0), it))
+
     counts = {"replaced": 0, "kept": 0, "namesake": 0, "staged": 0,
               "no_source": 0, "gone": 0, "kept_user": 0}
     dup_risk: list[str] = []
@@ -659,24 +663,27 @@ def _reconcile(lib, items: list[dict]) -> dict:
             continue
         pair = (norm_name(c["artist"]), norm_name(c["title"]))
         length = float(c.get("length") or 0)
-        exact, fuzzy = [], []
-        for hp, hlen, it in hydrated:
-            if abs(hlen - length) > 15:
-                continue
-            if hp == pair:
-                exact.append(it)
-            elif (_token_overlap(c["title"], it.title)
-                  and _token_overlap(c["artist"], it.artist)):
-                fuzzy.append(it)
-        matches = exact or fuzzy
+        matches = [(hlen, it) for hlen, it in by_pair.get(pair, [])
+                   if abs(hlen - length) <= 15]
+        if not matches:
+            # Fuzzy nur für paare ohne exakten Treffer (Retitle/feat-Credits)
+            for hp, rows in by_pair.items():
+                if hp == pair:
+                    continue
+                for hlen, it in rows:
+                    if abs(hlen - length) > 15:
+                        continue
+                    if (_token_overlap(c["title"], it.title)
+                            and _token_overlap(c["artist"], it.artist)):
+                        matches.append((hlen, it))
         if not matches:
             counts["gone"] += 1
             continue
-        if len(matches) > 1:
+        if len({getattr(it, "id", id(it)) for _hlen, it in matches}) > 1:
             dup_risk.append(f"{c['artist']} - {c['title']} "
                             f"({len(matches)} Kopien)")
-            continue
-        if _quality_tuple(matches[0]) > (_fmt_tier(c["format"]), c["kbps"]):
+        best = max(matches, key=lambda m: _quality_tuple(m[1]))[1]
+        if _quality_tuple(best) > (_fmt_tier(c["format"]), c["kbps"]):
             counts["replaced"] += 1
         else:
             counts["kept"] += 1
