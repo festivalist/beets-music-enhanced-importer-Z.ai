@@ -292,6 +292,21 @@ Bestands-Upgrades ohne je Batch-Entscheidung bleiben §8. Konfig:
 `musik: upgrades: {threshold_kbps: 200, batch_size: 109,
 ingest_patience: 7200}`.*
 
+*Scope-Change-Nachtrag 2026-11-20 (Batch-Executor-Härtung nach dem
+ersten Echtlauf, Befund b001 18.11.): der Batch läuft GESAMT unter dem
+ingest.lock (der 15-min-Timer darf Staging-Downloads nicht zwischendurch
+als Ein-Track-Alben über die MB-Albensuche importieren — dabei rutschten
+Karaoke-/Tribute-Treffer als „besser" durch). Je Download gilt ein
+Identitäts-Gate (Dauer ±5 s + fpcalc/pyacoustid-Fingerprint gegen die
+alte Datei; Verwerfen als `upgrade-namesake`), Tags werden aus dem
+Bestands-Row gestempelt, Import erfolgt pro Datei als Singleton über
+asis (dort zieht das 2.3/2.8-Dupe-Gate). Reststände im Staging =
+Batch-Status `partial` statt verfälschtem „behalten". Der erste
+Echtlauf b001 (109 Tracks, vor der Härtung) endete mit 0 echten
+Ersetzungen: 19 korrekt als schlechter verworfen, 62 im Staging
+geparkt (MG schrieb `Unknown`-Artist), 22 Namensvetter-Kopien neben den
+Originalen importiert (nach ID-Tabelle zurückgerollt), 6 echt behalten.*
+
 *Scope change 2026-10-21 (VA-Kompilations-Guard + Survivor-Import,
 Stories 10.5/10.6): Album-Units mit VA-Identität (kein Albumartist,
 mehrere Track-Artists), die keinen MusicBrainz-Kandidaten passieren,

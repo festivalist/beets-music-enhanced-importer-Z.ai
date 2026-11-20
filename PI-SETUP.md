@@ -663,17 +663,22 @@ der Qualitätsschwelle (`musik: upgrades: threshold_kbps`, Default 200
 kbps) werden zu Batches à ≤ `batch_size` (Default 109) geplant
 (`musik upgrades` oder der „🔍 Scan jetzt"-Button schreibt
 `state/upgrades.json` + `reports/upgrade-report.md`). „⬇️ Nachladen"
-lädt je Track über die MusicGrabber-Suche neu (lossless-first,
-Cover-Guard) und überlässt die Entscheidung dem Import: der
-2.3/2.8-Dupe-Vergleich behält automatisch die bessere Kopie, der
-Verlierer geht nach `_trash` — eine schlechtere Neukopie kann die
-Bibliothek also nicht verschlechtern. Je Track „🔇 Behalten" nimmt ihn
-aus allen Batches (Entscheidungen überleben Rescans); ohne Quelle /
-nicht besser sind dokumentierte Ergebnisse, Mehrfach-Treffer werden als
-`dup_risk` gemeldet. Läuft der ingest.lock dauerhaft, parkt der Batch
-als `ingest-pending` — erneutes Anstoßen holt nur Ingest + Auswertung
-nach (kein Re-Download). Grundlage: datierter Scope-Change 2026-11-18
-in SCOPE.md. Das
+läuft GESAMT unter dem ingest.lock (inkl. Downloads — der 15-min-Timer
+kann das Staging nicht zwischendurch leeren) und schaltet pro Datei ein
+**Identitäts-Gate** vor den Import: Dauer ±5 s gegen den Bestands-Track
+plus Audio-Fingerprint-Vergleich (fpcalc/pyacoustid) gegen die ALTE
+Datei — Namensvetter/Karaoke landen als `upgrade-namesake` im `_trash`,
+BEVOR sie importieren können (Befund 18.11.: Sunfly-Karaoke/Hip-Hop-
+Tribute-Kopien waren sonst über die reine Qualitätsbetrachtung als
+„besser" durchgerutscht). Artist/Title-Tags werden aus dem Bestands-Row
+gestempelt (MG-Quellen schreiben teils `Unknown`), dann importiert je
+Datei als Singleton per asis, wo der 2.3/2.8-Dupe-Vergleich rein
+qualitätsbasiert ersetzt/archiviert. Ohne Quelle / nicht besser =
+dokumentiertes Ergebnis; Reststände im Staging → Status `partial`,
+erneutes Anstoßen holt nur Import + Auswertung nach (kein Re-Download).
+Je Track „🔇 Behalten" nimmt ihn aus allen Batches (Entscheidungen
+überleben Rescans); Mehrfach-Treffer werden als `dup_risk` gemeldet.
+Grundlage: datierter Scope-Change 2026-11-18 in SCOPE.md. Das
 Upstream-Backend bleibt unangetastet; unsere
 UI-Stellen sind mit `musik-monitor`-Markern geflaggt. Bump-Prozedur mit
 Overlay-Verträglichkeitscheck: `musicgrabber/overlay/README.md`. Der

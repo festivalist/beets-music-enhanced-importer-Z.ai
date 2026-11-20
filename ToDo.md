@@ -410,6 +410,23 @@ als Stories 4.1/4.3 weitergeführt.*
   - [x] 3.3d Smoke smoke_upgrades.py (Scanner/Planung/Entscheidungen/
         Batch-Flows mit FakeMG; Suite 29/29), Doku (SCOPE-Dated-Change/
         README/PI-SETUP) — Deploy Pi + Live-Check offen
+  - [ ] 3.3e Batch-Executor-Härtung + b001-Nachlauf (Befund 18.11./20.11.,
+        Fix 20.11.): erster Echtlauf lief SCHIEF — Timer importierte
+        während der ~1,5-h-Download-Phase die MG-Singles als Ein-Track-
+        Alben über die MB-Albensuche → 22 Namensvetter-/Karaoke-Kopien
+        (Sunfly/Tribute/Panpipes) landeten neben den Originalen, 62
+        Downloads parksten als `Singles/Unknown`-Review-Einheit (MG
+        schrieb Unknown-Artist), Buchhaltung meldete fälschlich „88
+        behalten". accounting-realität: 0 echte Ersetzungen / 19 korrekt
+        als schlechter verworfen / 6 echt behalten. Fix: GESAMTER Batch
+        unter ingest.lock (Timer kann nicht zwischengreifen), Identitäts-
+        Gate je Download (Dauer ±5 s + fpcalc-Fingerprint vs. alte Datei
+        → Verwerfen als `upgrade-namesake`), Tag-Stamping aus dem
+        Bestands-Row, Einzelordner→Singleton-Isolation, asis-Import
+        (2.3/2.8-Gate entscheidet), statusgetreue Auswertung mit
+        `staged`/`namesake`/`partial` statt Schein-„kept". Suite 29/29.
+        Offen: b001 heilen (62 Staged-Files über den neuen Pfad), Junk-
+        Rollback der 22 Kopien (ID-Tabelle), bereinigtes Ergebnis.
 
 ## EPIC 6 — Code-Health (Audit 2026-10-08: Totcode/Datentypen/Struktur/Konventionen)
 

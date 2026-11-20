@@ -2,13 +2,16 @@
 """Smoke test für Story 3.3 (Track-Upgrades lossy → besser).
 
 Run:  python manual_tests/smoke_upgrades.py
-Netzfrei: beets-Lib und MusicGrabber sind Fakes; der Batch-Executor
-bekommt lock_runner/ingest_fn injiziert. Deckt: Scanner (Schwelle,
-Format-Filter, Junk-Ausnahme, Sortierung), Batch-Planung (Größe,
-Behalten ausgenommen), Entscheidungen (persistieren über Rescan),
-Batch-Flow (replaced / kept / no-source / dup_risk / kept-user),
-ingest-pending-Wiederaufnahme ohne Re-Download, bot_http-Aktionen
-(Validierung + Enqueue) und Snapshot-Summary.
+Netzfrei: beets-Lib, MusicGrabber, Scan/Asis/Ingest sind Fakes; der
+Batch-Executor bekommt lock_runner/scan_fn/asis_fn/ingest_fn injiziert
+und der Identitäts-Gate (Dauer/Fingerprint/Stamp) wird an den Nahtstellen
+gepatcht. Deckt: Scanner (Schwelle, Format-Filter, Junk-Ausnahme,
+Sortierung), Batch-Planung (Größe, Behalten ausgenommen), Entscheidungen
+(persistieren über Rescan), Batch-Flow (replaced / kept-user / namesake /
+staged → partial → Wiederaufnahme / no-source / gone), Lock-Verweigerung
+(ingest-pending, kein Re-Download), MG-Ausfall (kein Track berührt),
+Gate-Einzellogik (Dauer ±5 s, Fingerprint-Schwelle, fehlende Alt-Datei)
+und bot_http-Aktionen (Validierung + Enqueue + Executor).
 """
 
 import json
@@ -27,8 +30,11 @@ for _stream in (sys.stdout, sys.stderr):
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import musik.bot as B  # noqa: E402
 import musik.bot_http as BH  # noqa: E402
 import musik.paths as paths_mod  # noqa: E402
+import musik.state as state_mod  # noqa: E402
+import musik.trash as trash_mod  # noqa: E402
 import musik.upgrades as U  # noqa: E402
 
 
@@ -58,12 +64,14 @@ class Lib:
 
 
 class FakeMG:
-    """MG-Ersatz: liefert je Query einen FLAC-Treffer — außer für Queries
-    mit 'NoSrc' (keine Ergebnisse) oder 'DownFail' (Jobs failen)."""
+    """MG-Ersatz: legt je Download eine echte Staging-Datei an (der Gate/
+    Isolate/Scan-Flow braucht reale Pfade) — außer für Queries mit 'NoSrc'
+    (keine Ergebnisse)."""
 
-    def __init__(self, download_fail=False):
+    def __init__(self, inc, fail_names=()):
+        self.inc = inc
         self.queries = []
-        self.download_fail = download_fail
+        self.fail_names = set(fail_names)
 
     def mg_config(self):
         return {"enabled": True}
@@ -90,19 +98,24 @@ class FakeMG:
         return [r for r in results if r["video_id"]]
 
     def download(self, result, search_token=""):
-        if self.download_fail:
-            raise RuntimeError("job failed")
+        folder = os.path.join(self.inc, "musicgrabber", "Singles",
+                              result["artist"] or "Unknown")
+        os.makedirs(folder, exist_ok=True)
+        safe = "".join(c if c.isalnum() or c in " -_'&()!.+" else "_"
+                       for c in result["title"])
+        path = os.path.join(folder, f"{safe}.m4a")
+        with open(path, "wb") as fh:
+            fh.write(b"\x00")
         return "job-1"
 
     def wait_for_job(self, job_id, timeout=None, progress=None):
-        if self.download_fail:
-            raise RuntimeError("job failed")
         return {"status": "completed"}
 
 
-def _patch_paths(sd, rd):
+def _patch_paths(sd, rd, inc):
     paths_mod.state_dir = lambda: sd
     paths_mod.reports_dir = lambda: rd
+    paths_mod.incoming_dir = lambda: inc
     U.state_dir = lambda: sd      # Modul-Bindung in upgrades.py
     U.reports_dir = lambda: rd
     U._FMT_TIER = {}              # Tier-Cache zurücksetzen (lazy reload)
@@ -112,9 +125,15 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         sd = os.path.join(tmp, "state")
         rd = os.path.join(tmp, "reports")
-        os.makedirs(sd, exist_ok=True)
-        os.makedirs(rd, exist_ok=True)
-        _patch_paths(sd, rd)
+        inc = os.path.join(tmp, "incoming")
+        for d in (sd, rd, inc):
+            os.makedirs(d, exist_ok=True)
+        _patch_paths(sd, rd, inc)
+        trash_calls: list = []
+        trash_mod.trash_files = lambda files, reason, detail="": \
+            trash_calls.append((tuple(files), reason))
+        gate_calls: list = []
+        real_gate = U._gate_file   # Original sichern (Sektion 12 restauriert)
 
         # -- 1) Scanner: Schwelle, Format-Filter, Junk, Sortierung --------
         lib1 = Lib([
@@ -145,31 +164,24 @@ def main() -> int:
         report = os.path.join(rd, "upgrade-report.md")
         assert os.path.isfile(report), report
         with open(report, encoding="utf-8") as fh:
-            rtext = fh.read()
-        assert "LoArt" in rtext and "JunkArt" not in rtext, "Report-Inhalt"
+            assert "LoArt" in fh.read() and "JunkArt" not in fh.read()
 
-        # -- 3) Behalten-Entscheidung: Batch-Planung nimmt sie aus,
-        #      Rescan erhält sie -------------------------------------------------
+        # -- 3) Behalten-Entscheidung: Rescan erhält sie --------------------
         lines, failed = U.cmd_decide([7], "keep")
         assert failed == 0, lines
         st = U.load()
-        kept_c = next(c for c in st["candidates"] if c["id"] == 7)
-        assert kept_c["decision"] == "keep"
+        assert next(c for c in st["candidates"]
+                    if c["id"] == 7)["decision"] == "keep"
         U.plan(st)
         assert all(7 not in [c["id"] for c in b["items"]]
                    for b in st["batches"]), "keep im Batch"
         lines, failed = U.cmd_scan(lib=lib1)  # Rescan
         st = U.load()
-        kept_c = next(c for c in st["candidates"] if c["id"] == 7)
-        assert kept_c["decision"] == "keep", "Entscheidung überlebt Rescan"
-        bid = st["batches"][0]["id"]
+        assert next(c for c in st["candidates"]
+                    if c["id"] == 7)["decision"] == "keep", "überlebt Rescan"
+        bid = next(b["id"] for b in st["batches"] if b["status"] == "queued")
 
-        # -- 4) bot_http-Aktionen: Validierung + Enqueue (kein HTTP nötig,
-        #      der Server-Pfad ist in smoke_bot_http abgedeckt). Der Decide-
-        #      Executor läuft ECHT (schreibt nur upgrades.json); der Scan-
-        #      Executor würde die echte Lib öffnen → nur Enqueue prüfen. ---
-        import musik.bot as B
-
+        # -- 4) bot_http-Aktionen: Validierung + Enqueue; Decide-Executor ---
         captured: dict = {}
 
         def fake_enqueue(text, **fields):
@@ -201,142 +213,253 @@ def main() -> int:
         code, out = BH.handle_action({"action": "upgrade_scan"})
         assert code == 200 and captured["kind"] == "upgrade_scan", (code, out)
         st = U.load()
-        kept_now = [c["id"] for c in st["candidates"]
-                    if c["decision"] == "keep"]
-        assert sorted(kept_now) == [1, 7, 8], kept_now
-        # wieder freigeben (None)
+        assert sorted(c["id"] for c in st["candidates"]
+                      if c["decision"] == "keep") == [1, 7, 8], st["candidates"]
         code, out = BH.handle_action({"action": "upgrade_decide",
-                                      "item_ids": [1, 8], "decision": None})
+                                      "item_ids": [1, 8, 7], "decision": None})
         assert code == 200, (code, out)
         B._execute_upgrade_decide({"id": "j1", "chat_id": 0, **captured},
                                   lambda s: None)
         st = U.load()
-        assert not any(c.get("decision") for c in st["candidates"]
-                       if c["id"] in (1, 8))
+        assert not any(c.get("decision") for c in st["candidates"])
 
-        # frischer Plan mit allen 3 frei; dann Behalten NACH der Planung —
-        # genau der Pfad, den ein Klick im offenen Batch nimmt (kept-user)
-        U.cmd_decide([7], None)   # 7 aus dem Rescan-Reservoier freigeben
+        # frischer Plan mit allen 3 frei; dann Behalten NACH der Planung
+        # (kept-user-Pfad) + Freigabe von 7 für den Gate-Test unten
         U.cmd_scan(lib=lib1)
         st = U.load()
-        bid = st["batches"][0]["id"]
-        assert [c["id"] for c in st["batches"][0]["items"]] == [1, 7, 8]
-        U.cmd_decide([7], "keep")
+        bid = next(b["id"] for b in st["batches"] if b["status"] == "queued")
+        assert [c["id"] for c in
+                next(b for b in st["batches"]
+                     if b["status"] == "queued")["items"]] == [1, 7, 8]
+        U.cmd_decide([7], "keep")   # Entscheidung NACH der Planung
 
         # -- 5) Snapshot-Summary + detail -----------------------------------
         s = U.summary()
         assert s["total"] == 3 and s["kept"] == 1 and s["batches"], s
         assert "candidates" not in s, "Summary muss leicht bleiben"
-        d = U.detail()
-        assert len(d["candidates"]) == 3, d
+        assert len(U.detail()["candidates"]) == 3
 
-        # -- 6) Batch-Flow: replaced / kept-user / no-source / dup_risk -----
-        # Bibliothek NACH dem Import: Kandidat 1 ersetzt (FLAC), 8 doppelt,
-        # 7 unverändert (kept-user läuft sowieso nicht in den Download)
-        lib2 = Lib([
-            It(100, "LoArt", "LoTitle", "FLAC", 900, 200.0),   # ersetzt
-            It(101, "Dup", "DupTitle", "MP3", 160, 200.0),
-            It(102, "Dup", "DupTitle", "MP3", 160, 201.0),     # Dup-Risk
-            It(103, "AArt", "ATitle", "AAC", 130, 180.0),      # unverändert
-        ])
-        mg = FakeMG()  # "Dup" würde auch liefern — der Batch Match zählt
-        ingests = []
-        progress_log = []
+        # -- 6) Batch-Flow mit Gate: replaced / kept-user / namesake /
+        #       staged → partial --------------------------------------------
+        mg = FakeMG(inc)
+        ingests, scans, asis_runs = [], [], []
 
-        def lock_runner(fn, patience=0.0):
-            ingests.append(fn)
+        def lock_ok(fn, patience=0.0):
             fn()
             return True
 
+        def fake_scan(root):
+            scans.append(root)
+            stx = U.load()
+            for u in state_mod.units(stx).values():
+                for f in (u.get("files") or []):
+                    if os.path.isfile(f):
+                        break
+            # Einheiten je bereitliegender Staging-Datei registrieren
+            for dirpath, _d, files in os.walk(
+                    os.path.join(inc, "musicgrabber", "Singles")):
+                audio = [os.path.join(dirpath, f) for f in files
+                         if f.endswith(".m4a")]
+                if audio:
+                    state_mod.put_unit(stx, {
+                        "path": dirpath, "status": "pending",
+                        "reason": "", "updated": 1.0, "files": audio,
+                        "singleton": True, "import_path": dirpath,
+                    })
+            state_mod.save(stx)
+
+        def fake_asis(unit_paths, progress=None):
+            asis_runs.append(list(unit_paths))
+            stx = state_mod.load()
+            for up in unit_paths:
+                u = state_mod.get_unit(stx, up)
+                if not u:
+                    continue
+                if "LoArt" in (u.get("path") or ""):
+                    for f in (u.get("files") or []):
+                        if os.path.isfile(f):
+                            os.remove(f)  # simuliert Import (Datei weg)
+                    u["status"] = "asis"
+            state_mod.save(stx)
+            return ["✅ fake import"], False
+
+        def fake_gate(path, cand):
+            gate_calls.append(cand["id"])
+            if cand["artist"] == "Dup":
+                return "namesake", "Test-Namensvetter"
+            return "ready", ""
+
+        U._gate_file = fake_gate
+
+        def fake_ingest():
+            ingests.append(1)
+
         lines, failed = U.cmd_batch(
-            bid, progress=lambda l, i, t: progress_log.append(l),
-            lock_runner=lock_runner, mg_mod=mg, ingest_fn=lambda: None,
-            lib=lib2)
+            bid, progress=lambda l, i, t: None, lock_runner=lock_ok,
+            mg_mod=mg, scan_fn=fake_scan, asis_fn=fake_asis,
+            ingest_fn=fake_ingest, lib=Lib([
+                It(100, "LoArt", "LoTitle", "FLAC", 900, 200.0)]))
         assert failed == 0, lines
         st = U.load()
         b = next(x for x in st["batches"] if x["id"] == bid)
-        assert b["status"] == "done", b
         res = b["results"]
-        assert res["replaced"] == 1, res        # 1 → FLAC in lib2
-        assert res["no_source"] == 0, res       # alle drei liefern
-        assert len(res.get("dup_risk", [])) == 1, res  # 8 → 2 Kopien
-        assert res["kept"] == 1, res            # 7 kept-user
+        assert res["replaced"] == 1, res           # 1 → FLAC in der Fake-Lib
+        assert res["namesake"] == 1, res           # 8 → Gate verwirft
+        assert res["kept_user"] == 1, res          # 7 → Behalten nach Planung
+        assert res["staged"] == 0, res             # 8s Datei wurde getrasht,
+        # 1s Datei vom Fake-Import entfernt → keine Reststände
+        assert b["status"] == "done", b["status"]
+        assert any("Namensvetter" in l for l in lines), lines
+        assert gate_calls == [1, 8], gate_calls    # 7 wurde nie geladen
+        assert len(ingests) == 1 and len(scans) == 1, (ingests, scans)
+        assert len(asis_runs) == 1, asis_runs
+        assert any(tr[1] == "upgrade-namesake" for tr in trash_calls), \
+            trash_calls
         c1 = next(c for c in b["items"] if c["id"] == 1)
-        assert c1["status"] == "downloaded" and c1["source"] == "testflac"
-        c7 = next(c for c in b["items"] if c["id"] == 7)
-        assert c7["status"] == "kept-user", c7
-        assert len(ingests) == 1, "ein Ingest für den Batch"
-        assert any("ersetzt" in l for l in lines), lines
-        assert progress_log, "Progress gefeuert"
+        assert c1["status"] == "ready" and c1["staged_path"], c1
+        assert not os.path.isfile(c1["staged_path"]), "Import entfernt Datei"
+        c8 = next(c for c in b["items"] if c["id"] == 8)
+        assert c8["status"] == "namesake" and c8.get("namesake_reason")
 
-        # -- 7) kept-Batch nochmal anstoßen: nichts mehr zu holen ----------
+        # -- 7) fertigen Batch nicht erneut anstoßen ------------------------
         code, out = BH.handle_action({"action": "upgrade_batch",
                                       "batch_id": bid})
         assert code == 400 and "nicht anstoßbar" in out["error"], (code, out)
 
-        # -- 8) ingest-pending: Download-Phase übersprungen -----------------
-        def queued_batch():
-            stx = U.load()
-            qs = [b for b in stx["batches"] if b["status"] == "queued"]
-            assert qs, "kein queued Batch im Plan"
-            return qs[0]
+        # -- 8) staged → partial → Wiederaufnahme OHNE Re-Download ----------
+        U.cmd_scan(lib=Lib(lib1.items()
+                           + [It(20, "GoneArt", "GoneTitle", "MP3",
+                                 150, 200.0)]))
+        st = U.load()
+        bid2 = next(b["id"] for b in st["batches"] if b["status"] == "queued")
 
-        lines, failed = U.cmd_scan(lib=lib1)
-        b2 = queued_batch()
-        bid2 = b2["id"]
+        mg2 = FakeMG(inc)  # search/FakeMG recordiert Queries selbst
+        # Alle drei liefern Dateien; der asis-Fake lässt im ERSTEN Lauf
+        # GoneArt liegen → partial; der zweite Lauf importiert nach
+        # (keine neuen Downloads).
+
+        def fake_asis2(unit_paths, progress=None):
+            # asis_runs enthält bereits Sektion 6 — der ERSTE sec-8-Lauf
+            # ist der zweite Eintrag insgesamt.
+            first_run = len(asis_runs) < 2
+            asis_runs.append(list(unit_paths))
+            stx = state_mod.load()
+            for up in unit_paths:
+                u = state_mod.get_unit(stx, up)
+                if not u or (first_run and "GoneArt" in (u.get("path") or "")):
+                    continue
+                for f in (u.get("files") or []):
+                    if os.path.isfile(f):
+                        os.remove(f)
+                u["status"] = "asis"
+            state_mod.save(stx)
+            return ["✅ fake import"], False
+
+        U._gate_file = lambda path, cand: ("ready", "")
+        lines, failed = U.cmd_batch(
+            bid2, progress=lambda l, i, t: None, lock_runner=lock_ok,
+            mg_mod=mg2, scan_fn=fake_scan, asis_fn=fake_asis2,
+            ingest_fn=fake_ingest, lib=Lib([]))
         st = U.load()
         b2 = next(x for x in st["batches"] if x["id"] == bid2)
-        b2["status"] = "ingest-pending"
-        for c in b2["items"]:
-            c["status"] = "downloaded"
-            c["source"] = "testflac"
-        U.save(st)
-        mg2 = FakeMG()
-        ingests.clear()
-        lines, failed = U.cmd_batch(bid2, lock_runner=lock_runner,
-                                    mg_mod=mg2, ingest_fn=lambda: None,
-                                    lib=lib2)
-        assert failed == 0, lines
-        assert mg2.queries == [], "kein Re-Download bei ingest-pending"
-        assert len(ingests) == 1, "Ingest nachgeholt"
+        assert b2["results"].get("staged") == 1, b2["results"]
+        assert b2["status"] == "partial", b2["status"]
+        n_queries_first = len(mg2.queries)
+        assert n_queries_first >= 3, mg2.queries
+
+        lines, failed = U.cmd_batch(
+            bid2, progress=lambda l, i, t: None, lock_runner=lock_ok,
+            mg_mod=mg2, scan_fn=fake_scan, asis_fn=fake_asis2,
+            ingest_fn=fake_ingest, lib=Lib([]))
+        assert len(mg2.queries) == n_queries_first, "kein Re-Download!"
         st = U.load()
         b2 = next(x for x in st["batches"] if x["id"] == bid2)
-        assert b2["status"] == "done", b2
+        assert b2["status"] == "done", b2["status"]
+        assert b2["results"]["staged"] == 0, b2["results"]
+        assert b2["results"]["gone"] >= 1, "GoneArt-Datei weg, Lib leer"
 
-        # -- 9) no-source als dokumentiertes Ergebnis -----------------------
-        lines, failed = U.cmd_scan(lib=Lib([It(5, "NoSrc Art", "NoSrc Title",
-                                               "MP3", 96, 200.0)]))
-        bid3 = queued_batch()["id"]
-        mg3 = FakeMG()
-        lines, failed = U.cmd_batch(bid3, lock_runner=lock_runner,
-                                    mg_mod=mg3, ingest_fn=lambda: None,
-                                    lib=Lib([]))
+        # -- 9) Lock verweigert → ingest-pending, nichts geladen ------------
+        U.cmd_scan(lib=Lib([It(9, "XArt", "XTitle", "MP3", 128, 200.0)]))
+        st = U.load()
+        bid3 = next(b["id"] for b in st["batches"] if b["status"] == "queued")
+        mg3 = FakeMG(inc)
+
+        def lock_busy(fn, patience=0.0):
+            return False
+
+        lines, failed = U.cmd_batch(bid3, lock_runner=lock_busy, mg_mod=mg3)
         assert failed == 0, lines
+        assert mg3.queries == [], "Download darf ohne Lock nicht starten"
         st = U.load()
         b3 = next(x for x in st["batches"] if x["id"] == bid3)
-        assert b3["results"]["no_source"] == 1, b3["results"]
-        assert "ohne Quelle" in "\n".join(lines), lines
+        assert b3["status"] == "ingest-pending", b3
+        assert any("ingest-pending" in l for l in lines), lines
 
-        # -- 10) MG nicht erreichbar: Batch bricht sauber, nichts geändert --
-        lines, failed = U.cmd_scan(lib=Lib([It(9, "XArt", "XTitle", "MP3",
-                                               128, 200.0)]))
-        bid4 = queued_batch()["id"]
+        # -- 10) no-source als dokumentiertes Ergebnis -----------------------
+        U.cmd_scan(lib=Lib([It(5, "NoSrc Art", "NoSrc Title", "MP3",
+                               96, 200.0)]))
+        st = U.load()
+        bid4 = next(b["id"] for b in st["batches"] if b["status"] == "queued")
+        mg4 = FakeMG(inc)
+        lines, failed = U.cmd_batch(bid4, lock_runner=lock_ok, mg_mod=mg4,
+                                    scan_fn=fake_scan, asis_fn=fake_asis,
+                                    ingest_fn=fake_ingest, lib=Lib([]))
+        assert failed == 0, lines
+        st = U.load()
+        b4 = next(x for x in st["batches"] if x["id"] == bid4)
+        assert b4["results"]["no_source"] == 1, b4["results"]
+        assert b4["status"] == "done", b4["status"]
+
+        # -- 11) MG nicht erreichbar: Batch bricht sauber --------------------
+        U.cmd_scan(lib=Lib([It(11, "YArt", "YTitle", "MP3", 128, 200.0)]))
+        st = U.load()
+        bid5 = next(b["id"] for b in st["batches"] if b["status"] == "queued")
 
         class DownMG(FakeMG):
             def available(self):
                 return False
 
-        lines, failed = U.cmd_batch(bid4, lock_runner=lock_runner,
-                                    mg_mod=DownMG(), ingest_fn=lambda: None)
+        lines, failed = U.cmd_batch(bid5, lock_runner=lock_ok,
+                                    mg_mod=DownMG(inc))
         assert failed == 1, lines
-        assert any("nicht gestartet" in l for l in lines), lines
+        assert any("fehlgeschlagen" in l for l in lines), lines
         st = U.load()
-        b4 = next(x for x in st["batches"] if x["id"] == bid4)
-        assert b4["status"] == "error", b4
-        assert all(i.get("status") in (None, "queued")
-                   for i in b4["items"]), "kein Track angefasst"
+        b5 = next(x for x in st["batches"] if x["id"] == bid5)
+        assert b5["status"] == "error", b5
+        assert all(i.get("status") is None for i in b5["items"]), \
+            "kein Track angefasst"
 
-        # -- 11) Token-Overlap (Fuzzy-Match-Regel) --------------------------
+        # -- 12) Gate-Einzellogik (Dauer, Fingerprint, fehlende Alt-Datei) ---
+        U._gate_file = real_gate  # Original zurücksichern
+        orig_gate = U._gate_file
+        U._audio_length = lambda p: 200.0 if "kurz" not in p else 190.0
+        U._fp_similarity = lambda a, b: 0.9 if b else None
+        U._stamp_tags = lambda p, c: None
+        os.makedirs(os.path.join(inc, "g"), exist_ok=True)
+        gp = os.path.join(inc, "g", "a.m4a")
+        open(gp, "wb").close()
+        oldp = os.path.join(inc, "g", "old.m4a")
+        open(oldp, "wb").close()
+        assert orig_gate(gp, {"length": 200.0, "path": oldp,
+                              "artist": "A", "title": "T",
+                              "album": "A"})[0] == "ready"
+        assert orig_gate(gp.replace("a.m4a", "kurz.m4a"),
+                         {"length": 200.0, "path": oldp, "artist": "A",
+                          "title": "T", "album": "A"})[0] == "namesake"
+        assert orig_gate(gp, {"length": 200.0, "path": oldp,
+                              "artist": "A", "title": "T",
+                              "album": "A"})[0] == "ready"  # fp 0.9
+        U._fp_similarity = lambda a, b: (0.3 if (b and os.path.isfile(b))
+                                         else None)
+        assert orig_gate(gp, {"length": 200.0, "path": oldp,
+                              "artist": "A", "title": "T",
+                              "album": "A"})[0] == "namesake"
+        # Alte Datei fehlt → fp aussetzbar, Dauer entscheidet
+        assert orig_gate(gp, {"length": 200.0, "path": oldp + "weg",
+                              "artist": "A", "title": "T",
+                              "album": "A"})[0] == "ready"
+
+        # -- 13) Token-Overlap (Fuzzy-Match-Regel) ---------------------------
         assert U._token_overlap("Wonderwall (live at Knebworth Park)",
                                 "Wonderwall")
         assert not U._token_overlap("Wonderwall", "Champagne Supernova")

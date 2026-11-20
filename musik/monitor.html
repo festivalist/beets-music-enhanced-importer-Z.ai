@@ -212,13 +212,17 @@
 
     const UPG_STATUS_LABELS = {
         queued: "bereit", running: "🔄 läuft", done: "✅ fertig",
-        error: "❌ Fehler", "ingest-pending": "⏳ wartet auf Ingest"
+        error: "❌ Fehler", "ingest-pending": "⏳ wartet auf Ingest",
+        partial: "🔁 unvollständig — erneut anstoßen"
     };
 
     function upgResultsLine(res) {
         if (!res || res.replaced == null) return "";
-        const parts = [`${res.replaced} ersetzt`, `${res.kept ?? 0} behalten`,
-            `${res.no_source ?? 0} ohne Quelle`];
+        const parts = [`${res.replaced} ersetzt`, `${res.kept ?? 0} behalten`];
+        if (res.namesake) parts.push(`${res.namesake} Namensvetter verworfen`);
+        if (res.kept_user) parts.push(`${res.kept_user} behalten (Nutzer)`);
+        parts.push(`${res.no_source ?? 0} ohne Quelle`);
+        if (res.staged) parts.push(`${res.staged} noch im Staging`);
         if (res.gone) parts.push(`${res.gone} weg`);
         let s = " · " + parts.join(" · ");
         if (res.dup_risk && res.dup_risk.length)
@@ -242,7 +246,7 @@
     }
 
     function upgBatchHtml(b) {
-        const canRun = ["queued", "error", "ingest-pending"].includes(b.status);
+        const canRun = ["queued", "error", "ingest-pending", "partial"].includes(b.status);
         const items = b.items || [];
         const rows = items.slice(0, 130).map(upgTrackRow).join("");
         const more = items.length > 130

@@ -257,28 +257,40 @@ def cmd_decide(item_ids: list, decision) -> tuple[list[str], int]:
 
 
 # ---------------------------------------------------------------------------
-# Batch-Executor (nur Bot/Monitor) — beschafft, importiert, reconciled
+# Batch-Executor (nur Bot/Monitor) — beschafft, verifiziert, importiert
 # ---------------------------------------------------------------------------
 
-def cmd_batch(batch_id: str, progress=None, lock_runner=None,
-              mg_mod=None, ingest_fn=None, lib=None) -> tuple[list[str], int]:
-    """Einen Batch abarbeiten: (1) je Kandidat MG-Suche + Download
-    (best-3-Walk wie der Bot — kein Download ist ein dokumentiertes
-    Ergebnis „ohne Quelle", kein Fehler), (2) EIN Ingest unter dem
-    ingest.lock (der 2.3/2.8-Dupe-Vergleich ersetzt die bessere Kopie und
-    trasht den Verlierer automatisch), (3) Reconcile je Kandidat gegen die
-    frische Bibliothek. Ein Batch mit Status ingest-pending überspringt
-    die Download-Phase (Dateien liegen schon im Staging bzw. sind
-    importiert) und holt nur Ingest + Auswertung nach."""
-    from . import ingest as ingest_mod
+# Der GANZE Batch läuft unter dem ingest.lock (inkl. Downloads!): sonst
+# importiert der 15-min-Timer die Dateien während der ~1,5-h-Download-
+# Phase als Ein-Track-Alben über die MB-Albensuche — Befund 18.11.:
+# Karaoke-/Tribute-Treffer landeten auto-accepted in der Lib, während der
+# 2.3/2.8-Dupe-Gate (Singleton/Asis-Pfad) gar nicht erst fragen konnte.
 
+def cmd_batch(batch_id: str, progress=None, lock_runner=None,
+              mg_mod=None, scan_fn=None, asis_fn=None, ingest_fn=None,
+              lib=None) -> tuple[list[str], int]:
+    """Einen Batch abarbeiten — alles unter dem ingest.lock:
+    (1) je Kandidat MG-Suche + Download (best-3-Walk wie der Bot;
+    kein Download = dokumentiertes „ohne Quelle", kein Fehler),
+    (2) Identitäts-Gate je Datei: Dauer ±5 s gegen den Bestands-Track
+    + Audio-Fingerprint-Vergleich (fpcalc/pyacoustid) gegen die ALTE
+    Datei — Namensvetter/Karaoke werden verworfen, BEVOR sie importieren
+    können; danach werden Artist/Title-Tags aus dem Kandidaten (= dem
+    Bestands-Track) in die Datei geschrieben (KK-Lektion: MG schreibt
+    teils Unknown/Quellen-Tags — die Identität gehört dem Bestand),
+    (3) je Datei ein eigenes Staging-Unterordner + asis-Import über den
+    Singleton-Pfad, wo der 2.3/2.8-Dupe-Vergleich qualitätsbasiert
+    ersetzt/archiviert, (4) cmd_ingest für Cleanup/Enrich/Plex,
+    (5) statusgetreue Auswertung. Reststände im Staging → Status
+    „partial"; erneutes Anstoßen holt nur Import + Auswertung nach."""
     st = load()
     batch = next((b for b in st.get("batches", [])
                   if b.get("id") == batch_id), None)
     if batch is None:
         return [f"❌ Upgrade-Batch {batch_id!r} unbekannt (Rescan? "
                 "Neuen Batch-Plan im Monitor holen)"], 1
-    if batch.get("status") not in ("queued", "error", "ingest-pending"):
+    if batch.get("status") not in ("queued", "error", "ingest-pending",
+                                   "partial"):
         return [f"ℹ️ Batch {batch_id} läuft bereits oder ist fertig "
                 f"({batch.get('status')})."], 0
 
@@ -288,23 +300,64 @@ def cmd_batch(batch_id: str, progress=None, lock_runner=None,
     save(st)
 
     lines: list[str] = []
-    if any(i.get("status") != "downloaded" for i in items):
+    box: list = []
+    runner = lock_runner
+    if runner is None:
+        from .bot import _run_exclusive as runner
+
+    def body() -> None:
+        box.append(_batch_body(st, items, progress, mg_mod, scan_fn,
+                               asis_fn, ingest_fn, lib, lines))
+
+    try:
+        locked = runner(body,
+                        patience=float(upgrades_config()["ingest_patience"]))
+    except Exception as e:
+        batch["status"] = "error"
+        batch["finished_ts"] = time.time()
+        save(st)
+        return [f"❌ Batch {batch_id} fehlgeschlagen: "
+                f"{type(e).__name__}: {str(e)[:200]}"], 1
+    if not locked:
+        batch["status"] = "ingest-pending"
+        save(st)
+        lines.append("⏳ ingest.lock dauerhaft belegt — Batch als "
+                     "ingest-pending gemerkt. Erneut anstoßen holt nur "
+                     "Import + Auswertung nach (kein Re-Download).")
+        return lines, 0
+
+    results = box[0] if box else {}
+    batch["results"] = results
+    batch["status"] = "partial" if results.get("staged") else "done"
+    batch["finished_ts"] = time.time()
+    save(st)
+    lines.append(_results_line(batch_id, len(items), results))
+    if results.get("staged"):
+        lines.append("ℹ️ Reststände im Staging — Batch erneut anstoßen "
+                     "holt nur Import + Auswertung nach.")
+    return lines, 0
+
+
+def _batch_body(st, items, progress, mg_mod, scan_fn, asis_fn, ingest_fn,
+                lib, lines) -> dict:
+    """Der eigentliche Batch-Ablauf — läuft UNTER dem ingest.lock."""
+    from . import scan as scan_mod
+    from . import state as state_mod
+    from . import trash as trash_mod
+    from .paths import incoming_dir
+
+    mg_staging = os.path.join(incoming_dir(), "musicgrabber")
+
+    # -- 1) Downloads --------------------------------------------------------
+    if any(i.get("status") is None for i in items):
         if mg_mod is None:
             from . import musicgrabber as mg_mod
-        try:
-            if not mg_mod.mg_config().get("enabled", True):
-                raise mg_mod.MGUnavailable("MusicGrabber deaktiviert")
-            if not mg_mod.available():
-                raise mg_mod.MGUnavailable("nicht erreichbar")
-            mg_mod.ensure_staging_layout()
-        except Exception as e:
-            batch["status"] = "error"
-            batch["finished_ts"] = time.time()
-            save(st)
-            return [f"❌ Batch {batch_id} nicht gestartet — MusicGrabber "
-                    f"({str(e)[:120]}). Kein Track berührt; Batch erneut "
-                    "anstoßen, wenn MG wieder da ist."], 1
-        to_dl = [i for i in items if i.get("status") != "downloaded"]
+        if not mg_mod.mg_config().get("enabled", True):
+            raise RuntimeError("MusicGrabber deaktiviert")
+        if not mg_mod.available():
+            raise RuntimeError("MusicGrabber nicht erreichbar")
+        mg_mod.ensure_staging_layout()
+        to_dl = [i for i in items if i.get("status") is None]
         # Behalten-Entscheidungen, die NACH der Batch-Planung gefallen sind,
         # gelten auch für den laufenden Batch — die Batch-Items sind
         # Snapshots, der aktuelle Entscheid-Stand liegt bei den Kandidaten.
@@ -313,7 +366,7 @@ def cmd_batch(batch_id: str, progress=None, lock_runner=None,
         for c in to_dl:
             if dec_now.get(c.get("id")) == "keep":
                 c["status"] = "kept-user"
-        to_dl = [i for i in to_dl if i.get("status") != "kept-user"]
+        to_dl = [i for i in to_dl if i.get("status") is None]
         for idx, c in enumerate(to_dl, 1):
             note = _acquire_one(c, mg_mod)
             c["status"] = note["status"]
@@ -332,49 +385,76 @@ def cmd_batch(batch_id: str, progress=None, lock_runner=None,
                         if no_src else ""))
         save(st)
 
-    # Import: EIN Lauf für den ganzen Batch, unter demselben Lock wie der
-    # Timer. Lock dauerhaft belegt (patience) → ingest-pending; Wiederaufnahme
-    # ohne Re-Download. Ganz ohne Download (alles kept-user/no-source)
-    # gibt es nichts zu importieren — Ingest + Lib-Hydration entfallen.
-    if not any(i.get("status") == "downloaded" for i in items):
-        results = _reconcile(None, items)
-        batch["results"] = results
-        batch["status"] = "done"
-        batch["finished_ts"] = time.time()
+    # -- 2) Identitäts-Gate + Tags aus dem Bestand + Einzelordner ------------
+    ready: list[str] = []
+    downloaded = [i for i in items if i.get("status") == "downloaded"]
+    claimed: set = set()
+    for idx, c in enumerate(downloaded, 1):
+        path = _find_staged_file(mg_staging, c, claimed)
+        if not path:
+            continue  # Datei schon weg (früherer Lauf) — Reconcile entscheidet
+        verdict, why = _gate_file(path, c)
+        if verdict != "ready":
+            try:
+                trash_mod.trash_files([path], "upgrade-namesake", why)
+            except Exception:
+                pass
+            c["status"] = "namesake"
+            c["namesake_reason"] = why
+        else:
+            new_path = _isolate_file(path, c)
+            c["status"] = "ready"
+            c["staged_path"] = new_path
+            ready.append(new_path)
+        if progress:
+            progress(f"🔍 {idx}/{len(downloaded)}: {c['artist']} - "
+                     f"{c['title']} · {verdict}"
+                     + (f" ({why})" if why else ""), idx, len(downloaded))
+    namesake = sum(1 for i in items if i.get("status") == "namesake")
+    if downloaded:
+        lines.append(f"🔍 Identitäts-Gate: {len(ready)} bereit, "
+                     f"{namesake} Namensvetter verworfen")
         save(st)
-        lines.append(_results_line(batch_id, len(items), results))
-        return lines, 0
-    ingest_callable = ingest_fn or ingest_mod.cmd_ingest
-    runner = lock_runner
-    if runner is None:
-        from .bot import _run_exclusive as runner
-    try:
-        locked = runner(ingest_callable,
-                        patience=float(upgrades_config()["ingest_patience"]))
-    except Exception as e:
-        batch["status"] = "error"
-        batch["finished_ts"] = time.time()
-        save(st)
-        return [f"❌ Batch {batch_id}: Ingest fehlgeschlagen: "
-                f"{type(e).__name__}: {str(e)[:200]}"], 1
-    if not locked:
-        batch["status"] = "ingest-pending"
-        save(st)
-        lines.append("⏳ ingest.lock dauerhaft belegt — Batch als "
-                     "ingest-pending gemerkt. Erneut anstoßen holt nur "
-                     "Ingest + Auswertung nach (kein Re-Download).")
-        return lines, 0
 
+    # Wiederaufnahme: 'ready'-Items aus einem partial-Lauf, deren Datei
+    # noch liegt, gehören erneut in den Import-Stapel.
+    for c in items:
+        if c.get("status") == "ready" and c.get("staged_path") \
+                and os.path.isfile(c["staged_path"]) \
+                and c["staged_path"] not in ready:
+            ready.append(c["staged_path"])
+
+    # -- 3) Registrieren + asis-Import (Singleton-Pfad, 2.3/2.8-Gate) --------
+    if ready:
+        if scan_fn is None:
+            scan_fn = scan_mod.cmd_scan
+        scan_fn(mg_staging)
+        st2 = state_mod.load()
+        ready_set = {os.path.normcase(p) for p in ready}
+        unit_paths = []
+        for u in state_mod.units(st2).values():
+            for f in (u.get("files") or []):
+                if os.path.normcase(f) in ready_set:
+                    unit_paths.append(u.get("path"))
+                    break
+        if unit_paths:
+            if asis_fn is None:
+                from . import asis as asis_mod
+                asis_fn = asis_mod.import_units
+            asis_fn(unit_paths)
+
+    # -- 4) Ingest (Cleanup/Enrich/Plex) — Lock ist bereits gehalten ---------
+    if ready:
+        if ingest_fn is None:
+            from . import ingest as ingest_mod
+            ingest_fn = ingest_mod.cmd_ingest
+        ingest_fn()
+
+    # -- 5) Auswertung -------------------------------------------------------
     if lib is None:
         from . import engine
         lib = engine.open_library()
-    results = _reconcile(lib, items)
-    batch["results"] = results
-    batch["status"] = "done"
-    batch["finished_ts"] = time.time()
-    save(st)
-    lines.append(_results_line(batch_id, len(items), results))
-    return lines, 0
+    return _reconcile(lib, items)
 
 
 def _acquire_one(cand: dict, mg_mod) -> dict:
@@ -400,12 +480,149 @@ def _acquire_one(cand: dict, mg_mod) -> dict:
     return {"status": "no-source"}
 
 
+# -- Identitäts-Gate ---------------------------------------------------------
+
+def _audio_length(path: str) -> float:
+    from .scan import openable
+
+    try:
+        import mutagen
+
+        m = mutagen.File(openable(path))
+        return float(getattr(m.info, "length", 0) or 0) if m else 0.0
+    except Exception:
+        return 0.0
+
+
+def _fp_similarity(path_new: str, path_old: str) -> float | None:
+    """Audio-Fingerprint-Ähnlichkeit (fpcalc + pyacoustid); None, wenn
+    nicht berechenbar (fpcalc fehlt, Datei unlesbar, alte Datei weg) —
+    der Gate fällt dann auf die Dauer-Prüfung zurück."""
+    if not os.path.isfile(path_old):
+        return None
+    try:
+        import acoustid
+        from acoustid import chromaprint
+
+        fa, _ = acoustid.fingerprint_file(path_new)
+        fb, _ = acoustid.fingerprint_file(path_old)
+        da = chromaprint.decode_fingerprint(fa)
+        db = chromaprint.decode_fingerprint(fb)
+        return float(acoustid.compare_fingerprints(da, db))
+    except Exception:
+        return None
+
+
+def _gate_file(path: str, cand: dict) -> tuple[str, str]:
+    """Identitäts- und Qualitätsvorprüfung der Staging-Datei gegen den
+    Bestands-Kandidat. 'ready' = daruf importiert werden (Tags werden
+    aus dem Kandidaten gestempelt); 'namesake' = Verwerfen (Karaoke/
+    Tribute/Namensvetter — Befund 18.11.: Sunfly-Karaoke & Co. kamen
+    sonst über die reine Qualitätsbetrachtung in die Lib)."""
+    from .scan import is_audio
+
+    if not is_audio(path):
+        return "skip", "keine Audiodatei"
+    dur = _audio_length(path)
+    want = float(cand.get("length") or 0)
+    if want and dur and abs(dur - want) > 5:
+        return "namesake", (f"Dauer {dur:.0f}s ≠ Bestand {want:.0f}s "
+                            "— Namensvetter")
+    sim = _fp_similarity(path, cand.get("path") or "")
+    if sim is not None and sim < 0.7:
+        return "namesake", f"Fingerprint weicht ab ({sim:.2f})"
+    _stamp_tags(path, cand)
+    return "ready", ""
+
+
+def _stamp_tags(path: str, cand: dict) -> None:
+    """Artist/Title/Album-Tags aus dem Kandidaten (= Bestands-Track) in
+    die Staging-Datei schreiben — die Identität gehört dem Bestand, nicht
+    der MG-Quelle (KK-Lektion: MG lieferte 'Unknown'-Artist-Tags)."""
+    try:
+        import mutagen
+
+        m = mutagen.File(path, easy=True)
+        if m is None:
+            return
+        m["artist"] = cand["artist"]
+        m["albumartist"] = cand["artist"]
+        m["title"] = cand["title"]
+        m["album"] = cand.get("album") or cand["title"]
+        m.save()
+    except Exception:
+        pass  # untagbare Container: die Datei bleibt, der Import
+        # entscheidet weiter unten dennoch über die Bestands-Paarung
+
+
+def _isolate_file(path: str, cand: dict) -> str:
+    """Datei in einen EINZIGEN Unterordner je Track verschieben — der
+    Scan klassifiziert 1-Datei-Ordner als Singleton ('loose'), womit der
+    asis-Import über choose_item läuft und das 2.3/2.8-Dupe-Gate zieht
+    (gemischte Mehr-Datei-Ordner würden als Album-Asis ohne Gate
+    importiert — genau die 18.11.-Lücke)."""
+    import re as _re
+    import shutil
+
+    def clean(s: str) -> str:
+        s = _re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", s or "").strip(" .")
+        return s[:80] or "Unbekannt"
+
+    folder = os.path.join(os.path.dirname(path), clean(cand["artist"]),
+                          f"{clean(cand['artist'])} - {clean(cand['title'])}")
+    os.makedirs(folder, exist_ok=True)
+    target = os.path.join(folder, os.path.basename(path))
+    if os.path.abspath(target) != os.path.abspath(path):
+        shutil.move(path, target)
+    return target
+
+
+def _find_staged_file(mg_staging: str, cand: dict, claimed: set) -> str:
+    """Neueste Staging-Audiodatei, die per Dateiname (Token gegen
+    Artist/Title/Album) zu diesem Kandidaten passt."""
+    from .scan import is_audio
+
+    want = _tokens(cand["title"]) | _tokens(cand.get("album") or "")
+    artoks = _tokens(cand["artist"])
+    best = None
+    best_mtime = 0.0
+    for dirpath, _dirnames, filenames in os.walk(mg_staging):
+        for name in filenames:
+            if not is_audio(name):
+                continue
+            p = os.path.join(dirpath, name)
+            if os.path.normcase(p) in claimed:
+                continue
+            ftoks = _tokens(os.path.splitext(name)[0])
+            if not ftoks:
+                continue
+            hit_title = len(ftoks & want) >= max(1, min(2, len(want) - 1))
+            hit_artist = bool(ftoks & artoks)
+            if not (hit_title or hit_artist):
+                continue
+            try:
+                mtime = os.stat(p).st_mtime
+            except OSError:
+                continue
+            if mtime > best_mtime:
+                best, best_mtime = p, mtime
+    if best:
+        claimed.add(os.path.normcase(best))
+    return best or ""
+
+
+def _tokens(text: str) -> set:
+    from .scan import norm_name
+
+    return set(norm_name(text or "").split())
+
+
 def _reconcile(lib, items: list[dict]) -> dict:
-    """Je nachgeladenem Kandidat die Bibliothek prüfen: replaced (bessere
-    Kopie liegt jetzt in der Lib), kept (Quelle nicht besser — der Dupe-
-    Check hat die schlechtere Neukopie automatisch archiviert), dup_risk
-    (mehr als ein Match — händisch prüfen), gone (kein Match mehr).
-    lib=None (Fast-Pfad: nichts nachgeladen) überspringt die Hydration."""
+    """Statusgetreue Auswertung je Kandidat: replaced (bessere Kopie in
+    der Lib), kept (Quelle nicht besser — Dupe-Gate hat die Neukopie
+    archiviert), namesake (Identitäts-Gate hat verworfen), staged (liegt
+    noch im Staging — KEIN 'kept'!), no_source, gone, kept-user.
+    lib=None überspringt die Hydration (nichts zu prüfen)."""
     from .scan import norm_name
 
     hydrated = []
@@ -417,14 +634,27 @@ def _reconcile(lib, items: list[dict]) -> dict:
                 float(getattr(it, "length", 0) or 0),
                 it,
             ))
-    counts = {"replaced": 0, "kept": 0, "no_source": 0, "gone": 0}
+    counts = {"replaced": 0, "kept": 0, "namesake": 0, "staged": 0,
+              "no_source": 0, "gone": 0, "kept_user": 0}
     dup_risk: list[str] = []
+    staged_names: list[str] = []
     for c in items:
         status = c.get("status")
         if status == "no-source":
             counts["no_source"] += 1
             continue
-        if status != "downloaded":
+        if status == "namesake":
+            counts["namesake"] += 1
+            continue
+        if status == "kept-user":
+            counts["kept_user"] += 1
+            continue
+        if status == "ready" and c.get("staged_path") \
+                and os.path.isfile(c["staged_path"]):
+            counts["staged"] += 1
+            staged_names.append(f"{c['artist']} - {c['title']}")
+            continue
+        if status not in ("downloaded", "ready"):
             counts["kept"] += 1
             continue
         pair = (norm_name(c["artist"]), norm_name(c["title"]))
@@ -451,6 +681,7 @@ def _reconcile(lib, items: list[dict]) -> dict:
         else:
             counts["kept"] += 1
     counts["dup_risk"] = dup_risk
+    counts["staged_names"] = staged_names
     return counts
 
 
@@ -474,11 +705,19 @@ def _token_overlap(a: str, b: str) -> bool:
 
 
 def _results_line(batch_id: str, total: int, res: dict) -> str:
-    line = (f"✅ Batch {batch_id}: {res.get('replaced', 0)} ersetzt "
-            f"/ {total} Tracks · {res.get('kept', 0)} behalten (Quelle "
-            f"nicht besser) · {res.get('no_source', 0)} ohne Quelle"
-            + (f" · {res['gone']} nicht mehr auffindbar"
-               if res.get("gone") else ""))
+    parts = [f"{res.get('replaced', 0)} ersetzt",
+             f"{res.get('kept', 0)} behalten (Quelle nicht besser)"]
+    if res.get("namesake"):
+        parts.append(f"{res['namesake']} Namensvetter verworfen")
+    if res.get("kept_user"):
+        parts.append(f"{res['kept_user']} behalten (Nutzer)")
+    parts.append(f"{res.get('no_source', 0)} ohne Quelle")
+    if res.get("gone"):
+        parts.append(f"{res['gone']} nicht mehr auffindbar")
+    if res.get("staged"):
+        parts.append(f"{res['staged']} noch im Staging")
+    line = (f"✅ Batch {batch_id}: " + " · ".join(parts)
+            + f" / {total} Tracks")
     if res.get("dup_risk"):
         line += (f"\n⚠️ prüfen ({len(res['dup_risk'])} Mehrfach-Kopien):\n"
                  + "\n".join(f"- {d}" for d in res["dup_risk"][:5]))

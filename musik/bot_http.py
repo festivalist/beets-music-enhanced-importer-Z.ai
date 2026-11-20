@@ -206,7 +206,8 @@ def _action_upgrade_batch(payload: dict) -> tuple[int, dict]:
     if batch is None:
         return 400, {"error": f"unbekannter Batch: {bid!r} (nach einem "
                               "Rescan den neuen Plan benutzen)"}
-    if batch.get("status") not in ("queued", "error", "ingest-pending"):
+    if batch.get("status") not in ("queued", "error", "ingest-pending",
+                                   "partial"):
         return 400, {"error": f"Batch {bid} ist {batch.get('status')} — "
                               "nicht anstoßbar"}
     return _enqueue_job(f"Upgrade-Batch {bid} nachladen "

@@ -431,17 +431,21 @@ Notes:
   writes `reports/upgrade-report.md` plus a batch plan
   (`state/upgrades.json`, batches of ≤ `batch_size`, default 109). The
   actual re-download is a **user decision per batch** in the Import
-  Monitor's "⬆️ Upgrades" section: "Nachladen" sends each track through
-  the MusicGrabber search (lossless first, cover guard); ONE ingest run
-  then lets the usual duplicate comparison decide — the better copy
-  stays, the loser moves to `_trash` automatically, so a worse
-  re-download can never degrade the library. Tracks without a usable
-  source or without a better copy are documented results (`no-source` /
-  `kept`), never errors; multiple library matches for one track are
-  flagged as `dup_risk` for manual review. A "Behalten" click removes a
-  track from the batches (decisions survive rescans); if the ingest lock
-  is busy the batch parks as `ingest-pending` and re-triggering resumes
-  without re-downloading. Dated scope basis: SCOPE.md 2026-11-18.
+  Monitor's "⬆️ Upgrades" section: "Nachladen" runs the whole batch
+  (downloads included) under the ingest lock — the 15-min timer cannot
+  sweep staging mid-batch (18.11. lesson). Each downloaded file passes
+  an **identity gate** before it may import: duration within ±5 s of the
+  held track and an audio-fingerprint comparison (fpcalc/pyacoustid)
+  against the OLD file — karaoke/tribute/namesake hits are trashed as
+  `upgrade-namesake` before importing. Artist/title tags are stamped
+  from the held library row (MG sources sometimes write `Unknown`
+  artists), then each file imports as a per-track singleton via as-is,
+  where the usual 2.3/2.8 duplicate comparison decides on quality alone:
+  the better copy stays, the loser moves to `_trash`. Files that cannot
+  reach a source are documented results (`no-source` / `kept`); leftovers
+  in staging mark the batch `partial` and re-triggering resumes without
+  re-downloading. A "Behalten" click removes a track from the batches
+  (decisions survive rescans). Dated scope basis: SCOPE.md 2026-11-18.
 
 ## How decisions are made
 
